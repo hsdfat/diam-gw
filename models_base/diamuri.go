@@ -1,0 +1,39 @@
+package models_base
+
+import "fmt"
+
+// DiameterURI data type.
+type DiameterURI OctetString
+
+// DecodeDiameterURI decodes a DiameterURI from byte array.
+func DecodeDiameterURI(b []byte) (Type, error) {
+	d := make([]byte, len(b))
+	copy(d, b)
+	return DiameterURI(OctetString(d)), nil
+}
+
+// Serialize implements the Type interface.
+func (s DiameterURI) Serialize() []byte {
+	return OctetString(s).Serialize()
+}
+
+// Len implements the Type interface.
+func (s DiameterURI) Len() int {
+	return len(s)
+}
+
+// Padding implements the Type interface.
+func (s DiameterURI) Padding() int {
+	l := len(s)
+	return pad4(l) - l
+}
+
+// Type implements the Type interface.
+func (s DiameterURI) Type() TypeID {
+	return DiameterURIType
+}
+
+// String implements the Type interface.
+func (s DiameterURI) String() string {
+	return fmt.Sprintf("DiameterURI{%s},Padding:%d", string(s), s.Padding())
+}
