@@ -1029,6 +1029,10 @@ func ptrAddress(a models_base.Address) *models_base.Address {
 	return &a
 }
 
+func ptrTime(t models_base.Time) *models_base.Time {
+	return &t
+}
+
 func ptrFloat32(f float32) *models_base.Float32 {
 	v := models_base.Float32(f)
 	return &v
@@ -1393,6 +1397,238 @@ func (g *Generator) generateTestFieldAssignment(buf *bytes.Buffer, field *AVPFie
 	g.generateTestFieldAssignmentWithVar(buf, field, cmdName, "msg", "\t\t")
 }
 
+// generateTestFieldAssignmentWithAllChildren generates code to assign test values with ALL child fields populated
+func (g *Generator) generateTestFieldAssignmentWithAllChildren(buf *bytes.Buffer, field *AVPField, cmdName *string, varName string, indent string) {
+	fieldName := field.FieldName
+	isRepeated := field.Repeated
+	isOptional := !field.Required
+
+	switch field.AVP.TypeName {
+	case "Grouped":
+		// Generate test code for grouped AVP with ALL nested fields populated
+		if field.AVP.GroupedFields != nil && len(field.AVP.GroupedFields) > 0 {
+			groupTypeName := toCamelCase(strings.ReplaceAll(field.AVP.Name, "-", "_"))
+			if isRepeated {
+				buf.WriteString(fmt.Sprintf("%s%s.%s = []*%s{\n", indent, varName, fieldName, groupTypeName))
+				buf.WriteString(fmt.Sprintf("%s\t&%s{\n", indent, groupTypeName))
+			} else {
+				buf.WriteString(fmt.Sprintf("%s%s.%s = &%s{\n", indent, varName, fieldName, groupTypeName))
+			}
+
+			// Generate field assignments for ALL nested fields (not just first few)
+			for _, nestedField := range field.AVP.GroupedFields {
+				nestedFieldName := nestedField.FieldName
+				nestedIsOptional := !nestedField.Required
+				nestedIsRepeated := nestedField.Repeated
+
+				switch nestedField.AVP.TypeName {
+				case "UTF8String":
+					value := "\"test\""
+					if nestedField.AVP.Name == "IMEI" {
+						value = "\"123456789012345\""
+					} else if nestedField.AVP.Name == "Software-Version" {
+						value = "\"01\""
+					} else if strings.Contains(strings.ToLower(nestedField.AVP.Name), "session") {
+						value = "\"client.example.com;1234567890;1\""
+					} else if strings.Contains(strings.ToLower(nestedField.AVP.Name), "product") {
+						value = "\"TestProduct/1.0\""
+					}
+					if nestedIsRepeated {
+						buf.WriteString(fmt.Sprintf("%s\t\t%s: []models_base.UTF8String{models_base.UTF8String(%s)},\n", indent, nestedFieldName, value))
+					} else if nestedIsOptional {
+						buf.WriteString(fmt.Sprintf("%s\t\t%s: ptrUTF8String(%s),\n", indent, nestedFieldName, value))
+					} else {
+						buf.WriteString(fmt.Sprintf("%s\t\t%s: models_base.UTF8String(%s),\n", indent, nestedFieldName, value))
+					}
+				case "OctetString":
+					value := "[]byte{0x01, 0x02, 0x03}"
+					if strings.Contains(strings.ToLower(nestedField.AVP.Name), "meid") {
+						value = "[]byte{0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07}"
+					} else if strings.Contains(strings.ToLower(nestedField.AVP.Name), "plmn") {
+						value = "[]byte{0x00, 0xF1, 0x10}" // Example PLMN ID
+					}
+					if nestedIsRepeated {
+						buf.WriteString(fmt.Sprintf("%s\t\t%s: []models_base.OctetString{models_base.OctetString(%s)},\n", indent, nestedFieldName, value))
+					} else if nestedIsOptional {
+						buf.WriteString(fmt.Sprintf("%s\t\t%s: ptrOctetString(%s),\n", indent, nestedFieldName, value))
+					} else {
+						buf.WriteString(fmt.Sprintf("%s\t\t%s: models_base.OctetString(%s),\n", indent, nestedFieldName, value))
+					}
+				case "DiameterIdentity":
+					value := "\"client.example.com\""
+					if strings.Contains(strings.ToLower(nestedField.AVP.Name), "destination") {
+						value = "\"server.example.com\""
+					}
+					if nestedIsRepeated {
+						buf.WriteString(fmt.Sprintf("%s\t\t%s: []models_base.DiameterIdentity{models_base.DiameterIdentity(%s)},\n", indent, nestedFieldName, value))
+					} else if nestedIsOptional {
+						buf.WriteString(fmt.Sprintf("%s\t\t%s: ptrDiameterIdentity(%s),\n", indent, nestedFieldName, value))
+					} else {
+						buf.WriteString(fmt.Sprintf("%s\t\t%s: models_base.DiameterIdentity(%s),\n", indent, nestedFieldName, value))
+					}
+				case "Unsigned32":
+					value := "1"
+					if strings.Contains(strings.ToLower(nestedField.AVP.Name), "vendor") {
+						value = "10415" // 3GPP
+					} else if strings.Contains(strings.ToLower(nestedField.AVP.Name), "auth") && strings.Contains(strings.ToLower(nestedField.AVP.Name), "application") {
+						value = "16777252" // S13 application ID
+					} else if strings.Contains(strings.ToLower(nestedField.AVP.Name), "acct") && strings.Contains(strings.ToLower(nestedField.AVP.Name), "application") {
+						value = "1" // Accounting application ID
+					}
+					if nestedIsRepeated {
+						buf.WriteString(fmt.Sprintf("%s\t\t%s: []models_base.Unsigned32{models_base.Unsigned32(%s)},\n", indent, nestedFieldName, value))
+					} else if nestedIsOptional {
+						buf.WriteString(fmt.Sprintf("%s\t\t%s: ptrUnsigned32(%s),\n", indent, nestedFieldName, value))
+					} else {
+						buf.WriteString(fmt.Sprintf("%s\t\t%s: models_base.Unsigned32(%s),\n", indent, nestedFieldName, value))
+					}
+				case "Unsigned64":
+					if nestedIsRepeated {
+						buf.WriteString(fmt.Sprintf("%s\t\t%s: []models_base.Unsigned64{models_base.Unsigned64(1)},\n", indent, nestedFieldName))
+					} else if nestedIsOptional {
+						buf.WriteString(fmt.Sprintf("%s\t\t%s: ptrUnsigned64(1),\n", indent, nestedFieldName))
+					} else {
+						buf.WriteString(fmt.Sprintf("%s\t\t%s: models_base.Unsigned64(1),\n", indent, nestedFieldName))
+					}
+				case "Enumerated":
+					if nestedIsRepeated {
+						buf.WriteString(fmt.Sprintf("%s\t\t%s: []models_base.Enumerated{models_base.Enumerated(1)},\n", indent, nestedFieldName))
+					} else if nestedIsOptional {
+						buf.WriteString(fmt.Sprintf("%s\t\t%s: ptrEnumerated(1),\n", indent, nestedFieldName))
+					} else {
+						buf.WriteString(fmt.Sprintf("%s\t\t%s: models_base.Enumerated(1),\n", indent, nestedFieldName))
+					}
+				case "Address":
+					if nestedIsRepeated {
+						buf.WriteString(fmt.Sprintf("%s\t\t%s: []models_base.Address{models_base.Address(net.ParseIP(\"192.168.1.100\"))},\n", indent, nestedFieldName))
+					} else if nestedIsOptional {
+						buf.WriteString(fmt.Sprintf("%s\t\t%s: ptrAddress(models_base.Address(net.ParseIP(\"192.168.1.100\"))),\n", indent, nestedFieldName))
+					} else {
+						buf.WriteString(fmt.Sprintf("%s\t\t%s: models_base.Address(net.ParseIP(\"192.168.1.100\")),\n", indent, nestedFieldName))
+					}
+				case "Time":
+					if nestedIsRepeated {
+						buf.WriteString(fmt.Sprintf("%s\t\t%s: []models_base.Time{models_base.Time(time.Now())},\n", indent, nestedFieldName))
+					} else if nestedIsOptional {
+						buf.WriteString(fmt.Sprintf("%s\t\t%s: ptrTime(models_base.Time(time.Now())),\n", indent, nestedFieldName))
+					} else {
+						buf.WriteString(fmt.Sprintf("%s\t\t%s: models_base.Time(time.Now()),\n", indent, nestedFieldName))
+					}
+				default:
+					// For unknown types, add a comment
+					buf.WriteString(fmt.Sprintf("%s\t\t// %s: nil, // (type: %s) needs to be set\n", indent, nestedFieldName, nestedField.AVP.TypeName))
+				}
+			}
+
+			if isRepeated {
+				buf.WriteString(fmt.Sprintf("%s\t},\n", indent))
+				buf.WriteString(fmt.Sprintf("%s}\n", indent))
+			} else {
+				buf.WriteString(fmt.Sprintf("%s}\n", indent))
+			}
+		}
+	case "DiameterIdentity":
+		value := "\"client.example.com\""
+		if strings.Contains(strings.ToLower(*cmdName), "answer") {
+			value = "\"server.example.com\""
+		} else if strings.Contains(fieldName, "Destination") {
+			value = "\"server.example.com\""
+		}
+		if isRepeated {
+			// Repeated fields use slice literals
+			buf.WriteString(fmt.Sprintf("%s%s.%s = []models_base.DiameterIdentity{models_base.DiameterIdentity(%s)}\n", indent, varName, fieldName, value))
+		} else if isOptional {
+			// Optional fields use pointer helpers
+			buf.WriteString(fmt.Sprintf("%s%s.%s = ptrDiameterIdentity(%s)\n", indent, varName, fieldName, value))
+		} else {
+			// Required fields use direct values
+			buf.WriteString(fmt.Sprintf("%s%s.%s = models_base.DiameterIdentity(%s)\n", indent, varName, fieldName, value))
+		}
+	case "UTF8String":
+		value := "\"test\""
+		if fieldName == "SessionId" || strings.Contains(fieldName, "Session") {
+			value = "\"client.example.com;1234567890;1\""
+		} else if strings.Contains(fieldName, "Product") {
+			value = "\"TestProduct/1.0\""
+		}
+		if isRepeated {
+			buf.WriteString(fmt.Sprintf("%s%s.%s = []models_base.UTF8String{models_base.UTF8String(%s)}\n", indent, varName, fieldName, value))
+		} else if isOptional {
+			buf.WriteString(fmt.Sprintf("%s%s.%s = ptrUTF8String(%s)\n", indent, varName, fieldName, value))
+		} else {
+			buf.WriteString(fmt.Sprintf("%s%s.%s = models_base.UTF8String(%s)\n", indent, varName, fieldName, value))
+		}
+	case "OctetString":
+		value := "[]byte{0x01, 0x02, 0x03}"
+		if strings.Contains(strings.ToLower(fieldName), "plmn") {
+			value = "[]byte{0x00, 0xF1, 0x10}" // Example PLMN ID
+		} else if strings.Contains(strings.ToLower(fieldName), "imsi") {
+			value = "[]byte{0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11}" // Example IMSI
+		}
+		if isRepeated {
+			buf.WriteString(fmt.Sprintf("%s%s.%s = []models_base.OctetString{models_base.OctetString(%s)}\n", indent, varName, fieldName, value))
+		} else if isOptional {
+			buf.WriteString(fmt.Sprintf("%s%s.%s = ptrOctetString(%s)\n", indent, varName, fieldName, value))
+		} else {
+			buf.WriteString(fmt.Sprintf("%s%s.%s = models_base.OctetString(%s)\n", indent, varName, fieldName, value))
+		}
+	case "Unsigned32":
+		var value string
+		var comment string
+		if fieldName == "ResultCode" || strings.Contains(fieldName, "Result") {
+			value = "2001"
+			comment = " // DIAMETER_SUCCESS"
+		} else if fieldName == "VendorId" || strings.Contains(fieldName, "Vendor") {
+			value = "10415"
+			comment = " // 3GPP"
+		} else {
+			value = "1"
+			comment = ""
+		}
+		if isRepeated {
+			buf.WriteString(fmt.Sprintf("%s%s.%s = []models_base.Unsigned32{models_base.Unsigned32(%s)}%s\n", indent, varName, fieldName, value, comment))
+		} else if isOptional {
+			buf.WriteString(fmt.Sprintf("%s%s.%s = ptrUnsigned32(%s)%s\n", indent, varName, fieldName, value, comment))
+		} else {
+			buf.WriteString(fmt.Sprintf("%s%s.%s = models_base.Unsigned32(%s)%s\n", indent, varName, fieldName, value, comment))
+		}
+	case "Unsigned64":
+		if isRepeated {
+			buf.WriteString(fmt.Sprintf("%s%s.%s = []models_base.Unsigned64{models_base.Unsigned64(1)}\n", indent, varName, fieldName))
+		} else if isOptional {
+			buf.WriteString(fmt.Sprintf("%s%s.%s = ptrUnsigned64(1)\n", indent, varName, fieldName))
+		} else {
+			buf.WriteString(fmt.Sprintf("%s%s.%s = models_base.Unsigned64(1)\n", indent, varName, fieldName))
+		}
+	case "Enumerated":
+		value := "1"
+		if isRepeated {
+			buf.WriteString(fmt.Sprintf("%s%s.%s = []models_base.Enumerated{models_base.Enumerated(%s)}\n", indent, varName, fieldName, value))
+		} else if isOptional {
+			buf.WriteString(fmt.Sprintf("%s%s.%s = ptrEnumerated(%s)\n", indent, varName, fieldName, value))
+		} else {
+			buf.WriteString(fmt.Sprintf("%s%s.%s = models_base.Enumerated(%s)\n", indent, varName, fieldName, value))
+		}
+	case "Address":
+		if isOptional {
+			buf.WriteString(fmt.Sprintf("%s%s.%s = ptrAddress(models_base.Address(net.ParseIP(\"192.168.1.100\")))\n", indent, varName, fieldName))
+		} else {
+			buf.WriteString(fmt.Sprintf("%s%s.%s = []models_base.Address{\n", indent, varName, fieldName))
+			buf.WriteString(fmt.Sprintf("%s\tmodels_base.Address(net.ParseIP(\"192.168.1.100\")),\n", indent))
+			buf.WriteString(fmt.Sprintf("%s}\n", indent))
+		}
+	case "Time":
+		if isOptional {
+			buf.WriteString(fmt.Sprintf("%s%s.%s = ptrTime(models_base.Time(time.Now()))\n", indent, varName, fieldName))
+		} else {
+			buf.WriteString(fmt.Sprintf("%s%s.%s = models_base.Time(time.Now())\n", indent, varName, fieldName))
+		}
+	default:
+		// For other types, add a comment
+		buf.WriteString(fmt.Sprintf("%s// %s.%s needs to be set manually (type: %s)\n", indent, varName, fieldName, field.AVP.TypeName))
+	}
+}
+
 // generateTestFieldAssignmentWithVar generates code to assign test values to a field with custom variable name and indentation
 func (g *Generator) generateTestFieldAssignmentWithVar(buf *bytes.Buffer, field *AVPField, cmdName *string, varName string, indent string) {
 	fieldName := field.FieldName
@@ -1649,14 +1885,24 @@ func (g *Generator) generateCommandPcapTest(buf *bytes.Buffer, cmd *CommandDefin
 	buf.WriteString(fmt.Sprintf("\tpcapFile := filepath.Join(\"testdata\", \"%s\")\n", pcapFileName))
 	buf.WriteString("\t// PCAP files are kept for Wireshark analysis\n\n")
 
-	buf.WriteString(fmt.Sprintf("\t// Create %s message\n", msgType))
-	buf.WriteString(fmt.Sprintf("\tmsg := New%s()\n", structName))
+	buf.WriteString(fmt.Sprintf("\t// Create %s message with ALL fields populated\n", msgType))
+	buf.WriteString(fmt.Sprintf("\tmsg := New%s()\n\n", structName))
 
-	// Set required fields
+	// Set ALL fields (required and optional) for complete PCAP examples
 	cmdName := cmd.Name
+
+	// Group fields by required/optional for better organization
+	buf.WriteString("\t// Required fields\n")
 	for _, field := range cmd.Fields {
 		if field.Required {
-			g.generateTestFieldAssignment(buf, field, &cmdName)
+			g.generateTestFieldAssignmentWithAllChildren(buf, field, &cmdName, "msg", "\t")
+		}
+	}
+
+	buf.WriteString("\n\t// Optional fields (for complete PCAP examples)\n")
+	for _, field := range cmd.Fields {
+		if !field.Required {
+			g.generateTestFieldAssignmentWithAllChildren(buf, field, &cmdName, "msg", "\t")
 		}
 	}
 

@@ -242,8 +242,10 @@ func TestMEIdentityCheckRequest_PCAP(t *testing.T) {
 	pcapFile := filepath.Join("testdata", "test_micr.pcap")
 	// PCAP files are kept for Wireshark analysis
 
-	// Create Request message
+	// Create Request message with ALL fields populated
 	msg := NewMEIdentityCheckRequest()
+
+	// Required fields
 	msg.SessionId = models_base.UTF8String("client.example.com;1234567890;1")
 	msg.AuthSessionState = models_base.Enumerated(1)
 	msg.OriginHost = models_base.DiameterIdentity("client.example.com")
@@ -251,9 +253,27 @@ func TestMEIdentityCheckRequest_PCAP(t *testing.T) {
 	msg.DestinationRealm = models_base.DiameterIdentity("server.example.com")
 	msg.TerminalInformation = &TerminalInformation{
 		Imei:            ptrUTF8String("123456789012345"),
-		Meid:            ptrOctetString([]byte{0x01, 0x02, 0x03}),
+		Meid:            ptrOctetString([]byte{0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07}),
 		SoftwareVersion: ptrUTF8String("01"),
 	}
+
+	// Optional fields (for complete PCAP examples)
+	msg.Drmp = ptrOctetString([]byte{0x01, 0x02, 0x03})
+	msg.VendorSpecificApplicationId = &VendorSpecificApplicationId{
+		VendorId:          ptrUnsigned32(10415),
+		AuthApplicationId: ptrUnsigned32(16777252),
+		AcctApplicationId: ptrUnsigned32(1),
+	}
+	msg.DestinationHost = ptrDiameterIdentity("server.example.com")
+	msg.UserName = ptrUTF8String("test")
+	msg.Avp = []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})}
+	msg.ProxyInfo = []*ProxyInfo{
+		&ProxyInfo{
+			ProxyHost:  models_base.DiameterIdentity("client.example.com"),
+			ProxyState: models_base.OctetString([]byte{0x01, 0x02, 0x03}),
+		},
+	}
+	msg.RouteRecord = []models_base.DiameterIdentity{models_base.DiameterIdentity("client.example.com")}
 
 	// Set header identifiers
 	msg.Header.HopByHopID = 0x12345678
@@ -295,12 +315,39 @@ func TestMEIdentityCheckAnswer_PCAP(t *testing.T) {
 	pcapFile := filepath.Join("testdata", "test_mica.pcap")
 	// PCAP files are kept for Wireshark analysis
 
-	// Create Answer message
+	// Create Answer message with ALL fields populated
 	msg := NewMEIdentityCheckAnswer()
+
+	// Required fields
 	msg.SessionId = models_base.UTF8String("client.example.com;1234567890;1")
 	msg.AuthSessionState = models_base.Enumerated(1)
 	msg.OriginHost = models_base.DiameterIdentity("server.example.com")
 	msg.OriginRealm = models_base.DiameterIdentity("server.example.com")
+
+	// Optional fields (for complete PCAP examples)
+	msg.ResultCode = ptrUnsigned32(2001) // DIAMETER_SUCCESS
+	msg.ExperimentalResult = &ExperimentalResult{
+		VendorId:               models_base.Unsigned32(10415),
+		ExperimentalResultCode: models_base.Unsigned32(1),
+	}
+	msg.EquipmentStatus = ptrEnumerated(1)
+	msg.Drmp = ptrOctetString([]byte{0x01, 0x02, 0x03})
+	msg.VendorSpecificApplicationId = &VendorSpecificApplicationId{
+		VendorId:          ptrUnsigned32(10415),
+		AuthApplicationId: ptrUnsigned32(16777252),
+		AcctApplicationId: ptrUnsigned32(1),
+	}
+	msg.Avp = []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})}
+	msg.FailedAvp = &FailedAVP{
+		Avp: []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})},
+	}
+	msg.ProxyInfo = []*ProxyInfo{
+		&ProxyInfo{
+			ProxyHost:  models_base.DiameterIdentity("client.example.com"),
+			ProxyState: models_base.OctetString([]byte{0x01, 0x02, 0x03}),
+		},
+	}
+	msg.RouteRecord = []models_base.DiameterIdentity{models_base.DiameterIdentity("server.example.com")}
 
 	// Set header identifiers
 	msg.Header.HopByHopID = 0x12345678
