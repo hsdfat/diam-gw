@@ -1,4 +1,4 @@
-// S6a/S6d Interface Diameter Protocol Definition
+// Diameter S6a/S6d Interface Application
 // Based on 3GPP TS 29.272 v16.5.0
 // Interface between MME/SGSN and HSS
 
@@ -8,66 +8,217 @@ package diameter.s6a;
 
 option go_package = "github.com/hsdfat8/diam-gw/commands/s6a";
 
-// Application ID for S6a/S6d
+// ================================================================================
+//                         APPLICATION IDENTIFIER
+// ================================================================================
+// S6a/S6d Application ID: 16777251 (allocated by IANA)
+// Vendor ID: 10415 (3GPP)
+
 const S6A_APPLICATION_ID = 16777251;
 const VENDOR_ID_3GPP = 10415;
 
-// ============================================================================
-// AVP Definitions - 3GPP Vendor Specific (Vendor-Id: 10415)
-// ============================================================================
+// ================================================================================
+//                         COMMAND CODE VALUES
+// ================================================================================
+// Table 7.2.2/1: Command-Code values for S6a/S6d
 
-// --- Basic AVPs ---
+const ULR_COMMAND_CODE = 316;  // Update-Location-Request/Answer
+const CLR_COMMAND_CODE = 317;  // Cancel-Location-Request/Answer
+const AIR_COMMAND_CODE = 318;  // Authentication-Information-Request/Answer
+const IDR_COMMAND_CODE = 319;  // Insert-Subscriber-Data-Request/Answer
+const DSR_COMMAND_CODE = 320;  // Delete-Subscriber-Data-Request/Answer
+const PUR_COMMAND_CODE = 321;  // Purge-UE-Request/Answer
+const RSR_COMMAND_CODE = 322;  // Reset-Request/Answer
+const NOR_COMMAND_CODE = 323;  // Notify-Request/Answer
 
+// ================================================================================
+//                         ENUMERATED VALUE DEFINITIONS
+// ================================================================================
+
+// Cancellation-Type (AVP Code 1420)
+enum CancellationType {
+  MME_UPDATE_PROCEDURE = 0;
+  SGSN_UPDATE_PROCEDURE = 1;
+  SUBSCRIPTION_WITHDRAWAL = 2;
+  UPDATE_PROCEDURE_IWF = 3;
+  INITIAL_ATTACH_PROCEDURE = 4;
+}
+
+// Network-Access-Mode (AVP Code 1417)
+enum NetworkAccessMode {
+  PACKET_AND_CIRCUIT = 0;
+  Reserved = 1;
+  ONLY_PACKET = 2;
+}
+
+// Subscriber-Status (AVP Code 1424)
+enum SubscriberStatus {
+  SERVICE_GRANTED = 0;
+  OPERATOR_DETERMINED_BARRING = 1;
+}
+
+// All-APN-Configurations-Included-Indicator (AVP Code 1428)
+enum AllAPNConfigurationsIncludedIndicator {
+  All_APN_CONFIGURATIONS_INCLUDED = 0;
+  MODIFIED_ADDED_APN_CONFIGURATIONS_INCLUDED = 1;
+}
+
+// PDN-GW-Allocation-Type (AVP Code 1438)
+enum PDNGWAllocationType {
+  STATIC = 0;
+  DYNAMIC = 1;
+}
+
+// VPLMN-Dynamic-Address-Allowed (AVP Code 1432)
+enum VPLMNDynamicAddressAllowed {
+  NOTALLOWED = 0;
+  ALLOWED = 1;
+}
+
+// Alert-Reason (AVP Code 1434)
+enum AlertReason {
+  UE_PRESENT = 0;
+  UE_MEMORY_AVAILABLE = 1;
+}
+
+// Equipment-Status (AVP Code 1445)
+enum EquipmentStatus {
+  WHITELISTED = 0;
+  BLACKLISTED = 1;
+  GREYLISTED = 2;
+}
+
+// UE-SRVCC-Capability (AVP Code 1615)
+enum UESRVCCCapability {
+  UE_SRVCC_NOT_SUPPORTED = 0;
+  UE_SRVCC_SUPPORTED = 1;
+}
+
+// SMS-Register-Request (AVP Code 1648)
+enum SMSRegisterRequest {
+  SMS_REGISTRATION_REQUIRED = 0;
+  SMS_REGISTRATION_NOT_PREFERRED = 1;
+  NO_PREFERENCE = 2;
+}
+
+// ================================================================================
+//                         S6a SPECIFIC AVP DEFINITIONS
+// ================================================================================
+
+// Subscription-Data (AVP Code 1400) - Grouped
 avp Subscription-Data {
   code = 1400;
   vendor_id = 10415;
   type = Grouped;
   must = true;
   may_encrypt = false;
+  description = "Contains the subscription data for the user";
+
+  grouped {
+    optional Subscriber-Status subscriber_status = 1;
+    optional MSISDN msisdn = 2;
+    optional A-MSISDN a_msisdn = 3;
+    optional STN-SR stn_sr = 4;
+    optional ICS-Indicator ics_indicator = 5;
+    optional Network-Access-Mode network_access_mode = 6;
+    optional Operator-Determined-Barring operator_determined_barring = 7;
+    optional HPLMN-ODB hplmn_odb = 8;
+    repeated Regional-Subscription-Zone-Code regional_subscription_zone_code = 9;
+    optional Access-Restriction-Data access_restriction_data = 10;
+    optional APN-OI-Replacement apn_oi_replacement = 11;
+    optional LCS-Info lcs_info = 12;
+    optional Teleservice-List teleservice_list = 13;
+    repeated Call-Barring-Info call_barring_info = 14;
+    optional 3GPP-Charging-Characteristics charging_characteristics = 15;
+    optional AMBR ambr = 16;
+    optional APN-Configuration-Profile apn_configuration_profile = 17;
+    optional RAT-Frequency-Selection-Priority-ID rat_frequency_selection_priority_id = 18;
+    optional Trace-Data trace_data = 19;
+    optional GPRS-Subscription-Data gprs_subscription_data = 20;
+    repeated CSG-Subscription-Data csg_subscription_data = 21;
+    optional Roaming-Restricted-Due-To-Unsupported-Feature roaming_restricted = 22;
+    optional Subscribed-Periodic-RAU-TAU-Timer subscribed_periodic_rau_tau_timer = 23;
+    optional MPS-Priority mps_priority = 24;
+    optional VPLMN-LIPA-Allowed vplmn_lipa_allowed = 25;
+    optional Relay-Node-Indicator relay_node_indicator = 26;
+    optional MDT-User-Consent mdt_user_consent = 27;
+    optional Subscribed-VSRVCC subscribed_vsrvcc = 28;
+    optional ProSe-Subscription-Data prose_subscription_data = 29;
+    optional Subscription-Data-Flags subscription_data_flags = 30;
+    repeated Adjacent-Access-Restriction-Data adjacent_access_restriction_data = 31;
+    optional DL-Buffering-Suggested-Packet-Count dl_buffering_suggested_packet_count = 32;
+    repeated IMSI-Group-Id imsi_group_id = 33;
+    optional UE-Usage-Type ue_usage_type = 34;
+    repeated AESE-Communication-Pattern aese_communication_pattern = 35;
+    repeated Monitoring-Event-Configuration monitoring_event_configuration = 36;
+    optional Emergency-Info emergency_info = 37;
+    optional V2X-Subscription-Data v2x_subscription_data = 38;
+    optional eDRX-Cycle-Length edrx_cycle_length = 39;
+    optional External-Identifier external_identifier = 40;
+    optional Active-Time active_time = 41;
+    optional Service-Gap-Time service_gap_time = 42;
+    optional Broadcast-Location-Assistance-Data-Types broadcast_location_assistance_data_types = 43;
+    optional Aerial-UE-Subscription-Information aerial_ue_subscription_information = 44;
+    optional Core-Network-Restrictions core_network_restrictions = 45;
+  }
 }
 
+// Terminal-Information (AVP Code 1401) - Grouped
 avp Terminal-Information {
   code = 1401;
   vendor_id = 10415;
   type = Grouped;
   must = true;
   may_encrypt = false;
+  description = "Contains information about the user's mobile equipment";
+
+  grouped {
+    optional IMEI imei = 1;                        // Code 1402
+    optional 3GPP2-MEID meid = 2;                  // Code 1471
+    optional Software-Version software_version = 3; // Code 1403
+  }
 }
 
+// IMEI (AVP Code 1402)
 avp IMEI {
   code = 1402;
   vendor_id = 10415;
   type = UTF8String;
   must = true;
   may_encrypt = false;
+  description = "International Mobile Equipment Identity";
 }
 
+// Software-Version (AVP Code 1403)
 avp Software-Version {
   code = 1403;
   vendor_id = 10415;
   type = UTF8String;
   must = true;
   may_encrypt = false;
+  description = "Software version of the mobile equipment";
 }
 
+// 3GPP2-MEID (AVP Code 1471)
 avp 3GPP2-MEID {
   code = 1471;
   vendor_id = 10415;
   type = OctetString;
   must = true;
   may_encrypt = false;
+  description = "Mobile Equipment Identifier for 3GPP2";
 }
 
-// --- ULR/ULA AVPs ---
-
+// ULR-Flags (AVP Code 1405)
 avp ULR-Flags {
   code = 1405;
   vendor_id = 10415;
   type = Unsigned32;
   must = true;
   may_encrypt = false;
+  description = "Bit mask for Update Location Request flags";
   // Bit 0: Single-Registration-Indication
-  // Bit 1: S6a/S6d-Indicator
+  // Bit 1: S6a/S6d-Indicator (0=S6a, 1=S6d)
   // Bit 2: Skip-Subscriber-Data
   // Bit 3: GPRS-Subscription-Data-Indicator
   // Bit 4: Node-Type-Indicator
@@ -76,1251 +227,660 @@ avp ULR-Flags {
   // Bit 7: SMS-Only-Indication
 }
 
+// ULA-Flags (AVP Code 1406)
 avp ULA-Flags {
   code = 1406;
   vendor_id = 10415;
   type = Unsigned32;
   must = true;
   may_encrypt = false;
+  description = "Bit mask for Update Location Answer flags";
   // Bit 0: Separation Indication
   // Bit 1: MME Registered for SMS
 }
 
+// Visited-PLMN-Id (AVP Code 1407)
 avp Visited-PLMN-Id {
   code = 1407;
   vendor_id = 10415;
   type = OctetString;
   must = true;
   may_encrypt = false;
+  description = "MCC and MNC of the visited PLMN (3 bytes)";
 }
 
-// --- Authentication AVPs ---
-
+// Requested-EUTRAN-Authentication-Info (AVP Code 1408) - Grouped
 avp Requested-EUTRAN-Authentication-Info {
   code = 1408;
   vendor_id = 10415;
   type = Grouped;
   must = true;
   may_encrypt = false;
+  description = "Contains E-UTRAN authentication request information";
+
+  grouped {
+    optional Number-Of-Requested-Vectors number_of_requested_vectors = 1;  // Code 1410
+    optional Immediate-Response-Preferred immediate_response_preferred = 2; // Code 1412
+    optional Re-Synchronization-Info re_synchronization_info = 3;          // Code 1411
+  }
 }
 
+// Requested-UTRAN-GERAN-Authentication-Info (AVP Code 1409) - Grouped
 avp Requested-UTRAN-GERAN-Authentication-Info {
   code = 1409;
   vendor_id = 10415;
   type = Grouped;
   must = true;
   may_encrypt = false;
+  description = "Contains UTRAN/GERAN authentication request information";
+
+  grouped {
+    optional Number-Of-Requested-Vectors number_of_requested_vectors = 1;
+    optional Immediate-Response-Preferred immediate_response_preferred = 2;
+    optional Re-Synchronization-Info re_synchronization_info = 3;
+  }
 }
 
+// Number-Of-Requested-Vectors (AVP Code 1410)
 avp Number-Of-Requested-Vectors {
   code = 1410;
   vendor_id = 10415;
   type = Unsigned32;
   must = true;
   may_encrypt = false;
+  description = "Number of authentication vectors requested";
 }
 
+// Re-Synchronization-Info (AVP Code 1411)
 avp Re-Synchronization-Info {
   code = 1411;
   vendor_id = 10415;
   type = OctetString;
   must = true;
   may_encrypt = false;
+  description = "Contains RAND and AUTS for resynchronization";
 }
 
+// Immediate-Response-Preferred (AVP Code 1412)
 avp Immediate-Response-Preferred {
   code = 1412;
   vendor_id = 10415;
   type = Unsigned32;
   must = true;
   may_encrypt = false;
+  description = "Indicates vectors are needed for immediate use";
 }
 
+// Authentication-Info (AVP Code 1413) - Grouped
 avp Authentication-Info {
   code = 1413;
   vendor_id = 10415;
   type = Grouped;
   must = true;
   may_encrypt = false;
+  description = "Contains authentication vectors";
+
+  grouped {
+    repeated E-UTRAN-Vector e_utran_vector = 1;  // Code 1414
+    repeated UTRAN-Vector utran_vector = 2;      // Code 1415
+    repeated GERAN-Vector geran_vector = 3;      // Code 1416
+  }
 }
 
+// E-UTRAN-Vector (AVP Code 1414) - Grouped
 avp E-UTRAN-Vector {
   code = 1414;
   vendor_id = 10415;
   type = Grouped;
   must = true;
   may_encrypt = false;
+  description = "Contains E-UTRAN authentication vector";
+
+  grouped {
+    optional Item-Number item_number = 1;  // Code 1419
+    required RAND rand = 2;                // Code 1447
+    required XRES xres = 3;                // Code 1448
+    required AUTN autn = 4;                // Code 1449
+    required KASME kasme = 5;              // Code 1450
+  }
 }
 
+// UTRAN-Vector (AVP Code 1415) - Grouped
 avp UTRAN-Vector {
   code = 1415;
   vendor_id = 10415;
   type = Grouped;
   must = true;
   may_encrypt = false;
+  description = "Contains UTRAN authentication vector";
+
+  grouped {
+    optional Item-Number item_number = 1;
+    required RAND rand = 2;
+    required XRES xres = 3;
+    required AUTN autn = 4;
+    required Confidentiality-Key ck = 5;   // Code 1451
+    required Integrity-Key ik = 6;          // Code 1452
+  }
 }
 
+// GERAN-Vector (AVP Code 1416) - Grouped
 avp GERAN-Vector {
   code = 1416;
   vendor_id = 10415;
   type = Grouped;
   must = true;
   may_encrypt = false;
+  description = "Contains GERAN authentication vector";
+
+  grouped {
+    optional Item-Number item_number = 1;
+    required RAND rand = 2;
+    required SRES sres = 3;                // Code 1454
+    required Kc kc = 4;                    // Code 1453
+  }
 }
 
-avp RAND {
-  code = 1447;
-  vendor_id = 10415;
-  type = OctetString;
-  must = true;
-  may_encrypt = false;
-}
-
-avp XRES {
-  code = 1448;
-  vendor_id = 10415;
-  type = OctetString;
-  must = true;
-  may_encrypt = false;
-}
-
-avp AUTN {
-  code = 1449;
-  vendor_id = 10415;
-  type = OctetString;
-  must = true;
-  may_encrypt = false;
-}
-
-avp KASME {
-  code = 1450;
-  vendor_id = 10415;
-  type = OctetString;
-  must = true;
-  may_encrypt = false;
-}
-
-avp Kc {
-  code = 1453;
-  vendor_id = 10415;
-  type = OctetString;
-  must = true;
-  may_encrypt = false;
-}
-
-avp SRES {
-  code = 1454;
-  vendor_id = 10415;
-  type = OctetString;
-  must = true;
-  may_encrypt = false;
-}
-
+// Item-Number (AVP Code 1419)
 avp Item-Number {
   code = 1419;
   vendor_id = 10415;
   type = Unsigned32;
   must = true;
   may_encrypt = false;
+  description = "Ordering number for multiple vectors";
 }
 
-avp AIR-Flags {
-  code = 1679;
+// RAND (AVP Code 1447)
+avp RAND {
+  code = 1447;
   vendor_id = 10415;
-  type = Unsigned32;
-  must = false;
-  may_encrypt = false;
-}
-
-// --- Network/Subscription AVPs ---
-
-avp Network-Access-Mode {
-  code = 1417;
-  vendor_id = 10415;
-  type = Enumerated;
+  type = OctetString;
   must = true;
   may_encrypt = false;
-  // 0: PACKET_AND_CIRCUIT
-  // 1: Reserved
-  // 2: ONLY_PACKET
+  description = "Random challenge (16 bytes)";
 }
 
-avp HPLMN-ODB {
-  code = 1418;
+// XRES (AVP Code 1448)
+avp XRES {
+  code = 1448;
   vendor_id = 10415;
-  type = Unsigned32;
+  type = OctetString;
   must = true;
   may_encrypt = false;
+  description = "Expected response";
 }
 
+// AUTN (AVP Code 1449)
+avp AUTN {
+  code = 1449;
+  vendor_id = 10415;
+  type = OctetString;
+  must = true;
+  may_encrypt = false;
+  description = "Authentication token (16 bytes)";
+}
+
+// KASME (AVP Code 1450)
+avp KASME {
+  code = 1450;
+  vendor_id = 10415;
+  type = OctetString;
+  must = true;
+  may_encrypt = false;
+  description = "Key for E-UTRAN (32 bytes)";
+}
+
+// Confidentiality-Key (AVP Code 1451)
+avp Confidentiality-Key {
+  code = 1451;
+  vendor_id = 10415;
+  type = OctetString;
+  must = true;
+  may_encrypt = false;
+  description = "Ciphering key CK (16 bytes)";
+}
+
+// Integrity-Key (AVP Code 1452)
+avp Integrity-Key {
+  code = 1452;
+  vendor_id = 10415;
+  type = OctetString;
+  must = true;
+  may_encrypt = false;
+  description = "Integrity key IK (16 bytes)";
+}
+
+// Kc (AVP Code 1453)
+avp Kc {
+  code = 1453;
+  vendor_id = 10415;
+  type = OctetString;
+  must = true;
+  may_encrypt = false;
+  description = "GERAN ciphering key (8 bytes)";
+}
+
+// SRES (AVP Code 1454)
+avp SRES {
+  code = 1454;
+  vendor_id = 10415;
+  type = OctetString;
+  must = true;
+  may_encrypt = false;
+  description = "Signed response (4 bytes)";
+}
+
+// Cancellation-Type (AVP Code 1420)
 avp Cancellation-Type {
   code = 1420;
   vendor_id = 10415;
   type = Enumerated;
   must = true;
   may_encrypt = false;
-  // 0: MME_UPDATE_PROCEDURE
-  // 1: SGSN_UPDATE_PROCEDURE
-  // 2: SUBSCRIPTION_WITHDRAWAL
-  // 3: UPDATE_PROCEDURE_IWF
-  // 4: INITIAL_ATTACH_PROCEDURE
+  description = "Reason for cancel location";
 }
 
-avp CLR-Flags {
-  code = 1638;
-  vendor_id = 10415;
-  type = Unsigned32;
-  must = false;
-  may_encrypt = false;
-}
-
+// DSR-Flags (AVP Code 1421)
 avp DSR-Flags {
   code = 1421;
   vendor_id = 10415;
   type = Unsigned32;
   must = true;
   may_encrypt = false;
+  description = "Bit mask for Delete Subscriber Data Request flags";
+  // Bit 0: Regional Subscription Withdrawal
+  // Bit 1: Complete APN Configuration Profile Withdrawal
+  // Bit 2: Subscribed Charging Characteristics Withdrawal
+  // Bit 3: PDN subscription contexts Withdrawal
+  // Bit 4: STN-SR
+  // Bit 5: Complete PDP context list Withdrawal
+  // Bit 6: PDP contexts Withdrawal
+  // Bit 7: Roaming Restricted Due To Unsupported Feature
+  // Bit 8: Trace Data Withdrawal
+  // Bit 9: CSG Deleted
+  // Bit 10: APN-OI-Replacement
+  // ...more bits defined
 }
 
+// DSA-Flags (AVP Code 1422)
 avp DSA-Flags {
   code = 1422;
   vendor_id = 10415;
   type = Unsigned32;
   must = true;
   may_encrypt = false;
+  description = "Bit mask for Delete Subscriber Data Answer flags";
 }
 
+// Context-Identifier (AVP Code 1423)
 avp Context-Identifier {
   code = 1423;
   vendor_id = 10415;
   type = Unsigned32;
   must = true;
   may_encrypt = false;
+  description = "Identifies an APN Configuration";
 }
 
+// Subscriber-Status (AVP Code 1424)
 avp Subscriber-Status {
   code = 1424;
   vendor_id = 10415;
   type = Enumerated;
   must = true;
   may_encrypt = false;
-  // 0: SERVICE_GRANTED
-  // 1: OPERATOR_DETERMINED_BARRING
+  description = "Status of the subscriber";
 }
 
+// Operator-Determined-Barring (AVP Code 1425)
 avp Operator-Determined-Barring {
   code = 1425;
   vendor_id = 10415;
   type = Unsigned32;
   must = true;
   may_encrypt = false;
+  description = "Bit mask of barring categories";
 }
 
+// Access-Restriction-Data (AVP Code 1426)
 avp Access-Restriction-Data {
   code = 1426;
   vendor_id = 10415;
   type = Unsigned32;
   must = true;
   may_encrypt = false;
+  description = "Bit mask of access restrictions";
 }
 
+// APN-OI-Replacement (AVP Code 1427)
 avp APN-OI-Replacement {
   code = 1427;
   vendor_id = 10415;
   type = UTF8String;
   must = true;
   may_encrypt = false;
+  description = "APN Operator Identifier replacement";
 }
 
+// All-APN-Configurations-Included-Indicator (AVP Code 1428)
 avp All-APN-Configurations-Included-Indicator {
   code = 1428;
   vendor_id = 10415;
   type = Enumerated;
   must = true;
   may_encrypt = false;
-  // 0: All_APN_CONFIGURATIONS_INCLUDED
-  // 1: MODIFIED/ADDED_APN_CONFIGURATIONS_INCLUDED
+  description = "Indicates if all APNs are included";
 }
 
+// APN-Configuration-Profile (AVP Code 1429) - Grouped
 avp APN-Configuration-Profile {
   code = 1429;
   vendor_id = 10415;
   type = Grouped;
   must = true;
   may_encrypt = false;
+  description = "Contains APN configurations";
+
+  grouped {
+    required Context-Identifier context_identifier = 1;
+    required All-APN-Configurations-Included-Indicator all_apn_config_included = 2;
+    repeated APN-Configuration apn_configuration = 3;
+  }
 }
 
+// APN-Configuration (AVP Code 1430) - Grouped
 avp APN-Configuration {
   code = 1430;
   vendor_id = 10415;
   type = Grouped;
   must = true;
   may_encrypt = false;
+  description = "Contains single APN configuration";
+
+  grouped {
+    required Context-Identifier context_identifier = 1;
+    repeated Served-Party-IP-Address served_party_ip_address = 2;
+    required PDN-Type pdn_type = 3;
+    required Service-Selection service_selection = 4;
+    optional EPS-Subscribed-QoS-Profile eps_subscribed_qos_profile = 5;
+    optional VPLMN-Dynamic-Address-Allowed vplmn_dynamic_address_allowed = 6;
+    optional MIP6-Agent-Info mip6_agent_info = 7;
+    optional Visited-Network-Identifier visited_network_identifier = 8;
+    optional PDN-GW-Allocation-Type pdn_gw_allocation_type = 9;
+    optional 3GPP-Charging-Characteristics charging_characteristics = 10;
+    optional AMBR ambr = 11;
+    repeated Specific-APN-Info specific_apn_info = 12;
+    optional APN-OI-Replacement apn_oi_replacement = 13;
+    optional SIPTO-Permission sipto_permission = 14;
+    optional LIPA-Permission lipa_permission = 15;
+    optional Restoration-Priority restoration_priority = 16;
+    optional SIPTO-Local-Network-Permission sipto_local_network_permission = 17;
+    optional WLAN-offloadability wlan_offloadability = 18;
+    optional Non-IP-PDN-Type-Indicator non_ip_pdn_type_indicator = 19;
+    optional Non-IP-Data-Delivery-Mechanism non_ip_data_delivery_mechanism = 20;
+    optional SCEF-ID scef_id = 21;
+    optional SCEF-Realm scef_realm = 22;
+    optional Preferred-Data-Mode preferred_data_mode = 23;
+    optional PDN-Connection-Continuity pdn_connection_continuity = 24;
+  }
 }
 
+// EPS-Subscribed-QoS-Profile (AVP Code 1431) - Grouped
 avp EPS-Subscribed-QoS-Profile {
   code = 1431;
   vendor_id = 10415;
   type = Grouped;
   must = true;
   may_encrypt = false;
+  description = "Contains subscribed QoS profile for EPS";
+
+  grouped {
+    required QoS-Class-Identifier qos_class_identifier = 1;
+    required Allocation-Retention-Priority allocation_retention_priority = 2;
+  }
 }
 
-avp VPLMN-Dynamic-Address-Allowed {
-  code = 1432;
-  vendor_id = 10415;
-  type = Enumerated;
-  must = true;
-  may_encrypt = false;
-  // 0: NOTALLOWED
-  // 1: ALLOWED
-}
-
-avp STN-SR {
-  code = 1433;
-  vendor_id = 10415;
-  type = OctetString;
-  must = true;
-  may_encrypt = false;
-}
-
-avp Alert-Reason {
-  code = 1434;
-  vendor_id = 10415;
-  type = Enumerated;
-  must = true;
-  may_encrypt = false;
-  // 0: UE_PRESENT
-  // 1: UE_MEMORY_AVAILABLE
-}
-
+// AMBR (AVP Code 1435) - Grouped
 avp AMBR {
   code = 1435;
   vendor_id = 10415;
   type = Grouped;
   must = true;
   may_encrypt = false;
+  description = "Aggregate Maximum Bit Rate";
+
+  grouped {
+    required Max-Requested-Bandwidth-UL max_requested_bandwidth_ul = 1;
+    required Max-Requested-Bandwidth-DL max_requested_bandwidth_dl = 2;
+    optional Extended-Max-Requested-BW-UL extended_max_requested_bw_ul = 3;
+    optional Extended-Max-Requested-BW-DL extended_max_requested_bw_dl = 4;
+  }
 }
 
-avp Max-Requested-Bandwidth-UL {
-  code = 516;
-  vendor_id = 10415;
-  type = Unsigned32;
-  must = true;
-  may_encrypt = false;
-}
-
-avp Max-Requested-Bandwidth-DL {
-  code = 515;
-  vendor_id = 10415;
-  type = Unsigned32;
-  must = true;
-  may_encrypt = false;
-}
-
+// CSG-Subscription-Data (AVP Code 1436) - Grouped
 avp CSG-Subscription-Data {
   code = 1436;
   vendor_id = 10415;
   type = Grouped;
   must = true;
   may_encrypt = false;
-}
-
-avp CSG-Id {
-  code = 1437;
-  vendor_id = 10415;
-  type = Unsigned32;
-  must = true;
-  may_encrypt = false;
-}
-
-avp PDN-GW-Allocation-Type {
-  code = 1438;
-  vendor_id = 10415;
-  type = Enumerated;
-  must = true;
-  may_encrypt = false;
-  // 0: STATIC
-  // 1: DYNAMIC
-}
-
-avp Expiration-Date {
-  code = 1439;
-  vendor_id = 10415;
-  type = Time;
-  must = true;
-  may_encrypt = false;
-}
-
-avp RAT-Frequency-Selection-Priority-ID {
-  code = 1440;
-  vendor_id = 10415;
-  type = Unsigned32;
-  must = true;
-  may_encrypt = false;
-}
-
-avp IDA-Flags {
-  code = 1441;
-  vendor_id = 10415;
-  type = Unsigned32;
-  must = true;
-  may_encrypt = false;
-}
-
-avp PUA-Flags {
-  code = 1442;
-  vendor_id = 10415;
-  type = Unsigned32;
-  must = true;
-  may_encrypt = false;
-}
-
-avp NOR-Flags {
-  code = 1443;
-  vendor_id = 10415;
-  type = Unsigned32;
-  must = true;
-  may_encrypt = false;
-}
-
-avp User-Id {
-  code = 1444;
-  vendor_id = 10415;
-  type = UTF8String;
-  must = false;
-  may_encrypt = false;
-}
-
-avp Equipment-Status {
-  code = 1445;
-  vendor_id = 10415;
-  type = Enumerated;
-  must = true;
-  may_encrypt = false;
-  // 0: WHITELISTED
-  // 1: BLACKLISTED
-  // 2: GREYLISTED
-}
-
-avp Regional-Subscription-Zone-Code {
-  code = 1446;
-  vendor_id = 10415;
-  type = OctetString;
-  must = true;
-  may_encrypt = false;
-}
-
-avp PDN-Type {
-  code = 1456;
-  vendor_id = 10415;
-  type = Enumerated;
-  must = true;
-  may_encrypt = false;
-  // 0: IPv4
-  // 1: IPv6
-  // 2: IPv4v6
-  // 3: IPv4_OR_IPv6
-}
-
-avp Roaming-Restricted-Due-To-Unsupported-Feature {
-  code = 1457;
-  vendor_id = 10415;
-  type = Enumerated;
-  must = true;
-  may_encrypt = false;
-  // 0: Roaming-Restricted-Due-To-Unsupported-Feature
-}
-
-avp Trace-Data {
-  code = 1458;
-  vendor_id = 10415;
-  type = Grouped;
-  must = true;
-  may_encrypt = false;
-}
-
-avp Trace-Reference {
-  code = 1459;
-  vendor_id = 10415;
-  type = OctetString;
-  must = true;
-  may_encrypt = false;
-}
-
-avp Trace-Depth {
-  code = 1462;
-  vendor_id = 10415;
-  type = Enumerated;
-  must = true;
-  may_encrypt = false;
-}
-
-avp Trace-NE-Type-List {
-  code = 1463;
-  vendor_id = 10415;
-  type = OctetString;
-  must = true;
-  may_encrypt = false;
-}
-
-avp Trace-Interface-List {
-  code = 1464;
-  vendor_id = 10415;
-  type = OctetString;
-  must = true;
-  may_encrypt = false;
-}
-
-avp Trace-Event-List {
-  code = 1465;
-  vendor_id = 10415;
-  type = OctetString;
-  must = true;
-  may_encrypt = false;
-}
-
-avp OMC-Id {
-  code = 1466;
-  vendor_id = 10415;
-  type = OctetString;
-  must = true;
-  may_encrypt = false;
-}
-
-avp Trace-Collection-Entity {
-  code = 1452;
-  vendor_id = 10415;
-  type = Address;
-  must = true;
-  may_encrypt = false;
-}
-
-avp GPRS-Subscription-Data {
-  code = 1467;
-  vendor_id = 10415;
-  type = Grouped;
-  must = true;
-  may_encrypt = false;
-}
-
-avp Complete-Data-List-Included-Indicator {
-  code = 1468;
-  vendor_id = 10415;
-  type = Enumerated;
-  must = true;
-  may_encrypt = false;
-  // 0: All_PDP_CONTEXTS_INCLUDED
-  // 1: MODIFIED/ADDED_PDP_CONTEXTS_INCLUDED
-}
-
-avp PDP-Context {
-  code = 1469;
-  vendor_id = 10415;
-  type = Grouped;
-  must = true;
-  may_encrypt = false;
-}
-
-avp PDP-Type {
-  code = 1470;
-  vendor_id = 10415;
-  type = OctetString;
-  must = true;
-  may_encrypt = false;
-}
-
-avp QoS-Subscribed {
-  code = 1404;
-  vendor_id = 10415;
-  type = OctetString;
-  must = true;
-  may_encrypt = false;
-}
-
-avp Specific-APN-Info {
-  code = 1472;
-  vendor_id = 10415;
-  type = Grouped;
-  must = true;
-  may_encrypt = false;
-}
-
-avp LCS-Info {
-  code = 1473;
-  vendor_id = 10415;
-  type = Grouped;
-  must = true;
-  may_encrypt = false;
-}
-
-avp GMLC-Number {
-  code = 1474;
-  vendor_id = 10415;
-  type = OctetString;
-  must = true;
-  may_encrypt = false;
-}
-
-avp LCS-PrivacyException {
-  code = 1475;
-  vendor_id = 10415;
-  type = Grouped;
-  must = true;
-  may_encrypt = false;
-}
-
-avp SS-Code {
-  code = 1476;
-  vendor_id = 10415;
-  type = OctetString;
-  must = true;
-  may_encrypt = false;
-}
-
-avp SS-Status {
-  code = 1477;
-  vendor_id = 10415;
-  type = OctetString;
-  must = true;
-  may_encrypt = false;
-}
-
-avp Notification-To-UE-User {
-  code = 1478;
-  vendor_id = 10415;
-  type = Enumerated;
-  must = true;
-  may_encrypt = false;
-}
-
-avp External-Client {
-  code = 1479;
-  vendor_id = 10415;
-  type = Grouped;
-  must = true;
-  may_encrypt = false;
-}
-
-avp Client-Identity {
-  code = 1480;
-  vendor_id = 10415;
-  type = OctetString;
-  must = true;
-  may_encrypt = false;
-}
-
-avp GMLC-Restriction {
-  code = 1481;
-  vendor_id = 10415;
-  type = Enumerated;
-  must = true;
-  may_encrypt = false;
-}
-
-avp PLMN-Client {
-  code = 1482;
-  vendor_id = 10415;
-  type = Enumerated;
-  must = true;
-  may_encrypt = false;
-}
-
-avp Service-Type {
-  code = 1483;
-  vendor_id = 10415;
-  type = Grouped;
-  must = true;
-  may_encrypt = false;
-}
-
-avp ServiceTypeIdentity {
-  code = 1484;
-  vendor_id = 10415;
-  type = Unsigned32;
-  must = true;
-  may_encrypt = false;
-}
-
-avp MO-LR {
-  code = 1485;
-  vendor_id = 10415;
-  type = Grouped;
-  must = true;
-  may_encrypt = false;
-}
-
-avp Teleservice-List {
-  code = 1486;
-  vendor_id = 10415;
-  type = Grouped;
-  must = true;
-  may_encrypt = false;
-}
-
-avp TS-Code {
-  code = 1487;
-  vendor_id = 10415;
-  type = OctetString;
-  must = true;
-  may_encrypt = false;
-}
-
-avp Call-Barring-Info {
-  code = 1488;
-  vendor_id = 10415;
-  type = Grouped;
-  must = true;
-  may_encrypt = false;
-}
-
-avp SGSN-Number {
-  code = 1489;
-  vendor_id = 10415;
-  type = OctetString;
-  must = true;
-  may_encrypt = false;
-}
-
-avp IDR-Flags {
-  code = 1490;
-  vendor_id = 10415;
-  type = Unsigned32;
-  must = true;
-  may_encrypt = false;
-}
-
-avp ICS-Indicator {
-  code = 1491;
-  vendor_id = 10415;
-  type = Enumerated;
-  must = true;
-  may_encrypt = false;
-}
-
-avp IMS-Voice-Over-PS-Sessions-Supported {
-  code = 1492;
-  vendor_id = 10415;
-  type = Enumerated;
-  must = true;
-  may_encrypt = false;
-  // 0: NOT_SUPPORTED
-  // 1: SUPPORTED
-}
-
-avp Homogeneous-Support-of-IMS-Voice-Over-PS-Sessions {
-  code = 1493;
-  vendor_id = 10415;
-  type = Enumerated;
-  must = true;
-  may_encrypt = false;
-  // 0: NOT_SUPPORTED
-  // 1: SUPPORTED
-}
-
-avp Last-UE-Activity-Time {
-  code = 1494;
-  vendor_id = 10415;
-  type = Time;
-  must = true;
-  may_encrypt = false;
-}
-
-avp EPS-User-State {
-  code = 1495;
-  vendor_id = 10415;
-  type = Grouped;
-  must = true;
-  may_encrypt = false;
-}
-
-avp EPS-Location-Information {
-  code = 1496;
-  vendor_id = 10415;
-  type = Grouped;
-  must = true;
-  may_encrypt = false;
-}
-
-avp MME-User-State {
-  code = 1497;
-  vendor_id = 10415;
-  type = Grouped;
-  must = true;
-  may_encrypt = false;
-}
-
-avp SGSN-User-State {
-  code = 1498;
-  vendor_id = 10415;
-  type = Grouped;
-  must = true;
-  may_encrypt = false;
-}
-
-avp User-State {
-  code = 1499;
-  vendor_id = 10415;
-  type = Enumerated;
-  must = true;
-  may_encrypt = false;
-}
-
-avp MME-Location-Information {
-  code = 1600;
-  vendor_id = 10415;
-  type = Grouped;
-  must = true;
-  may_encrypt = false;
-}
-
-avp SGSN-Location-Information {
-  code = 1601;
-  vendor_id = 10415;
-  type = Grouped;
-  must = true;
-  may_encrypt = false;
-}
-
-avp E-UTRAN-Cell-Global-Identity {
-  code = 1602;
-  vendor_id = 10415;
-  type = OctetString;
-  must = true;
-  may_encrypt = false;
-}
-
-avp Tracking-Area-Identity {
-  code = 1603;
-  vendor_id = 10415;
-  type = OctetString;
-  must = true;
-  may_encrypt = false;
-}
-
-avp Cell-Global-Identity {
-  code = 1604;
-  vendor_id = 10415;
-  type = OctetString;
-  must = true;
-  may_encrypt = false;
-}
-
-avp Routing-Area-Identity {
-  code = 1605;
-  vendor_id = 10415;
-  type = OctetString;
-  must = true;
-  may_encrypt = false;
-}
-
-avp Location-Area-Identity {
-  code = 1606;
-  vendor_id = 10415;
-  type = OctetString;
-  must = true;
-  may_encrypt = false;
-}
-
-avp Service-Area-Identity {
-  code = 1607;
-  vendor_id = 10415;
-  type = OctetString;
-  must = true;
-  may_encrypt = false;
-}
-
-avp Geographical-Information {
-  code = 1608;
-  vendor_id = 10415;
-  type = OctetString;
-  must = true;
-  may_encrypt = false;
-}
-
-avp Geodetic-Information {
-  code = 1609;
-  vendor_id = 10415;
-  type = OctetString;
-  must = true;
-  may_encrypt = false;
-}
-
-avp Current-Location-Retrieved {
-  code = 1610;
-  vendor_id = 10415;
-  type = Enumerated;
-  must = true;
-  may_encrypt = false;
-}
-
-avp Age-Of-Location-Information {
-  code = 1611;
-  vendor_id = 10415;
-  type = Unsigned32;
-  must = true;
-  may_encrypt = false;
-}
-
-avp Active-APN {
-  code = 1612;
-  vendor_id = 10415;
-  type = Grouped;
-  must = true;
-  may_encrypt = false;
-}
-
-avp Error-Diagnostic {
-  code = 1614;
-  vendor_id = 10415;
-  type = Enumerated;
-  must = false;
-  may_encrypt = false;
-}
-
-avp UE-SRVCC-Capability {
-  code = 1615;
-  vendor_id = 10415;
-  type = Enumerated;
-  must = true;
-  may_encrypt = false;
-  // 0: UE-SRVCC-NOT-SUPPORTED
-  // 1: UE-SRVCC-SUPPORTED
-}
-
-avp MPS-Priority {
-  code = 1616;
-  vendor_id = 10415;
-  type = Unsigned32;
-  must = true;
-  may_encrypt = false;
-}
-
-avp VPLMN-LIPA-Allowed {
-  code = 1617;
-  vendor_id = 10415;
-  type = Enumerated;
-  must = true;
-  may_encrypt = false;
-}
-
-avp LIPA-Permission {
-  code = 1618;
-  vendor_id = 10415;
-  type = Enumerated;
-  must = true;
-  may_encrypt = false;
-}
-
-avp Subscribed-Periodic-RAU-TAU-Timer {
-  code = 1619;
-  vendor_id = 10415;
-  type = Unsigned32;
-  must = true;
-  may_encrypt = false;
-}
-
-avp Ext-PDP-Type {
-  code = 1620;
-  vendor_id = 10415;
-  type = OctetString;
-  must = true;
-  may_encrypt = false;
-}
-
-avp PUR-Flags {
-  code = 1635;
-  vendor_id = 10415;
-  type = Unsigned32;
-  must = false;
-  may_encrypt = false;
-}
-
-avp GMLC-Address {
-  code = 2405;
-  vendor_id = 10415;
-  type = Address;
-  must = true;
-  may_encrypt = false;
-}
-
-avp MME-Number-for-MT-SMS {
-  code = 1645;
-  vendor_id = 10415;
-  type = OctetString;
-  must = false;
-  may_encrypt = false;
-}
-
-avp SMS-Register-Request {
-  code = 1648;
-  vendor_id = 10415;
-  type = Enumerated;
-  must = false;
-  may_encrypt = false;
-}
-
-avp Local-Time-Zone {
-  code = 1649;
-  vendor_id = 10415;
-  type = Grouped;
-  must = false;
-  may_encrypt = false;
-}
+  description = "Contains CSG subscription data";
 
-avp Reset-ID {
-  code = 1670;
-  vendor_id = 10415;
-  type = OctetString;
-  must = false;
-  may_encrypt = false;
+  grouped {
+    required CSG-Id csg_id = 1;
+    optional Expiration-Date expiration_date = 2;
+    repeated Service-Selection service_selection = 3;
+    optional Visited-PLMN-Id visited_plmn_id = 4;
+  }
 }
 
+// RAT-Type (AVP Code 1032) - from 3GPP TS 29.212
 avp RAT-Type {
   code = 1032;
   vendor_id = 10415;
   type = Enumerated;
   must = true;
   may_encrypt = false;
-  // 0: WLAN
-  // 1: VIRTUAL
-  // 1000: UTRAN
-  // 1001: GERAN
-  // 1002: GAN
-  // 1003: HSPA_EVOLUTION
-  // 1004: EUTRAN
-  // 1005: EUTRAN_NB_IoT
-  // 2000: CDMA2000_1X
-  // 2001: HRPD
-  // 2002: UMB
-  // 2003: EHRPD
+  description = "Radio Access Technology type";
 }
 
-avp MIP6-Agent-Info {
-  code = 486;
-  type = Grouped;
+// IDA-Flags (AVP Code 1441)
+avp IDA-Flags {
+  code = 1441;
+  vendor_id = 10415;
+  type = Unsigned32;
   must = true;
   may_encrypt = false;
+  description = "Bit mask for Insert Subscriber Data Answer flags";
 }
 
-avp Equivalent-PLMN-List {
-  code = 1637;
-  vendor_id = 10415;
-  type = Grouped;
-  must = false;
-  may_encrypt = false;
-}
-
-// --- Common AVPs from RFC 6733 / 3GPP TS 29.229 ---
-
-avp Supported-Features {
-  code = 628;
-  vendor_id = 10415;
-  type = Grouped;
-  must = false;
-  may_encrypt = false;
-}
-
-avp Feature-List-ID {
-  code = 629;
+// PUA-Flags (AVP Code 1442)
+avp PUA-Flags {
+  code = 1442;
   vendor_id = 10415;
   type = Unsigned32;
-  must = false;
+  must = true;
   may_encrypt = false;
+  description = "Bit mask for Purge UE Answer flags";
+  // Bit 0: Freeze M-TMSI
+  // Bit 1: Freeze P-TMSI
 }
 
-avp Feature-List {
-  code = 630;
+// NOR-Flags (AVP Code 1443)
+avp NOR-Flags {
+  code = 1443;
   vendor_id = 10415;
   type = Unsigned32;
-  must = false;
+  must = true;
   may_encrypt = false;
+  description = "Bit mask for Notify Request flags";
+  // Bit 0: Single-Registration-Indication
+  // Bit 1: SGSN area restricted
+  // Bit 2: Ready for SM
+  // Bit 3: UE Reachable
+  // Bit 4: Homogeneous Support of IMS Voice Over PS Sessions
+  // Bit 5: S6a/S6d-Indicator
+  // Bit 6: Removal of MME Registration for SMS
 }
 
-avp DRMP {
-  code = 301;
+// Equipment-Status (AVP Code 1445)
+avp Equipment-Status {
+  code = 1445;
+  vendor_id = 10415;
   type = Enumerated;
-  must = false;
-  may_encrypt = false;
-}
-
-avp OC-Supported-Features {
-  code = 621;
-  type = Grouped;
-  must = false;
-  may_encrypt = false;
-}
-
-avp OC-OLR {
-  code = 623;
-  type = Grouped;
-  must = false;
-  may_encrypt = false;
-}
-
-avp Load {
-  code = 650;
-  type = Grouped;
-  must = false;
-  may_encrypt = false;
-}
-
-avp Experimental-Result {
-  code = 297;
-  type = Grouped;
   must = true;
   may_encrypt = false;
+  description = "Status of the mobile equipment";
 }
 
-avp Experimental-Result-Code {
-  code = 298;
+// SGSN-Number (AVP Code 1489)
+avp SGSN-Number {
+  code = 1489;
+  vendor_id = 10415;
+  type = OctetString;
+  must = true;
+  may_encrypt = false;
+  description = "ISDN number of the SGSN";
+}
+
+// IDR-Flags (AVP Code 1490)
+avp IDR-Flags {
+  code = 1490;
+  vendor_id = 10415;
   type = Unsigned32;
   must = true;
   may_encrypt = false;
+  description = "Bit mask for Insert Subscriber Data Request flags";
 }
 
+// PUR-Flags (AVP Code 1635)
+avp PUR-Flags {
+  code = 1635;
+  vendor_id = 10415;
+  type = Unsigned32;
+  must = true;
+  may_encrypt = false;
+  description = "Bit mask for Purge UE Request flags";
+}
+
+// CLR-Flags (AVP Code 1638)
+avp CLR-Flags {
+  code = 1638;
+  vendor_id = 10415;
+  type = Unsigned32;
+  must = true;
+  may_encrypt = false;
+  description = "Bit mask for Cancel Location Request flags";
+  // Bit 0: S6a/S6d-Indicator
+  // Bit 1: Reattach-Required
+}
+
+// AIR-Flags (AVP Code 1679)
+avp AIR-Flags {
+  code = 1679;
+  vendor_id = 10415;
+  type = Unsigned32;
+  must = true;
+  may_encrypt = false;
+  description = "Bit mask for Authentication Information Request flags";
+  // Bit 0: Send UE Usage Type
+}
+
+// MSISDN (AVP Code 701) - from 3GPP TS 29.329
+avp MSISDN {
+  code = 701;
+  vendor_id = 10415;
+  type = OctetString;
+  must = true;
+  may_encrypt = false;
+  description = "Mobile Subscriber ISDN Number";
+}
+
+// A-MSISDN (AVP Code 1643) - from 3GPP TS 29.329
+avp A-MSISDN {
+  code = 1643;
+  vendor_id = 10415;
+  type = OctetString;
+  must = true;
+  may_encrypt = false;
+  description = "Mobile Subscriber ISDN Number";
+}
+
+// Service-Selection (AVP Code from RFC 5778)
 avp Service-Selection {
   code = 493;
   type = UTF8String;
   must = true;
   may_encrypt = false;
+  description = "APN name";
 }
 
-avp Visited-Network-Identifier {
-  code = 600;
+// Alert-Reason (AVP Code 1434)
+avp Alert-Reason {
+  code = 1434;
   vendor_id = 10415;
-  type = OctetString;
-  must = true;
-  may_encrypt = false;
-}
-
-avp UE-Usage-Type {
-  code = 1680;
-  vendor_id = 10415;
-  type = Unsigned32;
-  must = false;
-  may_encrypt = false;
-}
-
-// ============================================================================
-// Base Protocol AVPs (from RFC 6733)
-// ============================================================================
-
-avp Session-Id {
-  code = 263;
-  type = UTF8String;
-  must = true;
-  may_encrypt = false;
-}
-
-avp Auth-Session-State {
-  code = 277;
   type = Enumerated;
   must = true;
   may_encrypt = false;
-  // 0: STATE_MAINTAINED
-  // 1: NO_STATE_MAINTAINED
+  description = "Reason for alerting HSS";
 }
 
-avp Origin-Host {
-  code = 264;
-  type = DiameterIdentity;
+// UE-SRVCC-Capability (AVP Code 1615)
+avp UE-SRVCC-Capability {
+  code = 1615;
+  vendor_id = 10415;
+  type = Enumerated;
   must = true;
   may_encrypt = false;
+  description = "Indicates if UE supports SRVCC";
 }
 
-avp Origin-Realm {
-  code = 296;
-  type = DiameterIdentity;
-  must = true;
-  may_encrypt = false;
-}
-
-avp Destination-Host {
-  code = 293;
-  type = DiameterIdentity;
+// Error-Diagnostic (AVP Code 1614)
+avp Error-Diagnostic {
+  code = 1614;
+  vendor_id = 10415;
+  type = Enumerated;
   must = false;
   may_encrypt = false;
+  description = "Additional error diagnostic information";
 }
 
-avp Destination-Realm {
-  code = 283;
-  type = DiameterIdentity;
-  must = true;
-  may_encrypt = false;
-}
+// ================================================================================
+//                         COMMAND DEFINITIONS
+// ================================================================================
 
-avp User-Name {
-  code = 1;
-  type = UTF8String;
-  must = false;
-  may_encrypt = true;
-  // Contains IMSI when present
-}
-
-avp Vendor-Specific-Application-Id {
-  code = 260;
-  type = Grouped;
-  must = false;
-  may_encrypt = false;
-}
-
-avp Result-Code {
-  code = 268;
-  type = Unsigned32;
-  must = true;
-  may_encrypt = false;
-}
-
-avp Failed-AVP {
-  code = 279;
-  type = Grouped;
-  must = false;
-  may_encrypt = false;
-}
-
-avp Proxy-Info {
-  code = 284;
-  type = Grouped;
-  must = false;
-  may_encrypt = false;
-}
-
-avp Route-Record {
-  code = 282;
-  type = DiameterIdentity;
-  must = false;
-  may_encrypt = false;
-}
-
-// ============================================================================
-// Command Definitions
-// ============================================================================
-
-// Update-Location-Request (ULR) - Code 316
-// Direction: MME/SGSN -> HSS
+// ================================================================================
+// Update-Location-Request (ULR) - Command Code 316
+// 3GPP TS 29.272 Section 7.2.3
+// Sent from MME/SGSN to HSS
+// ================================================================================
 command Update-Location-Request {
   code = 316;
   application_id = 16777251;
   request = true;
   proxiable = true;
+  description = "Request to update user location in HSS";
 
+  // Required AVPs
   fixed required Session-Id session_id = 1;
-  optional DRMP drmp = 2;
-  optional Vendor-Specific-Application-Id vendor_specific_application_id = 3;
-  fixed required Auth-Session-State auth_session_state = 4;
-  fixed required Origin-Host origin_host = 5;
-  fixed required Origin-Realm origin_realm = 6;
-  optional Destination-Host destination_host = 7;
-  fixed required Destination-Realm destination_realm = 8;
-  fixed required User-Name user_name = 9;  // IMSI
-  optional OC-Supported-Features oc_supported_features = 10;
-  repeated optional Supported-Features supported_features = 11;
-  optional Terminal-Information terminal_information = 12;
-  fixed required RAT-Type rat_type = 13;
-  fixed required ULR-Flags ulr_flags = 14;
-  optional UE-SRVCC-Capability ue_srvcc_capability = 15;
-  fixed required Visited-PLMN-Id visited_plmn_id = 16;
+  fixed required Auth-Session-State auth_session_state = 2;
+  fixed required Origin-Host origin_host = 3;
+  fixed required Origin-Realm origin_realm = 4;
+  fixed required Destination-Realm destination_realm = 5;
+  fixed required User-Name user_name = 6;              // IMSI
+  fixed required RAT-Type rat_type = 7;
+  fixed required ULR-Flags ulr_flags = 8;
+  fixed required Visited-PLMN-Id visited_plmn_id = 9;
+
+  // Optional AVPs
+  optional DRMP drmp = 10;
+  optional Vendor-Specific-Application-Id vendor_specific_application_id = 11;
+  optional Destination-Host destination_host = 12;
+  optional OC-Supported-Features oc_supported_features = 13;
+  repeated optional Supported-Features supported_features = 14;
+  optional Terminal-Information terminal_information = 15;
+  optional UE-SRVCC-Capability ue_srvcc_capability = 16;
   optional SGSN-Number sgsn_number = 17;
   optional Homogeneous-Support-of-IMS-Voice-Over-PS-Sessions homogeneous_support_ims_voice = 18;
   optional GMLC-Address gmlc_address = 19;
@@ -1328,27 +888,39 @@ command Update-Location-Request {
   optional Equivalent-PLMN-List equivalent_plmn_list = 21;
   optional MME-Number-for-MT-SMS mme_number_for_mt_sms = 22;
   optional SMS-Register-Request sms_register_request = 23;
-  repeated optional Proxy-Info proxy_info = 100;
-  repeated optional Route-Record route_record = 101;
+  optional SGs-MME-Identity sgs_mme_identity = 24;
+  optional Coupled-Node-Diameter-ID coupled_node_diameter_id = 25;
+  optional Adjacent-PLMNs adjacent_plmns = 26;
+  optional Supported-Services supported_services = 27;
+  repeated optional AVP avp = 28;
+  repeated optional Proxy-Info proxy_info = 29;
+  repeated optional Route-Record route_record = 30;
 }
 
-// Update-Location-Answer (ULA) - Code 316
-// Direction: HSS -> MME/SGSN
+// ================================================================================
+// Update-Location-Answer (ULA) - Command Code 316
+// 3GPP TS 29.272 Section 7.2.4
+// Sent from HSS to MME/SGSN
+// ================================================================================
 command Update-Location-Answer {
   code = 316;
   application_id = 16777251;
   request = false;
   proxiable = true;
+  description = "Response to Update Location Request";
 
+  // Required AVPs
   fixed required Session-Id session_id = 1;
-  optional DRMP drmp = 2;
-  optional Vendor-Specific-Application-Id vendor_specific_application_id = 3;
-  optional Result-Code result_code = 4;
-  optional Experimental-Result experimental_result = 5;
-  optional Error-Diagnostic error_diagnostic = 6;
-  fixed required Auth-Session-State auth_session_state = 7;
-  fixed required Origin-Host origin_host = 8;
-  fixed required Origin-Realm origin_realm = 9;
+  fixed required Auth-Session-State auth_session_state = 2;
+  fixed required Origin-Host origin_host = 3;
+  fixed required Origin-Realm origin_realm = 4;
+
+  // Conditional/Optional AVPs
+  optional DRMP drmp = 5;
+  optional Vendor-Specific-Application-Id vendor_specific_application_id = 6;
+  optional Result-Code result_code = 7;
+  optional Experimental-Result experimental_result = 8;
+  optional Error-Diagnostic error_diagnostic = 9;
   optional OC-Supported-Features oc_supported_features = 10;
   optional OC-OLR oc_olr = 11;
   repeated optional Load load = 12;
@@ -1356,330 +928,441 @@ command Update-Location-Answer {
   optional ULA-Flags ula_flags = 14;
   optional Subscription-Data subscription_data = 15;
   repeated optional Reset-ID reset_id = 16;
-  optional Failed-AVP failed_avp = 17;
-  repeated optional Proxy-Info proxy_info = 100;
-  repeated optional Route-Record route_record = 101;
+  repeated optional AVP avp = 17;
+  optional Failed-AVP failed_avp = 18;
+  repeated optional Proxy-Info proxy_info = 19;
+  repeated optional Route-Record route_record = 20;
 }
 
-// Authentication-Information-Request (AIR) - Code 318
-// Direction: MME/SGSN -> HSS
+// ================================================================================
+// Authentication-Information-Request (AIR) - Command Code 318
+// 3GPP TS 29.272 Section 7.2.5
+// Sent from MME/SGSN to HSS
+// ================================================================================
 command Authentication-Information-Request {
   code = 318;
   application_id = 16777251;
   request = true;
   proxiable = true;
+  description = "Request authentication vectors from HSS";
 
+  // Required AVPs
   fixed required Session-Id session_id = 1;
-  optional DRMP drmp = 2;
-  optional Vendor-Specific-Application-Id vendor_specific_application_id = 3;
-  fixed required Auth-Session-State auth_session_state = 4;
-  fixed required Origin-Host origin_host = 5;
-  fixed required Origin-Realm origin_realm = 6;
-  optional Destination-Host destination_host = 7;
-  fixed required Destination-Realm destination_realm = 8;
-  fixed required User-Name user_name = 9;  // IMSI
-  optional OC-Supported-Features oc_supported_features = 10;
-  repeated optional Supported-Features supported_features = 11;
-  optional Requested-EUTRAN-Authentication-Info requested_eutran_auth_info = 12;
-  optional Requested-UTRAN-GERAN-Authentication-Info requested_utran_geran_auth_info = 13;
-  fixed required Visited-PLMN-Id visited_plmn_id = 14;
+  fixed required Auth-Session-State auth_session_state = 2;
+  fixed required Origin-Host origin_host = 3;
+  fixed required Origin-Realm origin_realm = 4;
+  fixed required Destination-Realm destination_realm = 5;
+  fixed required User-Name user_name = 6;              // IMSI
+  fixed required Visited-PLMN-Id visited_plmn_id = 7;
+
+  // Optional AVPs
+  optional DRMP drmp = 8;
+  optional Vendor-Specific-Application-Id vendor_specific_application_id = 9;
+  optional Destination-Host destination_host = 10;
+  optional OC-Supported-Features oc_supported_features = 11;
+  repeated optional Supported-Features supported_features = 12;
+  optional Requested-EUTRAN-Authentication-Info requested_eutran_authentication_info = 13;
+  optional Requested-UTRAN-GERAN-Authentication-Info requested_utran_geran_authentication_info = 14;
   optional AIR-Flags air_flags = 15;
-  repeated optional Proxy-Info proxy_info = 100;
-  repeated optional Route-Record route_record = 101;
+  repeated optional AVP avp = 16;
+  repeated optional Proxy-Info proxy_info = 17;
+  repeated optional Route-Record route_record = 18;
 }
 
-// Authentication-Information-Answer (AIA) - Code 318
-// Direction: HSS -> MME/SGSN
+// ================================================================================
+// Authentication-Information-Answer (AIA) - Command Code 318
+// 3GPP TS 29.272 Section 7.2.6
+// Sent from HSS to MME/SGSN
+// ================================================================================
 command Authentication-Information-Answer {
   code = 318;
   application_id = 16777251;
   request = false;
   proxiable = true;
+  description = "Response with authentication vectors";
 
+  // Required AVPs
   fixed required Session-Id session_id = 1;
-  optional DRMP drmp = 2;
-  optional Vendor-Specific-Application-Id vendor_specific_application_id = 3;
-  optional Result-Code result_code = 4;
-  optional Experimental-Result experimental_result = 5;
-  optional Error-Diagnostic error_diagnostic = 6;
-  fixed required Auth-Session-State auth_session_state = 7;
-  fixed required Origin-Host origin_host = 8;
-  fixed required Origin-Realm origin_realm = 9;
+  fixed required Auth-Session-State auth_session_state = 2;
+  fixed required Origin-Host origin_host = 3;
+  fixed required Origin-Realm origin_realm = 4;
+
+  // Conditional/Optional AVPs
+  optional DRMP drmp = 5;
+  optional Vendor-Specific-Application-Id vendor_specific_application_id = 6;
+  optional Result-Code result_code = 7;
+  optional Experimental-Result experimental_result = 8;
+  optional Error-Diagnostic error_diagnostic = 9;
   optional OC-Supported-Features oc_supported_features = 10;
   optional OC-OLR oc_olr = 11;
   repeated optional Load load = 12;
   repeated optional Supported-Features supported_features = 13;
   optional Authentication-Info authentication_info = 14;
   optional UE-Usage-Type ue_usage_type = 15;
-  optional Failed-AVP failed_avp = 16;
-  repeated optional Proxy-Info proxy_info = 100;
-  repeated optional Route-Record route_record = 101;
+  repeated optional AVP avp = 16;
+  optional Failed-AVP failed_avp = 17;
+  repeated optional Proxy-Info proxy_info = 18;
+  repeated optional Route-Record route_record = 19;
 }
 
-// Cancel-Location-Request (CLR) - Code 317
-// Direction: HSS -> MME/SGSN
+// ================================================================================
+// Cancel-Location-Request (CLR) - Command Code 317
+// 3GPP TS 29.272 Section 7.2.7
+// Sent from HSS to MME/SGSN
+// ================================================================================
 command Cancel-Location-Request {
   code = 317;
   application_id = 16777251;
   request = true;
   proxiable = true;
+  description = "Request to cancel user location";
 
+  // Required AVPs
   fixed required Session-Id session_id = 1;
-  optional DRMP drmp = 2;
-  optional Vendor-Specific-Application-Id vendor_specific_application_id = 3;
-  fixed required Auth-Session-State auth_session_state = 4;
-  fixed required Origin-Host origin_host = 5;
-  fixed required Origin-Realm origin_realm = 6;
-  fixed required Destination-Host destination_host = 7;
-  fixed required Destination-Realm destination_realm = 8;
-  fixed required User-Name user_name = 9;  // IMSI
-  repeated optional Supported-Features supported_features = 10;
-  fixed required Cancellation-Type cancellation_type = 11;
+  fixed required Auth-Session-State auth_session_state = 2;
+  fixed required Origin-Host origin_host = 3;
+  fixed required Origin-Realm origin_realm = 4;
+  fixed required Destination-Host destination_host = 5;
+  fixed required Destination-Realm destination_realm = 6;
+  fixed required User-Name user_name = 7;
+  fixed required Cancellation-Type cancellation_type = 8;
+
+  // Optional AVPs
+  optional DRMP drmp = 9;
+  optional Vendor-Specific-Application-Id vendor_specific_application_id = 10;
+  repeated optional Supported-Features supported_features = 11;
   optional CLR-Flags clr_flags = 12;
-  repeated optional Proxy-Info proxy_info = 100;
-  repeated optional Route-Record route_record = 101;
+  repeated optional AVP avp = 13;
+  repeated optional Proxy-Info proxy_info = 14;
+  repeated optional Route-Record route_record = 15;
 }
 
-// Cancel-Location-Answer (CLA) - Code 317
-// Direction: MME/SGSN -> HSS
+// ================================================================================
+// Cancel-Location-Answer (CLA) - Command Code 317
+// 3GPP TS 29.272 Section 7.2.8
+// Sent from MME/SGSN to HSS
+// ================================================================================
 command Cancel-Location-Answer {
   code = 317;
   application_id = 16777251;
   request = false;
   proxiable = true;
+  description = "Response to Cancel Location Request";
 
+  // Required AVPs
   fixed required Session-Id session_id = 1;
-  optional DRMP drmp = 2;
-  optional Vendor-Specific-Application-Id vendor_specific_application_id = 3;
-  repeated optional Supported-Features supported_features = 4;
-  optional Result-Code result_code = 5;
-  optional Experimental-Result experimental_result = 6;
-  fixed required Auth-Session-State auth_session_state = 7;
-  fixed required Origin-Host origin_host = 8;
-  fixed required Origin-Realm origin_realm = 9;
-  optional Failed-AVP failed_avp = 10;
-  repeated optional Proxy-Info proxy_info = 100;
-  repeated optional Route-Record route_record = 101;
+  fixed required Auth-Session-State auth_session_state = 2;
+  fixed required Origin-Host origin_host = 3;
+  fixed required Origin-Realm origin_realm = 4;
+
+  // Optional AVPs
+  optional DRMP drmp = 5;
+  optional Vendor-Specific-Application-Id vendor_specific_application_id = 6;
+  repeated optional Supported-Features supported_features = 7;
+  optional Result-Code result_code = 8;
+  optional Experimental-Result experimental_result = 9;
+  repeated optional AVP avp = 10;
+  optional Failed-AVP failed_avp = 11;
+  repeated optional Proxy-Info proxy_info = 12;
+  repeated optional Route-Record route_record = 13;
 }
 
-// Insert-Subscriber-Data-Request (IDR) - Code 319
-// Direction: HSS -> MME/SGSN
+// ================================================================================
+// Insert-Subscriber-Data-Request (IDR) - Command Code 319
+// 3GPP TS 29.272 Section 7.2.9
+// Sent from HSS to MME/SGSN
+// ================================================================================
 command Insert-Subscriber-Data-Request {
   code = 319;
   application_id = 16777251;
   request = true;
   proxiable = true;
+  description = "Request to insert/update subscriber data";
 
+  // Required AVPs
   fixed required Session-Id session_id = 1;
-  optional DRMP drmp = 2;
-  optional Vendor-Specific-Application-Id vendor_specific_application_id = 3;
-  fixed required Auth-Session-State auth_session_state = 4;
-  fixed required Origin-Host origin_host = 5;
-  fixed required Origin-Realm origin_realm = 6;
-  fixed required Destination-Host destination_host = 7;
-  fixed required Destination-Realm destination_realm = 8;
-  fixed required User-Name user_name = 9;  // IMSI
-  repeated optional Supported-Features supported_features = 10;
-  fixed required Subscription-Data subscription_data = 11;
+  fixed required Auth-Session-State auth_session_state = 2;
+  fixed required Origin-Host origin_host = 3;
+  fixed required Origin-Realm origin_realm = 4;
+  fixed required Destination-Host destination_host = 5;
+  fixed required Destination-Realm destination_realm = 6;
+  fixed required User-Name user_name = 7;
+  fixed required Subscription-Data subscription_data = 8;
+
+  // Optional AVPs
+  optional DRMP drmp = 9;
+  optional Vendor-Specific-Application-Id vendor_specific_application_id = 10;
+  repeated optional Supported-Features supported_features = 11;
   optional IDR-Flags idr_flags = 12;
   repeated optional Reset-ID reset_id = 13;
-  repeated optional Proxy-Info proxy_info = 100;
-  repeated optional Route-Record route_record = 101;
+  repeated optional AVP avp = 14;
+  repeated optional Proxy-Info proxy_info = 15;
+  repeated optional Route-Record route_record = 16;
 }
 
-// Insert-Subscriber-Data-Answer (IDA) - Code 319
-// Direction: MME/SGSN -> HSS
+// ================================================================================
+// Insert-Subscriber-Data-Answer (IDA) - Command Code 319
+// 3GPP TS 29.272 Section 7.2.10
+// Sent from MME/SGSN to HSS
+// ================================================================================
 command Insert-Subscriber-Data-Answer {
   code = 319;
   application_id = 16777251;
   request = false;
   proxiable = true;
+  description = "Response to Insert Subscriber Data Request";
 
+  // Required AVPs
   fixed required Session-Id session_id = 1;
-  optional DRMP drmp = 2;
-  optional Vendor-Specific-Application-Id vendor_specific_application_id = 3;
-  repeated optional Supported-Features supported_features = 4;
-  optional Result-Code result_code = 5;
-  optional Experimental-Result experimental_result = 6;
-  fixed required Auth-Session-State auth_session_state = 7;
-  fixed required Origin-Host origin_host = 8;
-  fixed required Origin-Realm origin_realm = 9;
-  optional IMS-Voice-Over-PS-Sessions-Supported ims_voice_over_ps_supported = 10;
+  fixed required Auth-Session-State auth_session_state = 2;
+  fixed required Origin-Host origin_host = 3;
+  fixed required Origin-Realm origin_realm = 4;
+
+  // Optional AVPs
+  optional DRMP drmp = 5;
+  optional Vendor-Specific-Application-Id vendor_specific_application_id = 6;
+  repeated optional Supported-Features supported_features = 7;
+  optional Result-Code result_code = 8;
+  optional Experimental-Result experimental_result = 9;
+  optional IMS-Voice-Over-PS-Sessions-Supported ims_voice_over_ps_sessions_supported = 10;
   optional Last-UE-Activity-Time last_ue_activity_time = 11;
   optional RAT-Type rat_type = 12;
   optional IDA-Flags ida_flags = 13;
   optional EPS-User-State eps_user_state = 14;
   optional EPS-Location-Information eps_location_information = 15;
   optional Local-Time-Zone local_time_zone = 16;
-  optional Failed-AVP failed_avp = 17;
-  repeated optional Proxy-Info proxy_info = 100;
-  repeated optional Route-Record route_record = 101;
+  optional Supported-Services supported_services = 17;
+  repeated optional Monitoring-Event-Report monitoring_event_report = 18;
+  repeated optional Monitoring-Event-Config-Status monitoring_event_config_status = 19;
+  repeated optional AVP avp = 20;
+  optional Failed-AVP failed_avp = 21;
+  repeated optional Proxy-Info proxy_info = 22;
+  repeated optional Route-Record route_record = 23;
 }
 
-// Delete-Subscriber-Data-Request (DSR) - Code 320
-// Direction: HSS -> MME/SGSN
+// ================================================================================
+// Delete-Subscriber-Data-Request (DSR) - Command Code 320
+// 3GPP TS 29.272 Section 7.2.11
+// Sent from HSS to MME/SGSN
+// ================================================================================
 command Delete-Subscriber-Data-Request {
   code = 320;
   application_id = 16777251;
   request = true;
   proxiable = true;
+  description = "Request to delete subscriber data";
 
+  // Required AVPs
   fixed required Session-Id session_id = 1;
-  optional DRMP drmp = 2;
-  optional Vendor-Specific-Application-Id vendor_specific_application_id = 3;
-  fixed required Auth-Session-State auth_session_state = 4;
-  fixed required Origin-Host origin_host = 5;
-  fixed required Origin-Realm origin_realm = 6;
-  fixed required Destination-Host destination_host = 7;
-  fixed required Destination-Realm destination_realm = 8;
-  fixed required User-Name user_name = 9;  // IMSI
-  repeated optional Supported-Features supported_features = 10;
-  fixed required DSR-Flags dsr_flags = 11;
-  repeated optional Context-Identifier context_identifier = 12;
-  optional Trace-Reference trace_reference = 13;
-  repeated optional TS-Code ts_code = 14;
-  repeated optional SS-Code ss_code = 15;
-  repeated optional Proxy-Info proxy_info = 100;
-  repeated optional Route-Record route_record = 101;
+  fixed required Auth-Session-State auth_session_state = 2;
+  fixed required Origin-Host origin_host = 3;
+  fixed required Origin-Realm origin_realm = 4;
+  fixed required Destination-Host destination_host = 5;
+  fixed required Destination-Realm destination_realm = 6;
+  fixed required User-Name user_name = 7;
+  fixed required DSR-Flags dsr_flags = 8;
+
+  // Optional AVPs
+  optional DRMP drmp = 9;
+  optional Vendor-Specific-Application-Id vendor_specific_application_id = 10;
+  repeated optional Supported-Features supported_features = 11;
+  optional SCEF-ID scef_id = 12;
+  repeated optional Context-Identifier context_identifier = 13;
+  optional Trace-Reference trace_reference = 14;
+  repeated optional TS-Code ts_code = 15;
+  repeated optional SS-Code ss_code = 16;
+  optional eDRX-Related-RAT edrx_related_rat = 17;
+  repeated optional External-Identifier external_identifier = 18;
+  repeated optional AVP avp = 19;
+  repeated optional Proxy-Info proxy_info = 20;
+  repeated optional Route-Record route_record = 21;
 }
 
-// Delete-Subscriber-Data-Answer (DSA) - Code 320
-// Direction: MME/SGSN -> HSS
+// ================================================================================
+// Delete-Subscriber-Data-Answer (DSA) - Command Code 320
+// 3GPP TS 29.272 Section 7.2.12
+// Sent from MME/SGSN to HSS
+// ================================================================================
 command Delete-Subscriber-Data-Answer {
   code = 320;
   application_id = 16777251;
   request = false;
   proxiable = true;
+  description = "Response to Delete Subscriber Data Request";
 
+  // Required AVPs
   fixed required Session-Id session_id = 1;
-  optional DRMP drmp = 2;
-  optional Vendor-Specific-Application-Id vendor_specific_application_id = 3;
-  repeated optional Supported-Features supported_features = 4;
-  optional Result-Code result_code = 5;
-  optional Experimental-Result experimental_result = 6;
-  fixed required Auth-Session-State auth_session_state = 7;
-  fixed required Origin-Host origin_host = 8;
-  fixed required Origin-Realm origin_realm = 9;
+  fixed required Auth-Session-State auth_session_state = 2;
+  fixed required Origin-Host origin_host = 3;
+  fixed required Origin-Realm origin_realm = 4;
+
+  // Optional AVPs
+  optional DRMP drmp = 5;
+  optional Vendor-Specific-Application-Id vendor_specific_application_id = 6;
+  repeated optional Supported-Features supported_features = 7;
+  optional Result-Code result_code = 8;
+  optional Experimental-Result experimental_result = 9;
   optional DSA-Flags dsa_flags = 10;
-  optional Failed-AVP failed_avp = 11;
-  repeated optional Proxy-Info proxy_info = 100;
-  repeated optional Route-Record route_record = 101;
+  repeated optional AVP avp = 11;
+  optional Failed-AVP failed_avp = 12;
+  repeated optional Proxy-Info proxy_info = 13;
+  repeated optional Route-Record route_record = 14;
 }
 
-// Purge-UE-Request (PUR) - Code 321
-// Direction: MME/SGSN -> HSS
+// ================================================================================
+// Purge-UE-Request (PUR) - Command Code 321
+// 3GPP TS 29.272 Section 7.2.13
+// Sent from MME/SGSN to HSS
+// ================================================================================
 command Purge-UE-Request {
   code = 321;
   application_id = 16777251;
   request = true;
   proxiable = true;
+  description = "Request to purge UE from HSS";
 
+  // Required AVPs
   fixed required Session-Id session_id = 1;
-  optional DRMP drmp = 2;
-  optional Vendor-Specific-Application-Id vendor_specific_application_id = 3;
-  fixed required Auth-Session-State auth_session_state = 4;
-  fixed required Origin-Host origin_host = 5;
-  fixed required Origin-Realm origin_realm = 6;
-  optional Destination-Host destination_host = 7;
-  fixed required Destination-Realm destination_realm = 8;
-  fixed required User-Name user_name = 9;  // IMSI
+  fixed required Auth-Session-State auth_session_state = 2;
+  fixed required Origin-Host origin_host = 3;
+  fixed required Origin-Realm origin_realm = 4;
+  fixed required Destination-Realm destination_realm = 5;
+  fixed required User-Name user_name = 6;
+
+  // Optional AVPs
+  optional DRMP drmp = 7;
+  optional Vendor-Specific-Application-Id vendor_specific_application_id = 8;
+  optional Destination-Host destination_host = 9;
   optional OC-Supported-Features oc_supported_features = 10;
   optional PUR-Flags pur_flags = 11;
   repeated optional Supported-Features supported_features = 12;
   optional EPS-Location-Information eps_location_information = 13;
-  repeated optional Proxy-Info proxy_info = 100;
-  repeated optional Route-Record route_record = 101;
+  repeated optional AVP avp = 14;
+  repeated optional Proxy-Info proxy_info = 15;
+  repeated optional Route-Record route_record = 16;
 }
 
-// Purge-UE-Answer (PUA) - Code 321
-// Direction: HSS -> MME/SGSN
+// ================================================================================
+// Purge-UE-Answer (PUA) - Command Code 321
+// 3GPP TS 29.272 Section 7.2.14
+// Sent from HSS to MME/SGSN
+// ================================================================================
 command Purge-UE-Answer {
   code = 321;
   application_id = 16777251;
   request = false;
   proxiable = true;
+  description = "Response to Purge UE Request";
 
+  // Required AVPs
   fixed required Session-Id session_id = 1;
-  optional DRMP drmp = 2;
-  optional Vendor-Specific-Application-Id vendor_specific_application_id = 3;
-  repeated optional Supported-Features supported_features = 4;
-  optional Result-Code result_code = 5;
-  optional Experimental-Result experimental_result = 6;
-  fixed required Auth-Session-State auth_session_state = 7;
-  fixed required Origin-Host origin_host = 8;
-  fixed required Origin-Realm origin_realm = 9;
+  fixed required Auth-Session-State auth_session_state = 2;
+  fixed required Origin-Host origin_host = 3;
+  fixed required Origin-Realm origin_realm = 4;
+
+  // Optional AVPs
+  optional DRMP drmp = 5;
+  optional Vendor-Specific-Application-Id vendor_specific_application_id = 6;
+  repeated optional Supported-Features supported_features = 7;
+  optional Result-Code result_code = 8;
+  optional Experimental-Result experimental_result = 9;
   optional OC-Supported-Features oc_supported_features = 10;
   optional OC-OLR oc_olr = 11;
   repeated optional Load load = 12;
   optional PUA-Flags pua_flags = 13;
-  optional Failed-AVP failed_avp = 14;
-  repeated optional Proxy-Info proxy_info = 100;
-  repeated optional Route-Record route_record = 101;
+  repeated optional AVP avp = 14;
+  optional Failed-AVP failed_avp = 15;
+  repeated optional Proxy-Info proxy_info = 16;
+  repeated optional Route-Record route_record = 17;
 }
 
-// Reset-Request (RSR) - Code 322
-// Direction: HSS -> MME/SGSN
+// ================================================================================
+// Reset-Request (RSR) - Command Code 322
+// 3GPP TS 29.272 Section 7.2.15
+// Sent from HSS to MME/SGSN
+// ================================================================================
 command Reset-Request {
   code = 322;
   application_id = 16777251;
   request = true;
   proxiable = true;
+  description = "Notification of HSS restart";
 
+  // Required AVPs
   fixed required Session-Id session_id = 1;
-  optional DRMP drmp = 2;
-  optional Vendor-Specific-Application-Id vendor_specific_application_id = 3;
-  fixed required Auth-Session-State auth_session_state = 4;
-  fixed required Origin-Host origin_host = 5;
-  fixed required Origin-Realm origin_realm = 6;
-  fixed required Destination-Host destination_host = 7;
-  fixed required Destination-Realm destination_realm = 8;
+  fixed required Auth-Session-State auth_session_state = 2;
+  fixed required Origin-Host origin_host = 3;
+  fixed required Origin-Realm origin_realm = 4;
+  fixed required Destination-Host destination_host = 5;
+  fixed required Destination-Realm destination_realm = 6;
+
+  // Optional AVPs
+  optional DRMP drmp = 7;
+  optional Vendor-Specific-Application-Id vendor_specific_application_id = 8;
   repeated optional Supported-Features supported_features = 9;
   repeated optional User-Id user_id = 10;
   repeated optional Reset-ID reset_id = 11;
   optional Subscription-Data subscription_data = 12;
-  repeated optional Proxy-Info proxy_info = 100;
-  repeated optional Route-Record route_record = 101;
+  optional Subscription-Data-Deletion subscription_data_deletion = 13;
+  repeated optional AVP avp = 14;
+  repeated optional Proxy-Info proxy_info = 15;
+  repeated optional Route-Record route_record = 16;
 }
 
-// Reset-Answer (RSA) - Code 322
-// Direction: MME/SGSN -> HSS
+// ================================================================================
+// Reset-Answer (RSA) - Command Code 322
+// 3GPP TS 29.272 Section 7.2.16
+// Sent from MME/SGSN to HSS
+// ================================================================================
 command Reset-Answer {
   code = 322;
   application_id = 16777251;
   request = false;
   proxiable = true;
+  description = "Response to Reset Request";
 
+  // Required AVPs
   fixed required Session-Id session_id = 1;
-  optional DRMP drmp = 2;
-  optional Vendor-Specific-Application-Id vendor_specific_application_id = 3;
-  repeated optional Supported-Features supported_features = 4;
-  optional Result-Code result_code = 5;
-  optional Experimental-Result experimental_result = 6;
-  fixed required Auth-Session-State auth_session_state = 7;
-  fixed required Origin-Host origin_host = 8;
-  fixed required Origin-Realm origin_realm = 9;
-  optional Failed-AVP failed_avp = 10;
-  repeated optional Proxy-Info proxy_info = 100;
-  repeated optional Route-Record route_record = 101;
+  fixed required Auth-Session-State auth_session_state = 2;
+  fixed required Origin-Host origin_host = 3;
+  fixed required Origin-Realm origin_realm = 4;
+
+  // Optional AVPs
+  optional DRMP drmp = 5;
+  optional Vendor-Specific-Application-Id vendor_specific_application_id = 6;
+  repeated optional Supported-Features supported_features = 7;
+  optional Result-Code result_code = 8;
+  optional Experimental-Result experimental_result = 9;
+  repeated optional AVP avp = 10;
+  optional Failed-AVP failed_avp = 11;
+  repeated optional Proxy-Info proxy_info = 12;
+  repeated optional Route-Record route_record = 13;
 }
 
-// Notify-Request (NOR) - Code 323
-// Direction: MME/SGSN -> HSS
+// ================================================================================
+// Notify-Request (NOR) - Command Code 323
+// 3GPP TS 29.272 Section 7.2.17
+// Sent from MME/SGSN to HSS
+// ================================================================================
 command Notify-Request {
   code = 323;
   application_id = 16777251;
   request = true;
   proxiable = true;
+  description = "Notification to HSS about various events";
 
+  // Required AVPs
   fixed required Session-Id session_id = 1;
-  optional Vendor-Specific-Application-Id vendor_specific_application_id = 2;
-  optional DRMP drmp = 3;
-  fixed required Auth-Session-State auth_session_state = 4;
-  fixed required Origin-Host origin_host = 5;
-  fixed required Origin-Realm origin_realm = 6;
-  optional Destination-Host destination_host = 7;
-  fixed required Destination-Realm destination_realm = 8;
-  fixed required User-Name user_name = 9;  // IMSI
+  fixed required Auth-Session-State auth_session_state = 2;
+  fixed required Origin-Host origin_host = 3;
+  fixed required Origin-Realm origin_realm = 4;
+  fixed required Destination-Realm destination_realm = 5;
+  fixed required User-Name user_name = 6;
+
+  // Optional AVPs
+  optional DRMP drmp = 7;
+  optional Vendor-Specific-Application-Id vendor_specific_application_id = 8;
+  optional Destination-Host destination_host = 9;
   optional OC-Supported-Features oc_supported_features = 10;
   repeated optional Supported-Features supported_features = 11;
   optional Terminal-Information terminal_information = 12;
@@ -1691,31 +1374,105 @@ command Notify-Request {
   optional UE-SRVCC-Capability ue_srvcc_capability = 18;
   optional NOR-Flags nor_flags = 19;
   optional Homogeneous-Support-of-IMS-Voice-Over-PS-Sessions homogeneous_support_ims_voice = 20;
-  repeated optional Proxy-Info proxy_info = 100;
-  repeated optional Route-Record route_record = 101;
+  optional Maximum-UE-Availability-Time maximum_ue_availability_time = 21;
+  repeated optional Monitoring-Event-Config-Status monitoring_event_config_status = 22;
+  optional Emergency-Services emergency_services = 23;
+  repeated optional AVP avp = 24;
+  repeated optional Proxy-Info proxy_info = 25;
+  repeated optional Route-Record route_record = 26;
 }
 
-// Notify-Answer (NOA) - Code 323
-// Direction: HSS -> MME/SGSN
+// ================================================================================
+// Notify-Answer (NOA) - Command Code 323
+// 3GPP TS 29.272 Section 7.2.18
+// Sent from HSS to MME/SGSN
+// ================================================================================
 command Notify-Answer {
   code = 323;
   application_id = 16777251;
   request = false;
   proxiable = true;
+  description = "Response to Notify Request";
 
+  // Required AVPs
   fixed required Session-Id session_id = 1;
-  optional DRMP drmp = 2;
-  optional Vendor-Specific-Application-Id vendor_specific_application_id = 3;
-  optional Result-Code result_code = 4;
-  optional Experimental-Result experimental_result = 5;
-  fixed required Auth-Session-State auth_session_state = 6;
-  fixed required Origin-Host origin_host = 7;
-  fixed required Origin-Realm origin_realm = 8;
+  fixed required Auth-Session-State auth_session_state = 2;
+  fixed required Origin-Host origin_host = 3;
+  fixed required Origin-Realm origin_realm = 4;
+
+  // Optional AVPs
+  optional DRMP drmp = 5;
+  optional Vendor-Specific-Application-Id vendor_specific_application_id = 6;
+  optional Result-Code result_code = 7;
+  optional Experimental-Result experimental_result = 8;
   optional OC-Supported-Features oc_supported_features = 9;
   optional OC-OLR oc_olr = 10;
   repeated optional Load load = 11;
   repeated optional Supported-Features supported_features = 12;
-  optional Failed-AVP failed_avp = 13;
-  repeated optional Proxy-Info proxy_info = 100;
-  repeated optional Route-Record route_record = 101;
+  repeated optional AVP avp = 13;
+  optional Failed-AVP failed_avp = 14;
+  repeated optional Proxy-Info proxy_info = 15;
+  repeated optional Route-Record route_record = 16;
 }
+
+// ================================================================================
+//                         GROUPED AVP STRUCTURE SUMMARY
+// ================================================================================
+//
+// Subscription-Data (1400):
+//   +-- Subscriber-Status (1424)
+//   +-- MSISDN (701)
+//   +-- Network-Access-Mode (1417)
+//   +-- Operator-Determined-Barring (1425)
+//   +-- HPLMN-ODB (1418)
+//   +-- Access-Restriction-Data (1426)
+//   +-- APN-OI-Replacement (1427)
+//   +-- AMBR (1435)
+//   +-- APN-Configuration-Profile (1429)
+//   +-- RAT-Frequency-Selection-Priority-ID (1440)
+//   +-- *CSG-Subscription-Data (1436)
+//   +-- ...many more optional AVPs
+//
+// Terminal-Information (1401):
+//   +-- IMEI (1402)
+//   +-- 3GPP2-MEID (1471)
+//   +-- Software-Version (1403)
+//
+// Requested-EUTRAN-Authentication-Info (1408):
+//   +-- Number-Of-Requested-Vectors (1410)
+//   +-- Immediate-Response-Preferred (1412)
+//   +-- Re-Synchronization-Info (1411)
+//
+// Authentication-Info (1413):
+//   +-- *E-UTRAN-Vector (1414)
+//   +-- *UTRAN-Vector (1415)
+//   +-- *GERAN-Vector (1416)
+//
+// E-UTRAN-Vector (1414):
+//   +-- Item-Number (1419)
+//   +-- RAND (1447)
+//   +-- XRES (1448)
+//   +-- AUTN (1449)
+//   +-- KASME (1450)
+//
+// AMBR (1435):
+//   +-- Max-Requested-Bandwidth-UL (516)
+//   +-- Max-Requested-Bandwidth-DL (515)
+//
+// APN-Configuration-Profile (1429):
+//   +-- Context-Identifier (1423)
+//   +-- All-APN-Configurations-Included-Indicator (1428)
+//   +-- *APN-Configuration (1430)
+//
+// APN-Configuration (1430):
+//   +-- Context-Identifier (1423)
+//   +-- PDN-Type (1456)
+//   +-- Service-Selection (493)
+//   +-- EPS-Subscribed-QoS-Profile (1431)
+//   +-- VPLMN-Dynamic-Address-Allowed (1432)
+//   +-- MIP6-Agent-Info (486)
+//   +-- PDN-GW-Allocation-Type (1438)
+//   +-- AMBR (1435)
+//   +-- ...more optional AVPs
+//
+// ================================================================================

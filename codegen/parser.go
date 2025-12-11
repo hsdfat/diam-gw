@@ -108,6 +108,34 @@ func (p *ProtoParser) ParseFile(filename string) error {
 	return scanner.Err()
 }
 
+// ResolveAVPReferences resolves AVP references in commands and grouped fields
+// This should be called after all files have been parsed
+func (p *ProtoParser) ResolveAVPReferences() {
+	// Resolve references in command fields
+	for _, cmd := range p.Commands {
+		for _, field := range cmd.Fields {
+			if field.AVP != nil && field.AVP.Name != "AVP" {
+				// Try to resolve from AVPs map - always attempt resolution
+				if resolvedAVP, ok := p.AVPs[field.AVP.Name]; ok && resolvedAVP.Code != 0 {
+					field.AVP = resolvedAVP
+				}
+			}
+		}
+	}
+
+	// Resolve references in grouped fields
+	for _, avp := range p.AVPs {
+		for _, field := range avp.GroupedFields {
+			if field.AVP != nil && field.AVP.Name != "AVP" {
+				// Try to resolve from AVPs map - always attempt resolution
+				if resolvedAVP, ok := p.AVPs[field.AVP.Name]; ok && resolvedAVP.Code != 0 {
+					field.AVP = resolvedAVP
+				}
+			}
+		}
+	}
+}
+
 // parseAVPBlock parses an AVP definition block
 func (p *ProtoParser) parseAVPBlock(lines []string) error {
 	if len(lines) == 0 {
@@ -125,13 +153,44 @@ func (p *ProtoParser) parseAVPBlock(lines []string) error {
 	name = strings.TrimSpace(name)
 
 	avp := &AVPDefinition{
-		Name: name,
+		Name:          name,
+		GroupedFields: make([]*AVPField, 0),
 	}
 
 	// Parse AVP properties
-	for i := 1; i < len(lines)-1; i++ {
+	inGroupedBlock := false
+	var groupedLines []string
+
+	// Process all lines including the closing brace
+	// The last line (lines[len-1]) is always "}" which closes the AVP block
+	// We need to process up to but not including that line
+	for i := 1; i < len(lines); i++ {
 		line := strings.TrimSpace(lines[i])
 		if line == "" || strings.HasPrefix(line, "//") {
+			continue
+		}
+
+		// Check for grouped block start
+		if strings.HasPrefix(line, "grouped {") {
+			inGroupedBlock = true
+			groupedLines = []string{}
+			continue
+		}
+
+		if inGroupedBlock {
+			// Check for end of grouped block
+			if line == "}" {
+				// End of grouped block
+				inGroupedBlock = false
+				// Parse grouped fields
+				if err := p.parseGroupedFields(avp, groupedLines); err != nil {
+					return err
+				}
+				// Continue to next line - this closing brace belongs to grouped block
+				continue
+			}
+			// We're inside grouped block, collect the line
+			groupedLines = append(groupedLines, line)
 			continue
 		}
 
@@ -176,6 +235,99 @@ func (p *ProtoParser) parseAVPBlock(lines []string) error {
 	return nil
 }
 
+// parseGroupedFields parses the grouped block for a Grouped AVP
+func (p *ProtoParser) parseGroupedFields(avp *AVPDefinition, lines []string) error {
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line == "" || strings.HasPrefix(line, "//") {
+			continue
+		}
+
+		// Remove inline comments first
+		if idx := strings.Index(line, "//"); idx >= 0 {
+			line = strings.TrimSpace(line[:idx])
+		}
+
+		// Remove trailing semicolon
+		line = strings.TrimSuffix(line, ";")
+
+		// Parse field definition: "optional Vendor-Id vendor_id = 1"
+		// or "required Proxy-Host proxy_host = 1"
+		// or "repeated AVP avp = 1"
+		parts := strings.Fields(line)
+		if len(parts) < 4 {
+			continue
+		}
+
+		field := &AVPField{}
+		idx := 0
+
+		// Check for "optional", "required", or "repeated"
+		if parts[idx] == "optional" {
+			field.Required = false
+			idx++
+		} else if parts[idx] == "required" {
+			field.Required = true
+			idx++
+		} else if parts[idx] == "repeated" {
+			field.Repeated = true
+			field.Required = false
+			idx++
+		}
+
+		// AVP name
+		avpName := parts[idx]
+		idx++
+
+		// Field name
+		fieldName := parts[idx]
+		idx++
+
+		// Position (after =)
+		if idx < len(parts) && parts[idx] == "=" {
+			idx++
+			if idx < len(parts) {
+				posStr := strings.TrimSuffix(parts[idx], ";")
+				pos, err := strconv.Atoi(posStr)
+				if err == nil {
+					field.Position = pos
+				}
+			}
+		}
+
+		// Get or create AVP definition
+		// For grouped fields, we need to look up the AVP
+		// If it doesn't exist yet, we'll create a placeholder
+		var fieldAVP *AVPDefinition
+
+		// Handle generic "AVP" type (used for extensibility)
+		if avpName == "AVP" {
+			fieldAVP = &AVPDefinition{
+				Name:     "AVP",
+				Code:     0, // Will be runtime determined
+				TypeName: "OctetString",
+			}
+		} else {
+			var ok bool
+			fieldAVP, ok = p.AVPs[avpName]
+			if !ok {
+				// Create a placeholder - will be resolved later
+				fieldAVP = &AVPDefinition{
+					Name:     avpName,
+					TypeName: "OctetString", // Default placeholder type
+				}
+			}
+		}
+
+		field.AVP = fieldAVP
+		field.FieldName = toCamelCase(fieldName)
+
+		avp.GroupedFields = append(avp.GroupedFields, field)
+	}
+
+	return nil
+}
+
 // parseCommandBlock parses a command definition block
 func (p *ProtoParser) parseCommandBlock(lines []string) error {
 	if len(lines) == 0 {
@@ -202,6 +354,11 @@ func (p *ProtoParser) parseCommandBlock(lines []string) error {
 		line := strings.TrimSpace(lines[i])
 		if line == "" || strings.HasPrefix(line, "//") {
 			continue
+		}
+
+		// Remove inline comments first
+		if idx := strings.Index(line, "//"); idx >= 0 {
+			line = strings.TrimSpace(line[:idx])
 		}
 
 		// Remove trailing semicolon
@@ -245,6 +402,8 @@ func (p *ProtoParser) parseCommandBlock(lines []string) error {
 
 	// Generate abbreviation from name
 	cmd.Abbreviation = generateAbbreviation(name)
+	// Set the package name for this command
+	cmd.Package = p.PackageName
 
 	p.Commands = append(p.Commands, cmd)
 	return nil
@@ -302,9 +461,25 @@ func (p *ProtoParser) parseFieldDefinition(cmd *CommandDefinition, line string) 
 	}
 
 	// Get AVP definition
-	avp, ok := p.AVPs[avpName]
-	if !ok {
-		return fmt.Errorf("undefined AVP: %s", avpName)
+	// Handle generic "AVP" type (used for extensibility)
+	var avp *AVPDefinition
+	if avpName == "AVP" {
+		avp = &AVPDefinition{
+			Name:     "AVP",
+			Code:     0, // Will be runtime determined
+			TypeName: "OctetString",
+		}
+	} else {
+		var ok bool
+		avp, ok = p.AVPs[avpName]
+		if !ok {
+			// Create a placeholder for AVPs defined in other proto files (e.g., base protocol AVPs)
+			// These will be imported from their respective packages at runtime
+			avp = &AVPDefinition{
+				Name:     avpName,
+				TypeName: "OctetString", // Default placeholder - actual type from imported package
+			}
+		}
 	}
 
 	field.AVP = avp

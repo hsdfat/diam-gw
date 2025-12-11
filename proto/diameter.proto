@@ -1,6 +1,6 @@
-// Diameter Protocol Definition
-// This file defines the schema for Diameter base protocol commands
-// Similar to protobuf, this will be used to generate Go code
+// Diameter Base Protocol Definition
+// Based on RFC 3588 / RFC 6733
+// This file defines the schema for Diameter base protocol commands and AVPs
 
 syntax = "diameter1";
 
@@ -8,12 +8,178 @@ package diameter.base;
 
 option go_package = "github.com/hsdfat8/diam-gw/commands/base";
 
-// AVP Definitions
+// ================================================================================
+//                              DATA TYPES
+// ================================================================================
+// Basic AVP Data Types (RFC 3588 Section 4.2):
+//   - OctetString: Arbitrary data, variable length
+//   - Integer32: 32-bit signed value
+//   - Integer64: 64-bit signed value
+//   - Unsigned32: 32-bit unsigned value
+//   - Unsigned64: 64-bit unsigned value
+//   - Float32: Single precision floating point
+//   - Float64: Double precision floating point
+//   - Grouped: Sequence of AVPs
+//
+// Derived AVP Data Types (RFC 3588 Section 4.3):
+//   - Address: OctetString (AddressType + IP address)
+//   - Time: OctetString (NTP timestamp, 4 bytes)
+//   - UTF8String: OctetString (UTF-8 encoded)
+//   - DiameterIdentity: OctetString (FQDN)
+//   - DiameterURI: OctetString (aaa:// or aaas:// URI)
+//   - Enumerated: Integer32 (defined list of values)
+//   - IPFilterRule: OctetString (ASCII filter rule)
+//   - QoSFilterRule: OctetString (ASCII QoS rule)
+
+// ================================================================================
+//                         ENUMERATED VALUE DEFINITIONS
+// ================================================================================
+
+// Disconnect-Cause Values (AVP Code 273)
+enum DisconnectCause {
+  REBOOTING = 0;                    // Node is rebooting
+  BUSY = 1;                         // Node is too busy
+  DO_NOT_WANT_TO_TALK_TO_YOU = 2;   // Peer should not reconnect
+}
+
+// Re-Auth-Request-Type Values (AVP Code 285)
+enum ReAuthRequestType {
+  AUTHORIZE_ONLY = 0;               // Re-authorization only
+  AUTHORIZE_AUTHENTICATE = 1;       // Full re-authentication required
+}
+
+// Termination-Cause Values (AVP Code 295)
+enum TerminationCause {
+  DIAMETER_LOGOUT = 1;              // User initiated logout
+  DIAMETER_SERVICE_NOT_PROVIDED = 2; // Service could not be provided
+  DIAMETER_BAD_ANSWER = 3;          // Invalid answer from server
+  DIAMETER_ADMINISTRATIVE = 4;      // Admin terminated session
+  DIAMETER_LINK_BROKEN = 5;         // Link to user broken
+  DIAMETER_AUTH_EXPIRED = 6;        // Authorization expired
+  DIAMETER_USER_MOVED = 7;          // User moved to another server
+  DIAMETER_SESSION_TIMEOUT = 8;     // Session timed out
+}
+
+// Accounting-Record-Type Values (AVP Code 480)
+enum AccountingRecordType {
+  EVENT_RECORD = 1;                 // One-time event, no session
+  START_RECORD = 2;                 // Session start
+  INTERIM_RECORD = 3;               // Periodic update during session
+  STOP_RECORD = 4;                  // Session end
+}
+
+// Accounting-Realtime-Required Values (AVP Code 483)
+enum AccountingRealtimeRequired {
+  DELIVER_AND_GRANT = 1;            // Must deliver, grant service anyway
+  GRANT_AND_STORE = 2;              // Store if can't deliver, grant service
+  GRANT_AND_LOSE = 3;               // Grant service, may lose record
+}
+
+// Auth-Request-Type Values (AVP Code 274)
+enum AuthRequestType {
+  AUTHENTICATE_ONLY = 1;            // Authentication only
+  AUTHORIZE_ONLY = 2;               // Authorization only
+  AUTHORIZE_AUTHENTICATE = 3;       // Both authentication and authorization
+}
+
+// Auth-Session-State Values (AVP Code 277)
+enum AuthSessionState {
+  STATE_MAINTAINED = 0;             // Session state is maintained
+  NO_STATE_MAINTAINED = 1;          // No session state maintained
+}
+
+// Redirect-Host-Usage Values (AVP Code 261)
+enum RedirectHostUsage {
+  DONT_CACHE = 0;                   // Don't cache redirect
+  ALL_SESSION = 1;                  // Cache for all session messages
+  ALL_REALM = 2;                    // Cache for all realm messages
+  REALM_AND_APPLICATION = 3;        // Cache for realm and application
+  ALL_APPLICATION = 4;              // Cache for all application messages
+  ALL_HOST = 5;                     // Cache for all messages to host
+  ALL_USER = 6;                     // Cache for all user messages
+}
+
+// Session-Server-Failover Values (AVP Code 271)
+enum SessionServerFailover {
+  REFUSE_SERVICE = 0;               // Refuse service on failover
+  TRY_AGAIN = 1;                    // Client should try again
+  ALLOW_SERVICE = 2;                // Allow service on failover
+  TRY_AGAIN_ALLOW_SERVICE = 3;      // Try again, allow service if fails
+}
+
+// Inband-Security-Id Values (AVP Code 299)
+enum InbandSecurityId {
+  NO_INBAND_SECURITY = 0;           // No inband security
+  TLS = 1;                          // TLS security
+}
+
+// ================================================================================
+//                         RESULT CODE DEFINITIONS
+// ================================================================================
+
+// Result-Code Values (AVP Code 268)
+// Informational (1xxx)
+const DIAMETER_MULTI_ROUND_AUTH = 1001;
+
+// Success (2xxx)
+const DIAMETER_SUCCESS = 2001;
+const DIAMETER_LIMITED_SUCCESS = 2002;
+
+// Protocol Errors (3xxx)
+const DIAMETER_COMMAND_UNSUPPORTED = 3001;
+const DIAMETER_UNABLE_TO_DELIVER = 3002;
+const DIAMETER_REALM_NOT_SERVED = 3003;
+const DIAMETER_TOO_BUSY = 3004;
+const DIAMETER_LOOP_DETECTED = 3005;
+const DIAMETER_REDIRECT_INDICATION = 3006;
+const DIAMETER_APPLICATION_UNSUPPORTED = 3007;
+const DIAMETER_INVALID_HDR_BITS = 3008;
+const DIAMETER_INVALID_AVP_BITS = 3009;
+const DIAMETER_UNKNOWN_PEER = 3010;
+
+// Transient Failures (4xxx)
+const DIAMETER_AUTHENTICATION_REJECTED = 4001;
+const DIAMETER_OUT_OF_SPACE = 4002;
+
+// Permanent Failures (5xxx)
+const DIAMETER_AVP_UNSUPPORTED = 5001;
+const DIAMETER_UNKNOWN_SESSION_ID = 5002;
+const DIAMETER_AUTHORIZATION_REJECTED = 5003;
+const DIAMETER_INVALID_AVP_VALUE = 5004;
+const DIAMETER_MISSING_AVP = 5005;
+const DIAMETER_RESOURCES_EXCEEDED = 5006;
+const DIAMETER_CONTRADICTING_AVPS = 5007;
+const DIAMETER_AVP_NOT_ALLOWED = 5008;
+const DIAMETER_AVP_OCCURS_TOO_MANY_TIMES = 5009;
+const DIAMETER_NO_COMMON_APPLICATION = 5010;
+const DIAMETER_UNSUPPORTED_VERSION = 5011;
+const DIAMETER_UNABLE_TO_COMPLY = 5012;
+const DIAMETER_INVALID_BIT_IN_HEADER = 5013;
+const DIAMETER_INVALID_AVP_LENGTH = 5014;
+const DIAMETER_INVALID_MESSAGE_LENGTH = 5015;
+const DIAMETER_INVALID_AVP_BIT_COMBO = 5016;
+const DIAMETER_NO_COMMON_SECURITY = 5017;
+
+// ================================================================================
+//                         BASIC AVP DEFINITIONS
+// ================================================================================
+
+// Session Identification
+avp Session-Id {
+  code = 263;
+  type = UTF8String;
+  must = true;
+  may_encrypt = false;
+  description = "Globally unique session identifier. Format: <DiameterIdentity>;<high 32 bits>;<low 32 bits>[;<optional value>]";
+}
+
+// Origin/Destination Routing AVPs
 avp Origin-Host {
   code = 264;
   type = DiameterIdentity;
   must = true;
   may_encrypt = false;
+  description = "FQDN of the Diameter node originating the message";
 }
 
 avp Origin-Realm {
@@ -21,104 +187,15 @@ avp Origin-Realm {
   type = DiameterIdentity;
   must = true;
   may_encrypt = false;
+  description = "Realm of the Diameter node originating the message";
 }
 
-avp Host-IP-Address {
-  code = 257;
-  type = Address;
+avp Destination-Host {
+  code = 293;
+  type = DiameterIdentity;
   must = true;
   may_encrypt = false;
-}
-
-avp Vendor-Id {
-  code = 266;
-  type = Unsigned32;
-  must = true;
-  may_encrypt = false;
-}
-
-avp Product-Name {
-  code = 269;
-  type = UTF8String;
-  must = false;
-  may_encrypt = false;
-}
-
-avp Origin-State-Id {
-  code = 278;
-  type = Unsigned32;
-  must = false;
-  may_encrypt = false;
-}
-
-avp Supported-Vendor-Id {
-  code = 265;
-  type = Unsigned32;
-  must = false;
-  may_encrypt = false;
-}
-
-avp Auth-Application-Id {
-  code = 258;
-  type = Unsigned32;
-  must = false;
-  may_encrypt = false;
-}
-
-avp Inband-Security-Id {
-  code = 299;
-  type = Unsigned32;
-  must = false;
-  may_encrypt = false;
-}
-
-avp Acct-Application-Id {
-  code = 259;
-  type = Unsigned32;
-  must = false;
-  may_encrypt = false;
-}
-
-avp Vendor-Specific-Application-Id {
-  code = 260;
-  type = Grouped;
-  must = false;
-  may_encrypt = false;
-}
-
-avp Firmware-Revision {
-  code = 267;
-  type = Unsigned32;
-  must = false;
-  may_encrypt = false;
-}
-
-avp Result-Code {
-  code = 268;
-  type = Unsigned32;
-  must = true;
-  may_encrypt = false;
-}
-
-avp Error-Message {
-  code = 281;
-  type = UTF8String;
-  must = false;
-  may_encrypt = false;
-}
-
-avp Failed-AVP {
-  code = 279;
-  type = Grouped;
-  must = false;
-  may_encrypt = false;
-}
-
-avp Session-Id {
-  code = 263;
-  type = UTF8String;
-  must = true;
-  may_encrypt = false;
+  description = "FQDN of the Diameter node the message should be routed to";
 }
 
 avp Destination-Realm {
@@ -126,13 +203,115 @@ avp Destination-Realm {
   type = DiameterIdentity;
   must = true;
   may_encrypt = false;
+  description = "Realm the message should be routed to";
 }
 
-avp Destination-Host {
-  code = 293;
+// Peer Discovery/Capabilities AVPs
+avp Host-IP-Address {
+  code = 257;
+  type = Address;
+  must = true;
+  may_encrypt = false;
+  description = "IP address(es) of the Diameter node";
+}
+
+avp Vendor-Id {
+  code = 266;
+  type = Unsigned32;
+  must = true;
+  may_encrypt = false;
+  description = "IANA Private Enterprise Number of the vendor";
+}
+
+avp Product-Name {
+  code = 269;
+  type = UTF8String;
+  must = false;
+  may_encrypt = false;
+  description = "Vendor-assigned name for the product";
+}
+
+avp Origin-State-Id {
+  code = 278;
+  type = Unsigned32;
+  must = false;
+  may_encrypt = false;
+  description = "State machine state, used to detect restarts. Value changes after restart.";
+}
+
+avp Supported-Vendor-Id {
+  code = 265;
+  type = Unsigned32;
+  must = true;
+  may_encrypt = false;
+  description = "Vendor IDs supported by this node";
+}
+
+avp Firmware-Revision {
+  code = 267;
+  type = Unsigned32;
+  must = false;
+  may_encrypt = false;
+  description = "Firmware revision of the device";
+}
+
+// Application Identification AVPs
+avp Auth-Application-Id {
+  code = 258;
+  type = Unsigned32;
+  must = true;
+  may_encrypt = false;
+  description = "Authentication/Authorization application identifier";
+}
+
+avp Acct-Application-Id {
+  code = 259;
+  type = Unsigned32;
+  must = true;
+  may_encrypt = false;
+  description = "Accounting application identifier";
+}
+
+avp Inband-Security-Id {
+  code = 299;
+  type = Unsigned32;
+  must = true;
+  may_encrypt = false;
+  description = "Inband security mechanism. 0=NO_INBAND_SECURITY, 1=TLS";
+}
+
+// Result/Error AVPs
+avp Result-Code {
+  code = 268;
+  type = Unsigned32;
+  must = true;
+  may_encrypt = false;
+  description = "Result of the request. See Result Code definitions.";
+}
+
+avp Error-Message {
+  code = 281;
+  type = UTF8String;
+  must = false;
+  may_encrypt = false;
+  description = "Human-readable error message. MUST NOT be used for programmatic error handling.";
+}
+
+avp Error-Reporting-Host {
+  code = 294;
   type = DiameterIdentity;
   must = false;
   may_encrypt = false;
+  description = "Identity of the node that detected the error";
+}
+
+// Session Management AVPs
+avp User-Name {
+  code = 1;
+  type = UTF8String;
+  must = true;
+  may_encrypt = true;
+  description = "User identity in NAI format (user@realm)";
 }
 
 avp Disconnect-Cause {
@@ -140,6 +319,7 @@ avp Disconnect-Cause {
   type = Enumerated;
   must = true;
   may_encrypt = false;
+  description = "Reason for disconnection. 0=REBOOTING, 1=BUSY, 2=DO_NOT_WANT_TO_TALK_TO_YOU";
 }
 
 avp Re-Auth-Request-Type {
@@ -147,13 +327,7 @@ avp Re-Auth-Request-Type {
   type = Enumerated;
   must = true;
   may_encrypt = false;
-}
-
-avp User-Name {
-  code = 1;
-  type = UTF8String;
-  must = false;
-  may_encrypt = true;
+  description = "Type of re-auth. 0=AUTHORIZE_ONLY, 1=AUTHORIZE_AUTHENTICATE";
 }
 
 avp Termination-Cause {
@@ -161,13 +335,80 @@ avp Termination-Cause {
   type = Enumerated;
   must = true;
   may_encrypt = false;
+  description = "Reason for session termination. Values 1-8 defined.";
 }
 
+avp Auth-Request-Type {
+  code = 274;
+  type = Enumerated;
+  must = true;
+  may_encrypt = false;
+  description = "Type of auth request. 1=AUTHENTICATE_ONLY, 2=AUTHORIZE_ONLY, 3=AUTHORIZE_AUTHENTICATE";
+}
+
+avp Auth-Session-State {
+  code = 277;
+  type = Enumerated;
+  must = true;
+  may_encrypt = false;
+  description = "Session state maintenance. 0=STATE_MAINTAINED, 1=NO_STATE_MAINTAINED";
+}
+
+avp Authorization-Lifetime {
+  code = 291;
+  type = Unsigned32;
+  must = true;
+  may_encrypt = false;
+  description = "Maximum seconds the authorization is valid";
+}
+
+avp Auth-Grace-Period {
+  code = 276;
+  type = Unsigned32;
+  must = true;
+  may_encrypt = false;
+  description = "Grace period in seconds after Authorization-Lifetime expires";
+}
+
+avp Session-Timeout {
+  code = 27;
+  type = Unsigned32;
+  must = true;
+  may_encrypt = false;
+  description = "Maximum seconds the session may exist";
+}
+
+avp Multi-Round-Time-Out {
+  code = 272;
+  type = Unsigned32;
+  must = true;
+  may_encrypt = false;
+  description = "Timeout for multi-round authentication";
+}
+
+avp Class {
+  code = 25;
+  type = OctetString;
+  must = true;
+  may_encrypt = true;
+  description = "Opaque data for server use, returned unchanged by client";
+}
+
+avp Event-Timestamp {
+  code = 55;
+  type = Time;
+  must = true;
+  may_encrypt = false;
+  description = "Time when the event occurred (NTP format)";
+}
+
+// Accounting AVPs
 avp Accounting-Record-Type {
   code = 480;
   type = Enumerated;
   must = true;
   may_encrypt = false;
+  description = "Type of accounting record. 1=EVENT, 2=START, 3=INTERIM, 4=STOP";
 }
 
 avp Accounting-Record-Number {
@@ -175,189 +416,529 @@ avp Accounting-Record-Number {
   type = Unsigned32;
   must = true;
   may_encrypt = false;
+  description = "Sequence number for ordering accounting records";
 }
 
-// Command Definitions
+avp Acct-Session-Id {
+  code = 44;
+  type = OctetString;
+  must = true;
+  may_encrypt = false;
+  description = "Legacy accounting session identifier";
+}
 
-// Capabilities-Exchange-Request (CER)
+avp Acct-Multi-Session-Id {
+  code = 50;
+  type = UTF8String;
+  must = true;
+  may_encrypt = false;
+  description = "Links multiple related sessions (e.g., multilink PPP)";
+}
+
+avp Accounting-Sub-Session-Id {
+  code = 287;
+  type = Unsigned64;
+  must = true;
+  may_encrypt = false;
+  description = "Unique sub-session identifier within a session";
+}
+
+avp Acct-Interim-Interval {
+  code = 85;
+  type = Unsigned32;
+  must = true;
+  may_encrypt = false;
+  description = "Interval in seconds between interim accounting records";
+}
+
+avp Accounting-Realtime-Required {
+  code = 483;
+  type = Enumerated;
+  must = true;
+  may_encrypt = false;
+  description = "Real-time accounting requirement. 1=DELIVER_AND_GRANT, 2=GRANT_AND_STORE, 3=GRANT_AND_LOSE";
+}
+
+// Routing AVPs
+avp Route-Record {
+  code = 282;
+  type = DiameterIdentity;
+  must = true;
+  may_encrypt = false;
+  description = "Identity of proxy that forwarded the request. Added by each proxy.";
+}
+
+// Redirect AVPs
+avp Redirect-Host {
+  code = 292;
+  type = DiameterURI;
+  must = true;
+  may_encrypt = false;
+  description = "URI of server to redirect to";
+}
+
+avp Redirect-Host-Usage {
+  code = 261;
+  type = Enumerated;
+  must = true;
+  may_encrypt = false;
+  description = "How the redirect should be cached/used";
+}
+
+avp Redirect-Max-Cache-Time {
+  code = 262;
+  type = Unsigned32;
+  must = true;
+  may_encrypt = false;
+  description = "Maximum seconds to cache redirect information";
+}
+
+// Session Binding AVPs
+avp Session-Binding {
+  code = 270;
+  type = Unsigned32;
+  must = true;
+  may_encrypt = false;
+  description = "Flags indicating how session is bound";
+}
+
+avp Session-Server-Failover {
+  code = 271;
+  type = Enumerated;
+  must = true;
+  may_encrypt = false;
+  description = "Failover behavior. 0=REFUSE_SERVICE, 1=TRY_AGAIN, 2=ALLOW_SERVICE, 3=TRY_AGAIN_ALLOW_SERVICE";
+}
+
+// ================================================================================
+//                         GROUPED AVP DEFINITIONS
+// ================================================================================
+
+// Vendor-Specific-Application-Id (AVP Code 260)
+// Used to advertise support for vendor-specific Diameter applications
+// RFC 3588 Section 6.11
+avp Vendor-Specific-Application-Id {
+  code = 260;
+  type = Grouped;
+  must = true;
+  may_encrypt = false;
+  description = "Identifies a vendor-specific Diameter application";
+
+  grouped {
+    // Vendor-Id is required to identify the vendor
+    // At least one of Auth-Application-Id or Acct-Application-Id MUST be present
+    optional Vendor-Id vendor_id = 1;                    // Code 266, Unsigned32
+    optional Auth-Application-Id auth_application_id = 2; // Code 258, Unsigned32
+    optional Acct-Application-Id acct_application_id = 3; // Code 259, Unsigned32
+  }
+}
+
+// Failed-AVP (AVP Code 279)
+// Contains the AVP(s) that caused the failure
+// RFC 3588 Section 7.5
+avp Failed-AVP {
+  code = 279;
+  type = Grouped;
+  must = true;
+  may_encrypt = false;
+  description = "Contains the AVP(s) that caused a failure";
+
+  grouped {
+    // Contains one or more AVPs that caused the error
+    // The AVPs are included with their original values
+    // Used for debugging and error identification
+    repeated AVP avp = 1;  // Any AVP that caused the failure
+  }
+}
+
+// Proxy-Info (AVP Code 284)
+// Added by proxy agents to store state information
+// RFC 3588 Section 6.7.2
+avp Proxy-Info {
+  code = 284;
+  type = Grouped;
+  must = true;
+  may_encrypt = false;
+  description = "Allows proxy agents to add routing/state information";
+
+  grouped {
+    required Proxy-Host proxy_host = 1;    // Code 280, DiameterIdentity - FQDN of proxy
+    required Proxy-State proxy_state = 2;  // Code 33, OctetString - State data
+  }
+}
+
+avp Proxy-Host {
+  code = 280;
+  type = DiameterIdentity;
+  must = true;
+  may_encrypt = false;
+  description = "FQDN of the proxy that added the Proxy-Info AVP";
+}
+
+avp Proxy-State {
+  code = 33;
+  type = OctetString;
+  must = true;
+  may_encrypt = false;
+  description = "Opaque state data added by proxy, returned in answer";
+}
+
+// Experimental-Result (AVP Code 297)
+// Used to return vendor-specific result codes
+// RFC 3588 Section 7.6
+avp Experimental-Result {
+  code = 297;
+  type = Grouped;
+  must = true;
+  may_encrypt = false;
+  description = "Contains vendor-specific result code";
+
+  grouped {
+    required Vendor-Id vendor_id = 1;                              // Code 266, Unsigned32
+    required Experimental-Result-Code experimental_result_code = 2; // Code 298, Unsigned32
+  }
+}
+
+avp Experimental-Result-Code {
+  code = 298;
+  type = Unsigned32;
+  must = true;
+  may_encrypt = false;
+  description = "Vendor-specific result code";
+}
+
+// E2E-Sequence (AVP Code 300)
+// Used for end-to-end security and duplicate detection
+// RFC 3588 Section 6.15
+avp E2E-Sequence {
+  code = 300;
+  type = Grouped;
+  must = true;
+  may_encrypt = false;
+  description = "End-to-end sequence for security and duplicate detection";
+
+  grouped {
+    // Contains end-to-end identifier and optional nonce
+    required AVP avp = 1;  // Implementation specific content
+  }
+}
+
+// MIP-Home-Agent-Host (AVP Code 348) - From Mobile IP Application
+// Included for completeness as referenced in base protocol
+avp MIP-Home-Agent-Host {
+  code = 348;
+  type = Grouped;
+  must = true;
+  may_encrypt = false;
+  description = "Contains Home Agent identity for Mobile IP";
+
+  grouped {
+    required Destination-Realm destination_realm = 1;  // Code 283
+    required Destination-Host destination_host = 2;    // Code 293
+  }
+}
+
+// MIP6-Agent-Info (AVP Code 486) - From MIPv6 Application
+// Grouped AVP for Mobile IPv6
+avp MIP6-Agent-Info {
+  code = 486;
+  type = Grouped;
+  must = true;
+  may_encrypt = false;
+  description = "Contains Mobile IPv6 Home Agent information";
+
+  grouped {
+    repeated MIP-Home-Agent-Address mip_home_agent_address = 1;  // Code 334, Address
+    optional MIP-Home-Agent-Host mip_home_agent_host = 2;        // Code 348, Grouped
+    optional MIP6-Home-Link-Prefix mip6_home_link_prefix = 3;    // Code 125, OctetString
+  }
+}
+
+avp MIP-Home-Agent-Address {
+  code = 334;
+  type = Address;
+  must = true;
+  may_encrypt = false;
+  description = "IP address of the Mobile IP Home Agent";
+}
+
+avp MIP6-Home-Link-Prefix {
+  code = 125;
+  type = OctetString;
+  must = true;
+  may_encrypt = false;
+  description = "Home network prefix for Mobile IPv6";
+}
+
+// ================================================================================
+//                         COMMAND DEFINITIONS
+// ================================================================================
+
+// ================================================================================
+// Capabilities-Exchange-Request (CER) - Command Code 257
+// RFC 3588 Section 5.3.1
+// Sent after transport connection to negotiate capabilities
+// ================================================================================
 command Capabilities-Exchange-Request {
   code = 257;
-  application_id = 0;
+  application_id = 0;  // Base Protocol
   request = true;
-  proxiable = false;
+  proxiable = false;   // MUST be processed hop-by-hop
+  description = "Sent to exchange capabilities after transport connection";
 
-  // Fixed required AVPs
-  fixed required Origin-Host origin_host = 1;
-  fixed required Origin-Realm origin_realm = 2;
-
-  // Required AVPs (at least one)
-  repeated required Host-IP-Address host_ip_address = 3;
-
-  fixed required Vendor-Id vendor_id = 4;
-  fixed required Product-Name product_name = 5;
+  // Required AVPs
+  fixed required Origin-Host origin_host = 1;           // Sender's FQDN
+  fixed required Origin-Realm origin_realm = 2;         // Sender's realm
+  repeated required Host-IP-Address host_ip_address = 3; // At least 1 required
+  fixed required Vendor-Id vendor_id = 4;               // Implementation vendor
+  fixed required Product-Name product_name = 5;         // Product identifier
 
   // Optional AVPs
-  optional Origin-State-Id origin_state_id = 6;
+  optional Origin-State-Id origin_state_id = 6;         // Detect restarts
   repeated optional Supported-Vendor-Id supported_vendor_id = 7;
   repeated optional Auth-Application-Id auth_application_id = 8;
   repeated optional Inband-Security-Id inband_security_id = 9;
   repeated optional Acct-Application-Id acct_application_id = 10;
   repeated optional Vendor-Specific-Application-Id vendor_specific_application_id = 11;
   optional Firmware-Revision firmware_revision = 12;
+  repeated optional AVP avp = 13;  // Additional AVPs
 }
 
-// Capabilities-Exchange-Answer (CEA)
+// ================================================================================
+// Capabilities-Exchange-Answer (CEA) - Command Code 257
+// RFC 3588 Section 5.3.2
+// Response to CER, contains responder's capabilities
+// ================================================================================
 command Capabilities-Exchange-Answer {
   code = 257;
   application_id = 0;
   request = false;
   proxiable = false;
+  description = "Response to CER with responder's capabilities";
 
-  fixed required Result-Code result_code = 1;
+  // Required AVPs
+  fixed required Result-Code result_code = 1;           // 2001=Success
   fixed required Origin-Host origin_host = 2;
   fixed required Origin-Realm origin_realm = 3;
   repeated required Host-IP-Address host_ip_address = 4;
   fixed required Vendor-Id vendor_id = 5;
   fixed required Product-Name product_name = 6;
 
+  // Optional AVPs
   optional Origin-State-Id origin_state_id = 7;
-  optional Error-Message error_message = 8;
-  optional Failed-AVP failed_avp = 9;
+  optional Error-Message error_message = 8;             // Human-readable error
+  optional Failed-AVP failed_avp = 9;                   // Grouped: AVPs causing failure
   repeated optional Supported-Vendor-Id supported_vendor_id = 10;
   repeated optional Auth-Application-Id auth_application_id = 11;
   repeated optional Inband-Security-Id inband_security_id = 12;
   repeated optional Acct-Application-Id acct_application_id = 13;
   repeated optional Vendor-Specific-Application-Id vendor_specific_application_id = 14;
   optional Firmware-Revision firmware_revision = 15;
+  repeated optional AVP avp = 16;
 }
 
-// Device-Watchdog-Request (DWR)
+// ================================================================================
+// Device-Watchdog-Request (DWR) - Command Code 280
+// RFC 3588 Section 5.5.1
+// Keep-alive message, sent when connection is idle
+// ================================================================================
 command Device-Watchdog-Request {
   code = 280;
   application_id = 0;
   request = true;
   proxiable = false;
+  description = "Watchdog message to detect peer availability";
 
   fixed required Origin-Host origin_host = 1;
   fixed required Origin-Realm origin_realm = 2;
-  optional Origin-State-Id origin_state_id = 3;
+  optional Origin-State-Id origin_state_id = 3;  // Detect peer restart
+  repeated optional AVP avp = 4;
 }
 
-// Device-Watchdog-Answer (DWA)
+// ================================================================================
+// Device-Watchdog-Answer (DWA) - Command Code 280
+// RFC 3588 Section 5.5.2
+// Response to DWR
+// ================================================================================
 command Device-Watchdog-Answer {
   code = 280;
   application_id = 0;
   request = false;
   proxiable = false;
+  description = "Response to watchdog request";
 
-  fixed required Result-Code result_code = 1;
+  fixed required Result-Code result_code = 1;  // Should be 2001
   fixed required Origin-Host origin_host = 2;
   fixed required Origin-Realm origin_realm = 3;
   optional Error-Message error_message = 4;
-  optional Failed-AVP failed_avp = 5;
+  optional Failed-AVP failed_avp = 5;          // Grouped
   optional Origin-State-Id origin_state_id = 6;
+  repeated optional AVP avp = 7;
 }
 
-// Disconnect-Peer-Request (DPR)
+// ================================================================================
+// Disconnect-Peer-Request (DPR) - Command Code 282
+// RFC 3588 Section 5.4.1
+// Graceful connection termination
+// ================================================================================
 command Disconnect-Peer-Request {
   code = 282;
   application_id = 0;
   request = true;
   proxiable = false;
+  description = "Request to gracefully disconnect peer connection";
 
   fixed required Origin-Host origin_host = 1;
   fixed required Origin-Realm origin_realm = 2;
-  fixed required Disconnect-Cause disconnect_cause = 3;
+  fixed required Disconnect-Cause disconnect_cause = 3;  // Enumerated: reason
+  repeated optional AVP avp = 4;
 }
 
-// Disconnect-Peer-Answer (DPA)
+// ================================================================================
+// Disconnect-Peer-Answer (DPA) - Command Code 282
+// RFC 3588 Section 5.4.2
+// Response to DPR, connection closed after this
+// ================================================================================
 command Disconnect-Peer-Answer {
   code = 282;
   application_id = 0;
   request = false;
   proxiable = false;
+  description = "Response to disconnect request";
 
   fixed required Result-Code result_code = 1;
   fixed required Origin-Host origin_host = 2;
   fixed required Origin-Realm origin_realm = 3;
   optional Error-Message error_message = 4;
-  optional Failed-AVP failed_avp = 5;
+  optional Failed-AVP failed_avp = 5;  // Grouped
+  repeated optional AVP avp = 6;
 }
 
-// Re-Auth-Request (RAR)
+// ================================================================================
+// Re-Auth-Request (RAR) - Command Code 258
+// RFC 3588 Section 8.3.1
+// Server-initiated re-authentication request
+// ================================================================================
 command Re-Auth-Request {
   code = 258;
   application_id = 0;
   request = true;
-  proxiable = true;
+  proxiable = true;  // Can be proxied
+  description = "Server request for client to re-authenticate user";
 
-  fixed required Session-Id session_id = 1;
-  fixed required Origin-Host origin_host = 2;
+  fixed required Session-Id session_id = 1;            // Target session
+  fixed required Origin-Host origin_host = 2;          // Server identity
   fixed required Origin-Realm origin_realm = 3;
   fixed required Destination-Realm destination_realm = 4;
-  fixed required Destination-Host destination_host = 5;
+  fixed required Destination-Host destination_host = 5; // Client identity
   fixed required Auth-Application-Id auth_application_id = 6;
-  fixed required Re-Auth-Request-Type re_auth_request_type = 7;
+  fixed required Re-Auth-Request-Type re_auth_request_type = 7;  // Enumerated
+
   optional User-Name user_name = 8;
   optional Origin-State-Id origin_state_id = 9;
+  repeated optional Proxy-Info proxy_info = 10;        // Grouped
+  repeated optional Route-Record route_record = 11;
+  repeated optional AVP avp = 12;
 }
 
-// Re-Auth-Answer (RAA)
+// ================================================================================
+// Re-Auth-Answer (RAA) - Command Code 258
+// RFC 3588 Section 8.3.2
+// Client response to RAR
+// ================================================================================
 command Re-Auth-Answer {
   code = 258;
   application_id = 0;
   request = false;
   proxiable = true;
+  description = "Client response to re-authentication request";
 
   fixed required Session-Id session_id = 1;
   fixed required Result-Code result_code = 2;
   fixed required Origin-Host origin_host = 3;
   fixed required Origin-Realm origin_realm = 4;
+
   optional User-Name user_name = 5;
   optional Origin-State-Id origin_state_id = 6;
   optional Error-Message error_message = 7;
-  optional Failed-AVP failed_avp = 8;
+  optional Error-Reporting-Host error_reporting_host = 8;
+  optional Failed-AVP failed_avp = 9;                  // Grouped
+  repeated optional Redirect-Host redirect_host = 10;
+  optional Redirect-Host-Usage redirect_host_usage = 11;  // Enumerated
+  optional Redirect-Max-Cache-Time redirect_max_cache_time = 12;
+  repeated optional Proxy-Info proxy_info = 13;        // Grouped
+  repeated optional AVP avp = 14;
 }
 
-// Session-Termination-Request (STR)
+// ================================================================================
+// Session-Termination-Request (STR) - Command Code 275
+// RFC 3588 Section 8.4.1
+// Client-initiated session termination
+// ================================================================================
 command Session-Termination-Request {
   code = 275;
   application_id = 0;
   request = true;
   proxiable = true;
+  description = "Client request to terminate a session";
 
   fixed required Session-Id session_id = 1;
   fixed required Origin-Host origin_host = 2;
   fixed required Origin-Realm origin_realm = 3;
   fixed required Destination-Realm destination_realm = 4;
   fixed required Auth-Application-Id auth_application_id = 5;
-  fixed required Termination-Cause termination_cause = 6;
+  fixed required Termination-Cause termination_cause = 6;  // Enumerated
+
   optional User-Name user_name = 7;
   optional Destination-Host destination_host = 8;
+  repeated optional Class class = 9;
+  optional Origin-State-Id origin_state_id = 10;
+  repeated optional Proxy-Info proxy_info = 11;         // Grouped
+  repeated optional Route-Record route_record = 12;
+  repeated optional AVP avp = 13;
 }
 
-// Session-Termination-Answer (STA)
+// ================================================================================
+// Session-Termination-Answer (STA) - Command Code 275
+// RFC 3588 Section 8.4.2
+// Server response to STR
+// ================================================================================
 command Session-Termination-Answer {
   code = 275;
   application_id = 0;
   request = false;
   proxiable = true;
+  description = "Server response to session termination";
 
   fixed required Session-Id session_id = 1;
   fixed required Result-Code result_code = 2;
   fixed required Origin-Host origin_host = 3;
   fixed required Origin-Realm origin_realm = 4;
+
   optional User-Name user_name = 5;
-  optional Error-Message error_message = 6;
-  optional Failed-AVP failed_avp = 7;
+  repeated optional Class class = 6;
+  optional Error-Message error_message = 7;
+  optional Error-Reporting-Host error_reporting_host = 8;
+  optional Failed-AVP failed_avp = 9;                   // Grouped
+  optional Origin-State-Id origin_state_id = 10;
+  repeated optional Redirect-Host redirect_host = 11;
+  optional Redirect-Host-Usage redirect_host_usage = 12;
+  optional Redirect-Max-Cache-Time redirect_max_cache_time = 13;
+  repeated optional Proxy-Info proxy_info = 14;         // Grouped
+  repeated optional AVP avp = 15;
 }
 
-// Abort-Session-Request (ASR)
+// ================================================================================
+// Abort-Session-Request (ASR) - Command Code 274
+// RFC 3588 Section 8.5.1
+// Server-initiated session abort
+// ================================================================================
 command Abort-Session-Request {
   code = 274;
   application_id = 0;
   request = true;
   proxiable = true;
+  description = "Server request to abort a session";
 
   fixed required Session-Id session_id = 1;
   fixed required Origin-Host origin_host = 2;
@@ -365,51 +946,89 @@ command Abort-Session-Request {
   fixed required Destination-Realm destination_realm = 4;
   fixed required Destination-Host destination_host = 5;
   fixed required Auth-Application-Id auth_application_id = 6;
+
   optional User-Name user_name = 7;
   optional Origin-State-Id origin_state_id = 8;
+  repeated optional Proxy-Info proxy_info = 9;          // Grouped
+  repeated optional Route-Record route_record = 10;
+  repeated optional AVP avp = 11;
 }
 
-// Abort-Session-Answer (ASA)
+// ================================================================================
+// Abort-Session-Answer (ASA) - Command Code 274
+// RFC 3588 Section 8.5.2
+// Client response to ASR
+// ================================================================================
 command Abort-Session-Answer {
   code = 274;
   application_id = 0;
   request = false;
   proxiable = true;
+  description = "Client response to abort session request";
 
   fixed required Session-Id session_id = 1;
   fixed required Result-Code result_code = 2;
   fixed required Origin-Host origin_host = 3;
   fixed required Origin-Realm origin_realm = 4;
+
   optional User-Name user_name = 5;
   optional Origin-State-Id origin_state_id = 6;
   optional Error-Message error_message = 7;
-  optional Failed-AVP failed_avp = 8;
+  optional Error-Reporting-Host error_reporting_host = 8;
+  optional Failed-AVP failed_avp = 9;                   // Grouped
+  repeated optional Redirect-Host redirect_host = 10;
+  optional Redirect-Host-Usage redirect_host_usage = 11;
+  optional Redirect-Max-Cache-Time redirect_max_cache_time = 12;
+  repeated optional Proxy-Info proxy_info = 13;         // Grouped
+  repeated optional AVP avp = 14;
 }
 
-// Accounting-Request (ACR)
+// ================================================================================
+// Accounting-Request (ACR) - Command Code 271
+// RFC 3588 Section 9.7.1
+// Report resource usage for billing/auditing
+// ================================================================================
 command Accounting-Request {
   code = 271;
-  application_id = 0;
+  application_id = 3;  // Base Accounting Application
   request = true;
   proxiable = true;
+  description = "Report accounting information for billing/auditing";
 
   fixed required Session-Id session_id = 1;
   fixed required Origin-Host origin_host = 2;
   fixed required Origin-Realm origin_realm = 3;
   fixed required Destination-Realm destination_realm = 4;
-  fixed required Accounting-Record-Type accounting_record_type = 5;
+  fixed required Accounting-Record-Type accounting_record_type = 5;  // Enumerated
   fixed required Accounting-Record-Number accounting_record_number = 6;
+
   optional Acct-Application-Id acct_application_id = 7;
-  optional User-Name user_name = 8;
-  optional Destination-Host destination_host = 9;
+  optional Vendor-Specific-Application-Id vendor_specific_application_id = 8;  // Grouped
+  optional User-Name user_name = 9;
+  optional Destination-Host destination_host = 10;
+  optional Accounting-Sub-Session-Id accounting_sub_session_id = 11;
+  optional Acct-Session-Id acct_session_id = 12;
+  optional Acct-Multi-Session-Id acct_multi_session_id = 13;
+  optional Acct-Interim-Interval acct_interim_interval = 14;
+  optional Accounting-Realtime-Required accounting_realtime_required = 15;  // Enumerated
+  optional Origin-State-Id origin_state_id = 16;
+  optional Event-Timestamp event_timestamp = 17;
+  repeated optional Proxy-Info proxy_info = 18;         // Grouped
+  repeated optional Route-Record route_record = 19;
+  repeated optional AVP avp = 20;  // Application-specific accounting AVPs
 }
 
-// Accounting-Answer (ACA)
+// ================================================================================
+// Accounting-Answer (ACA) - Command Code 271
+// RFC 3588 Section 9.7.2
+// Response to ACR
+// ================================================================================
 command Accounting-Answer {
   code = 271;
-  application_id = 0;
+  application_id = 3;
   request = false;
   proxiable = true;
+  description = "Response to accounting request";
 
   fixed required Session-Id session_id = 1;
   fixed required Result-Code result_code = 2;
@@ -417,6 +1036,51 @@ command Accounting-Answer {
   fixed required Origin-Realm origin_realm = 4;
   fixed required Accounting-Record-Type accounting_record_type = 5;
   fixed required Accounting-Record-Number accounting_record_number = 6;
+
   optional Acct-Application-Id acct_application_id = 7;
-  optional User-Name user_name = 8;
+  optional Vendor-Specific-Application-Id vendor_specific_application_id = 8;  // Grouped
+  optional User-Name user_name = 9;
+  optional Acct-Interim-Interval acct_interim_interval = 10;
+  optional Accounting-Realtime-Required accounting_realtime_required = 11;
+  optional Origin-State-Id origin_state_id = 12;
+  optional Event-Timestamp event_timestamp = 13;
+  optional Error-Message error_message = 14;
+  optional Error-Reporting-Host error_reporting_host = 15;
+  optional Failed-AVP failed_avp = 16;                  // Grouped
+  repeated optional Proxy-Info proxy_info = 17;         // Grouped
+  repeated optional AVP avp = 18;
 }
+
+// ================================================================================
+//                         GROUPED AVP STRUCTURE SUMMARY
+// ================================================================================
+//
+// Vendor-Specific-Application-Id (260):
+//   +-- Vendor-Id (266)              [Optional, Unsigned32]
+//   +-- Auth-Application-Id (258)    [Optional, Unsigned32]
+//   +-- Acct-Application-Id (259)    [Optional, Unsigned32]
+//
+// Failed-AVP (279):
+//   +-- *AVP                         [1+, Any AVP that caused failure]
+//
+// Proxy-Info (284):
+//   +-- Proxy-Host (280)             [Required, DiameterIdentity]
+//   +-- Proxy-State (33)             [Required, OctetString]
+//
+// Experimental-Result (297):
+//   +-- Vendor-Id (266)              [Required, Unsigned32]
+//   +-- Experimental-Result-Code (298) [Required, Unsigned32]
+//
+// E2E-Sequence (300):
+//   +-- *AVP                         [Implementation specific]
+//
+// MIP-Home-Agent-Host (348):
+//   +-- Destination-Realm (283)      [Required, DiameterIdentity]
+//   +-- Destination-Host (293)       [Required, DiameterIdentity]
+//
+// MIP6-Agent-Info (486):
+//   +-- *MIP-Home-Agent-Address (334) [Optional, Address]
+//   +-- MIP-Home-Agent-Host (348)     [Optional, Grouped]
+//   +-- MIP6-Home-Link-Prefix (125)   [Optional, OctetString]
+//
+// ================================================================================

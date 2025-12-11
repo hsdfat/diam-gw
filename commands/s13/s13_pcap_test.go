@@ -275,7 +275,11 @@ func TestMEIdentityCheckRequest_Validation(t *testing.T) {
 		msg.OriginHost = models_base.DiameterIdentity("client.example.com")
 		msg.OriginRealm = models_base.DiameterIdentity("client.example.com")
 		msg.DestinationRealm = models_base.DiameterIdentity("server.example.com")
-		// msg.TerminalInformation (Grouped) needs to be set manually
+		msg.TerminalInformation = &TerminalInformation{
+			Imei:            ptrUTF8String("123456789012345"),
+			Meid:            ptrOctetString([]byte{0x01, 0x02, 0x03}),
+			SoftwareVersion: ptrUTF8String("01"),
+		}
 
 		err := msg.Validate()
 		if err != nil {
@@ -302,7 +306,11 @@ func TestMEIdentityCheckRequest_PCAP(t *testing.T) {
 	msg.OriginHost = models_base.DiameterIdentity("client.example.com")
 	msg.OriginRealm = models_base.DiameterIdentity("client.example.com")
 	msg.DestinationRealm = models_base.DiameterIdentity("server.example.com")
-	// msg.TerminalInformation (Grouped) needs to be set manually
+	msg.TerminalInformation = &TerminalInformation{
+		Imei:            ptrUTF8String("123456789012345"),
+		Meid:            ptrOctetString([]byte{0x01, 0x02, 0x03}),
+		SoftwareVersion: ptrUTF8String("01"),
+	}
 
 	// Set header identifiers
 	msg.Header.HopByHopID = 0x12345678
@@ -342,7 +350,11 @@ func TestMEIdentityCheckRequest_MarshalUnmarshal(t *testing.T) {
 	original.OriginHost = models_base.DiameterIdentity("client.example.com")
 	original.OriginRealm = models_base.DiameterIdentity("client.example.com")
 	original.DestinationRealm = models_base.DiameterIdentity("server.example.com")
-	// original.TerminalInformation (Grouped) needs to be set manually
+	original.TerminalInformation = &TerminalInformation{
+		Imei:            ptrUTF8String("123456789012345"),
+		Meid:            ptrOctetString([]byte{0x01, 0x02, 0x03}),
+		SoftwareVersion: ptrUTF8String("01"),
+	}
 
 	// Set header identifiers for comparison
 	original.Header.HopByHopID = 0xAABBCCDD
@@ -421,7 +433,11 @@ func BenchmarkMEIdentityCheckRequest_Marshal(b *testing.B) {
 	msg.OriginHost = models_base.DiameterIdentity("client.example.com")
 	msg.OriginRealm = models_base.DiameterIdentity("client.example.com")
 	msg.DestinationRealm = models_base.DiameterIdentity("server.example.com")
-	// msg.TerminalInformation (Grouped) needs to be set manually
+	msg.TerminalInformation = &TerminalInformation{
+		Imei:            ptrUTF8String("123456789012345"),
+		Meid:            ptrOctetString([]byte{0x01, 0x02, 0x03}),
+		SoftwareVersion: ptrUTF8String("01"),
+	}
 
 	b.ResetTimer()
 	b.ReportAllocs()
@@ -442,7 +458,11 @@ func BenchmarkMEIdentityCheckRequest_Unmarshal(b *testing.B) {
 	msg.OriginHost = models_base.DiameterIdentity("client.example.com")
 	msg.OriginRealm = models_base.DiameterIdentity("client.example.com")
 	msg.DestinationRealm = models_base.DiameterIdentity("server.example.com")
-	// msg.TerminalInformation (Grouped) needs to be set manually
+	msg.TerminalInformation = &TerminalInformation{
+		Imei:            ptrUTF8String("123456789012345"),
+		Meid:            ptrOctetString([]byte{0x01, 0x02, 0x03}),
+		SoftwareVersion: ptrUTF8String("01"),
+	}
 
 	data, err := msg.Marshal()
 	if err != nil {
@@ -469,7 +489,11 @@ func BenchmarkMEIdentityCheckRequest_Roundtrip(b *testing.B) {
 	msg.OriginHost = models_base.DiameterIdentity("client.example.com")
 	msg.OriginRealm = models_base.DiameterIdentity("client.example.com")
 	msg.DestinationRealm = models_base.DiameterIdentity("server.example.com")
-	// msg.TerminalInformation (Grouped) needs to be set manually
+	msg.TerminalInformation = &TerminalInformation{
+		Imei:            ptrUTF8String("123456789012345"),
+		Meid:            ptrOctetString([]byte{0x01, 0x02, 0x03}),
+		SoftwareVersion: ptrUTF8String("01"),
+	}
 
 	b.ResetTimer()
 	b.ReportAllocs()
@@ -743,7 +767,11 @@ func TestMIC_Pair_PCAP(t *testing.T) {
 	request.OriginHost = models_base.DiameterIdentity("client.example.com")
 	request.OriginRealm = models_base.DiameterIdentity("client.example.com")
 	request.DestinationRealm = models_base.DiameterIdentity("server.example.com")
-	// request.TerminalInformation (Grouped) needs to be set manually
+	request.TerminalInformation = &TerminalInformation{
+		Imei:            ptrUTF8String("123456789012345"),
+		Meid:            ptrOctetString([]byte{0x01, 0x02, 0x03}),
+		SoftwareVersion: ptrUTF8String("01"),
+	}
 
 	// Set header identifiers for request
 	request.Header.HopByHopID = 0x12345678

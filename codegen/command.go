@@ -8,15 +8,16 @@ type CommandDefinition struct {
 	ApplicationID uint32      // Application ID
 	Request       bool        // Request or Answer
 	Proxiable     bool        // Can be proxied
+	Package       string      // Package name for organizing output (e.g., "base", "s6a")
 	Fields        []*AVPField // List of AVP fields
 }
 
 // CommandFlags represents Diameter command header flags
 type CommandFlags struct {
-	Request             bool // R-bit
-	Proxiable           bool // P-bit
-	Error               bool // E-bit
-	Retransmitted       bool // T-bit
+	Request       bool // R-bit
+	Proxiable     bool // P-bit
+	Error         bool // E-bit
+	Retransmitted bool // T-bit
 }
 
 // DiameterHeader represents the Diameter message header (20 bytes)

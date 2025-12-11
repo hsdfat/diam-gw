@@ -4,13 +4,14 @@ import "github.com/hsdfat8/diam-gw/models_base"
 
 // AVPDefinition represents an AVP definition from the proto file
 type AVPDefinition struct {
-	Name        string // e.g., "Origin-Host"
-	Code        uint32
-	Type        models_base.TypeID
-	TypeName    string // e.g., "DiameterIdentity"
-	Must        bool   // M-bit (Mandatory)
-	MayEncrypt  bool   // P-bit (Protected)
-	VendorID    uint32 // 0 for IETF AVPs
+	Name         string // e.g., "Origin-Host"
+	Code         uint32
+	Type         models_base.TypeID
+	TypeName     string // e.g., "DiameterIdentity"
+	Must         bool   // M-bit (Mandatory)
+	MayEncrypt   bool   // P-bit (Protected)
+	VendorID     uint32 // 0 for IETF AVPs
+	GroupedFields []*AVPField // For Grouped AVPs
 }
 
 // AVPField represents a field in a command message

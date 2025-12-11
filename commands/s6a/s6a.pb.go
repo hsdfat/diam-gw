@@ -29,161 +29,2574 @@ type DiameterHeader struct {
 	EndToEndID    uint32       // 4 bytes
 }
 
+// Grouped AVP structures
+
+// RequestedUTRANGERANAuthenticationInfo represents the Requested-UTRAN-GERAN-Authentication-Info grouped AVP (AVP Code 1409)
+type RequestedUTRANGERANAuthenticationInfo struct {
+	NumberOfRequestedVectors   *models_base.Unsigned32  // Optional
+	ImmediateResponsePreferred *models_base.Unsigned32  // Optional
+	ReSynchronizationInfo      *models_base.OctetString // Optional
+}
+
+// Marshal serializes RequestedUTRANGERANAuthenticationInfo to bytes
+func (g *RequestedUTRANGERANAuthenticationInfo) Marshal() ([]byte, error) {
+	var buf bytes.Buffer
+
+	// Marshal NumberOfRequestedVectors (optional)
+	if g.NumberOfRequestedVectors != nil {
+		buf.Write(marshalAVPWithVendor(1410, *g.NumberOfRequestedVectors, true, false, 10415))
+	}
+
+	// Marshal ImmediateResponsePreferred (optional)
+	if g.ImmediateResponsePreferred != nil {
+		buf.Write(marshalAVPWithVendor(1412, *g.ImmediateResponsePreferred, true, false, 10415))
+	}
+
+	// Marshal ReSynchronizationInfo (optional)
+	if g.ReSynchronizationInfo != nil {
+		buf.Write(marshalAVPWithVendor(1411, *g.ReSynchronizationInfo, true, false, 10415))
+	}
+
+	return buf.Bytes(), nil
+}
+
+// Unmarshal deserializes bytes into RequestedUTRANGERANAuthenticationInfo
+func (g *RequestedUTRANGERANAuthenticationInfo) Unmarshal(data []byte) error {
+	// Parse AVPs in the grouped data
+	avpData := data
+	for len(avpData) > 0 {
+		if len(avpData) < 8 {
+			break // Not enough data for AVP header
+		}
+
+		// Parse AVP header
+		avpCode := binary.BigEndian.Uint32(avpData[0:4])
+		avpFlags := avpData[4]
+		avpLength := binary.BigEndian.Uint32([]byte{0, avpData[5], avpData[6], avpData[7]})
+
+		if int(avpLength) > len(avpData) {
+			return fmt.Errorf("AVP length exceeds remaining data")
+		}
+
+		// Extract AVP data
+		headerSize := 8
+		var vendorID uint32
+		if avpFlags&0x80 != 0 { // V-bit set
+			if len(avpData) < 12 {
+				return fmt.Errorf("AVP data too short for vendor ID")
+			}
+			vendorID = binary.BigEndian.Uint32(avpData[8:12])
+			headerSize = 12
+		}
+		avpDataLen := int(avpLength) - headerSize
+		if avpDataLen < 0 {
+			return fmt.Errorf("invalid AVP data length")
+		}
+		avpValue := avpData[headerSize : headerSize+avpDataLen]
+
+		// Parse AVP based on code and vendor ID
+		switch avpCode {
+		case 1410: // Number-Of-Requested-Vectors
+			if vendorID != 10415 {
+				break // Vendor ID mismatch
+			}
+			val, err := models_base.DecodeUnsigned32(avpValue)
+			if err == nil {
+				v := val.(models_base.Unsigned32)
+				g.NumberOfRequestedVectors = &v
+			}
+		case 1412: // Immediate-Response-Preferred
+			if vendorID != 10415 {
+				break // Vendor ID mismatch
+			}
+			val, err := models_base.DecodeUnsigned32(avpValue)
+			if err == nil {
+				v := val.(models_base.Unsigned32)
+				g.ImmediateResponsePreferred = &v
+			}
+		case 1411: // Re-Synchronization-Info
+			if vendorID != 10415 {
+				break // Vendor ID mismatch
+			}
+			val, err := models_base.DecodeOctetString(avpValue)
+			if err == nil {
+				v := val.(models_base.OctetString)
+				g.ReSynchronizationInfo = &v
+			}
+		}
+
+		// Move to next AVP (with padding)
+		paddedLength := int(avpLength)
+		if paddedLength%4 != 0 {
+			paddedLength += 4 - (paddedLength % 4)
+		}
+		if paddedLength > len(avpData) {
+			break
+		}
+		avpData = avpData[paddedLength:]
+	}
+
+	return nil
+}
+
+// MIPHomeAgentHost represents the MIP-Home-Agent-Host grouped AVP (AVP Code 348)
+type MIPHomeAgentHost struct {
+	DestinationRealm models_base.DiameterIdentity // Required
+	DestinationHost  models_base.DiameterIdentity // Required
+}
+
+// Marshal serializes MIPHomeAgentHost to bytes
+func (g *MIPHomeAgentHost) Marshal() ([]byte, error) {
+	var buf bytes.Buffer
+
+	// Marshal DestinationRealm (required)
+	buf.Write(marshalAVP(283, g.DestinationRealm, true, false))
+
+	// Marshal DestinationHost (required)
+	buf.Write(marshalAVP(293, g.DestinationHost, true, false))
+
+	return buf.Bytes(), nil
+}
+
+// Unmarshal deserializes bytes into MIPHomeAgentHost
+func (g *MIPHomeAgentHost) Unmarshal(data []byte) error {
+	// Parse AVPs in the grouped data
+	avpData := data
+	for len(avpData) > 0 {
+		if len(avpData) < 8 {
+			break // Not enough data for AVP header
+		}
+
+		// Parse AVP header
+		avpCode := binary.BigEndian.Uint32(avpData[0:4])
+		avpFlags := avpData[4]
+		avpLength := binary.BigEndian.Uint32([]byte{0, avpData[5], avpData[6], avpData[7]})
+
+		if int(avpLength) > len(avpData) {
+			return fmt.Errorf("AVP length exceeds remaining data")
+		}
+
+		// Extract AVP data
+		headerSize := 8
+		if avpFlags&0x80 != 0 { // V-bit set
+			if len(avpData) < 12 {
+				return fmt.Errorf("AVP data too short for vendor ID")
+			}
+			_ = binary.BigEndian.Uint32(avpData[8:12]) // vendorID not used
+			headerSize = 12
+		}
+		avpDataLen := int(avpLength) - headerSize
+		if avpDataLen < 0 {
+			return fmt.Errorf("invalid AVP data length")
+		}
+		avpValue := avpData[headerSize : headerSize+avpDataLen]
+
+		// Parse AVP based on code and vendor ID
+		switch avpCode {
+		case 283: // Destination-Realm
+			val, err := models_base.DecodeDiameterIdentity(avpValue)
+			if err == nil {
+				g.DestinationRealm = val.(models_base.DiameterIdentity)
+			}
+		case 293: // Destination-Host
+			val, err := models_base.DecodeDiameterIdentity(avpValue)
+			if err == nil {
+				g.DestinationHost = val.(models_base.DiameterIdentity)
+			}
+		}
+
+		// Move to next AVP (with padding)
+		paddedLength := int(avpLength)
+		if paddedLength%4 != 0 {
+			paddedLength += 4 - (paddedLength % 4)
+		}
+		if paddedLength > len(avpData) {
+			break
+		}
+		avpData = avpData[paddedLength:]
+	}
+
+	return nil
+}
+
+// SubscriptionData represents the Subscription-Data grouped AVP (AVP Code 1400)
+type SubscriptionData struct {
+	SubscriberStatus                     *models_base.Enumerated   // Optional
+	Msisdn                               *models_base.OctetString  // Optional
+	AMsisdn                              *models_base.OctetString  // Optional
+	StnSr                                *models_base.OctetString  // Optional - WARNING: AVP code not defined, DO NOT USE
+	IcsIndicator                         *models_base.OctetString  // Optional - WARNING: AVP code not defined, DO NOT USE
+	NetworkAccessMode                    *models_base.OctetString  // Optional - WARNING: AVP code not defined, DO NOT USE
+	OperatorDeterminedBarring            *models_base.Unsigned32   // Optional
+	HplmnOdb                             *models_base.OctetString  // Optional - WARNING: AVP code not defined, DO NOT USE
+	RegionalSubscriptionZoneCode         []models_base.OctetString // Optional - WARNING: AVP code not defined, DO NOT USE
+	AccessRestrictionData                *models_base.Unsigned32   // Optional
+	ApnOiReplacement                     *models_base.UTF8String   // Optional
+	LcsInfo                              *models_base.OctetString  // Optional - WARNING: AVP code not defined, DO NOT USE
+	TeleserviceList                      *models_base.OctetString  // Optional - WARNING: AVP code not defined, DO NOT USE
+	CallBarringInfo                      []models_base.OctetString // Optional - WARNING: AVP code not defined, DO NOT USE
+	ChargingCharacteristics              *models_base.OctetString  // Optional - WARNING: AVP code not defined, DO NOT USE
+	Ambr                                 *AMBR                     // Optional
+	ApnConfigurationProfile              *APNConfigurationProfile  // Optional
+	RatFrequencySelectionPriorityId      *models_base.OctetString  // Optional - WARNING: AVP code not defined, DO NOT USE
+	TraceData                            *models_base.OctetString  // Optional - WARNING: AVP code not defined, DO NOT USE
+	GprsSubscriptionData                 *models_base.OctetString  // Optional - WARNING: AVP code not defined, DO NOT USE
+	CsgSubscriptionData                  []*CSGSubscriptionData    // Optional
+	RoamingRestricted                    *models_base.OctetString  // Optional - WARNING: AVP code not defined, DO NOT USE
+	SubscribedPeriodicRauTauTimer        *models_base.OctetString  // Optional - WARNING: AVP code not defined, DO NOT USE
+	MpsPriority                          *models_base.OctetString  // Optional - WARNING: AVP code not defined, DO NOT USE
+	VplmnLipaAllowed                     *models_base.OctetString  // Optional - WARNING: AVP code not defined, DO NOT USE
+	RelayNodeIndicator                   *models_base.OctetString  // Optional - WARNING: AVP code not defined, DO NOT USE
+	MdtUserConsent                       *models_base.OctetString  // Optional - WARNING: AVP code not defined, DO NOT USE
+	SubscribedVsrvcc                     *models_base.OctetString  // Optional - WARNING: AVP code not defined, DO NOT USE
+	ProseSubscriptionData                *models_base.OctetString  // Optional - WARNING: AVP code not defined, DO NOT USE
+	SubscriptionDataFlags                *models_base.OctetString  // Optional - WARNING: AVP code not defined, DO NOT USE
+	AdjacentAccessRestrictionData        []models_base.OctetString // Optional - WARNING: AVP code not defined, DO NOT USE
+	DlBufferingSuggestedPacketCount      *models_base.OctetString  // Optional - WARNING: AVP code not defined, DO NOT USE
+	ImsiGroupId                          []models_base.OctetString // Optional - WARNING: AVP code not defined, DO NOT USE
+	UeUsageType                          *models_base.OctetString  // Optional - WARNING: AVP code not defined, DO NOT USE
+	AeseCommunicationPattern             []models_base.OctetString // Optional - WARNING: AVP code not defined, DO NOT USE
+	MonitoringEventConfiguration         []models_base.OctetString // Optional - WARNING: AVP code not defined, DO NOT USE
+	EmergencyInfo                        *models_base.OctetString  // Optional - WARNING: AVP code not defined, DO NOT USE
+	V2xSubscriptionData                  *models_base.OctetString  // Optional - WARNING: AVP code not defined, DO NOT USE
+	EdrxCycleLength                      *models_base.OctetString  // Optional - WARNING: AVP code not defined, DO NOT USE
+	ExternalIdentifier                   *models_base.OctetString  // Optional - WARNING: AVP code not defined, DO NOT USE
+	ActiveTime                           *models_base.OctetString  // Optional - WARNING: AVP code not defined, DO NOT USE
+	ServiceGapTime                       *models_base.OctetString  // Optional - WARNING: AVP code not defined, DO NOT USE
+	BroadcastLocationAssistanceDataTypes *models_base.OctetString  // Optional - WARNING: AVP code not defined, DO NOT USE
+	AerialUeSubscriptionInformation      *models_base.OctetString  // Optional - WARNING: AVP code not defined, DO NOT USE
+	CoreNetworkRestrictions              *models_base.OctetString  // Optional - WARNING: AVP code not defined, DO NOT USE
+}
+
+// Marshal serializes SubscriptionData to bytes
+func (g *SubscriptionData) Marshal() ([]byte, error) {
+	var buf bytes.Buffer
+
+	// Marshal SubscriberStatus (optional)
+	if g.SubscriberStatus != nil {
+		buf.Write(marshalAVPWithVendor(1424, *g.SubscriberStatus, true, false, 10415))
+	}
+
+	// Marshal Msisdn (optional)
+	if g.Msisdn != nil {
+		buf.Write(marshalAVPWithVendor(701, *g.Msisdn, true, false, 10415))
+	}
+
+	// Marshal AMsisdn (optional)
+	if g.AMsisdn != nil {
+		buf.Write(marshalAVPWithVendor(1643, *g.AMsisdn, true, false, 10415))
+	}
+
+	// Marshal StnSr (optional)
+	if g.StnSr != nil {
+		buf.Write(marshalAVP(0, *g.StnSr, false, false))
+	}
+
+	// Marshal IcsIndicator (optional)
+	if g.IcsIndicator != nil {
+		buf.Write(marshalAVP(0, *g.IcsIndicator, false, false))
+	}
+
+	// Marshal NetworkAccessMode (optional)
+	if g.NetworkAccessMode != nil {
+		buf.Write(marshalAVP(0, *g.NetworkAccessMode, false, false))
+	}
+
+	// Marshal OperatorDeterminedBarring (optional)
+	if g.OperatorDeterminedBarring != nil {
+		buf.Write(marshalAVPWithVendor(1425, *g.OperatorDeterminedBarring, true, false, 10415))
+	}
+
+	// Marshal HplmnOdb (optional)
+	if g.HplmnOdb != nil {
+		buf.Write(marshalAVP(0, *g.HplmnOdb, false, false))
+	}
+
+	// Marshal RegionalSubscriptionZoneCode (repeated)
+	for _, v := range g.RegionalSubscriptionZoneCode {
+		buf.Write(marshalAVP(0, v, false, false))
+	}
+
+	// Marshal AccessRestrictionData (optional)
+	if g.AccessRestrictionData != nil {
+		buf.Write(marshalAVPWithVendor(1426, *g.AccessRestrictionData, true, false, 10415))
+	}
+
+	// Marshal ApnOiReplacement (optional)
+	if g.ApnOiReplacement != nil {
+		buf.Write(marshalAVPWithVendor(1427, *g.ApnOiReplacement, true, false, 10415))
+	}
+
+	// Marshal LcsInfo (optional)
+	if g.LcsInfo != nil {
+		buf.Write(marshalAVP(0, *g.LcsInfo, false, false))
+	}
+
+	// Marshal TeleserviceList (optional)
+	if g.TeleserviceList != nil {
+		buf.Write(marshalAVP(0, *g.TeleserviceList, false, false))
+	}
+
+	// Marshal CallBarringInfo (repeated)
+	for _, v := range g.CallBarringInfo {
+		buf.Write(marshalAVP(0, v, false, false))
+	}
+
+	// Marshal ChargingCharacteristics (optional)
+	if g.ChargingCharacteristics != nil {
+		buf.Write(marshalAVP(0, *g.ChargingCharacteristics, false, false))
+	}
+
+	// Marshal Ambr (grouped)
+	if g.Ambr != nil {
+		if groupedData, err := g.Ambr.Marshal(); err == nil {
+			buf.Write(marshalAVPWithVendor(1435, models_base.Grouped(groupedData), true, false, 10415))
+		}
+	}
+
+	// Marshal ApnConfigurationProfile (grouped)
+	if g.ApnConfigurationProfile != nil {
+		if groupedData, err := g.ApnConfigurationProfile.Marshal(); err == nil {
+			buf.Write(marshalAVPWithVendor(1429, models_base.Grouped(groupedData), true, false, 10415))
+		}
+	}
+
+	// Marshal RatFrequencySelectionPriorityId (optional)
+	if g.RatFrequencySelectionPriorityId != nil {
+		buf.Write(marshalAVP(0, *g.RatFrequencySelectionPriorityId, false, false))
+	}
+
+	// Marshal TraceData (optional)
+	if g.TraceData != nil {
+		buf.Write(marshalAVP(0, *g.TraceData, false, false))
+	}
+
+	// Marshal GprsSubscriptionData (optional)
+	if g.GprsSubscriptionData != nil {
+		buf.Write(marshalAVP(0, *g.GprsSubscriptionData, false, false))
+	}
+
+	// Marshal CsgSubscriptionData (repeated, grouped)
+	for _, v := range g.CsgSubscriptionData {
+		if v != nil {
+			if groupedData, err := v.Marshal(); err == nil {
+				buf.Write(marshalAVPWithVendor(1436, models_base.Grouped(groupedData), true, false, 10415))
+			}
+		}
+	}
+
+	// Marshal RoamingRestricted (optional)
+	if g.RoamingRestricted != nil {
+		buf.Write(marshalAVP(0, *g.RoamingRestricted, false, false))
+	}
+
+	// Marshal SubscribedPeriodicRauTauTimer (optional)
+	if g.SubscribedPeriodicRauTauTimer != nil {
+		buf.Write(marshalAVP(0, *g.SubscribedPeriodicRauTauTimer, false, false))
+	}
+
+	// Marshal MpsPriority (optional)
+	if g.MpsPriority != nil {
+		buf.Write(marshalAVP(0, *g.MpsPriority, false, false))
+	}
+
+	// Marshal VplmnLipaAllowed (optional)
+	if g.VplmnLipaAllowed != nil {
+		buf.Write(marshalAVP(0, *g.VplmnLipaAllowed, false, false))
+	}
+
+	// Marshal RelayNodeIndicator (optional)
+	if g.RelayNodeIndicator != nil {
+		buf.Write(marshalAVP(0, *g.RelayNodeIndicator, false, false))
+	}
+
+	// Marshal MdtUserConsent (optional)
+	if g.MdtUserConsent != nil {
+		buf.Write(marshalAVP(0, *g.MdtUserConsent, false, false))
+	}
+
+	// Marshal SubscribedVsrvcc (optional)
+	if g.SubscribedVsrvcc != nil {
+		buf.Write(marshalAVP(0, *g.SubscribedVsrvcc, false, false))
+	}
+
+	// Marshal ProseSubscriptionData (optional)
+	if g.ProseSubscriptionData != nil {
+		buf.Write(marshalAVP(0, *g.ProseSubscriptionData, false, false))
+	}
+
+	// Marshal SubscriptionDataFlags (optional)
+	if g.SubscriptionDataFlags != nil {
+		buf.Write(marshalAVP(0, *g.SubscriptionDataFlags, false, false))
+	}
+
+	// Marshal AdjacentAccessRestrictionData (repeated)
+	for _, v := range g.AdjacentAccessRestrictionData {
+		buf.Write(marshalAVP(0, v, false, false))
+	}
+
+	// Marshal DlBufferingSuggestedPacketCount (optional)
+	if g.DlBufferingSuggestedPacketCount != nil {
+		buf.Write(marshalAVP(0, *g.DlBufferingSuggestedPacketCount, false, false))
+	}
+
+	// Marshal ImsiGroupId (repeated)
+	for _, v := range g.ImsiGroupId {
+		buf.Write(marshalAVP(0, v, false, false))
+	}
+
+	// Marshal UeUsageType (optional)
+	if g.UeUsageType != nil {
+		buf.Write(marshalAVP(0, *g.UeUsageType, false, false))
+	}
+
+	// Marshal AeseCommunicationPattern (repeated)
+	for _, v := range g.AeseCommunicationPattern {
+		buf.Write(marshalAVP(0, v, false, false))
+	}
+
+	// Marshal MonitoringEventConfiguration (repeated)
+	for _, v := range g.MonitoringEventConfiguration {
+		buf.Write(marshalAVP(0, v, false, false))
+	}
+
+	// Marshal EmergencyInfo (optional)
+	if g.EmergencyInfo != nil {
+		buf.Write(marshalAVP(0, *g.EmergencyInfo, false, false))
+	}
+
+	// Marshal V2xSubscriptionData (optional)
+	if g.V2xSubscriptionData != nil {
+		buf.Write(marshalAVP(0, *g.V2xSubscriptionData, false, false))
+	}
+
+	// Marshal EdrxCycleLength (optional)
+	if g.EdrxCycleLength != nil {
+		buf.Write(marshalAVP(0, *g.EdrxCycleLength, false, false))
+	}
+
+	// Marshal ExternalIdentifier (optional)
+	if g.ExternalIdentifier != nil {
+		buf.Write(marshalAVP(0, *g.ExternalIdentifier, false, false))
+	}
+
+	// Marshal ActiveTime (optional)
+	if g.ActiveTime != nil {
+		buf.Write(marshalAVP(0, *g.ActiveTime, false, false))
+	}
+
+	// Marshal ServiceGapTime (optional)
+	if g.ServiceGapTime != nil {
+		buf.Write(marshalAVP(0, *g.ServiceGapTime, false, false))
+	}
+
+	// Marshal BroadcastLocationAssistanceDataTypes (optional)
+	if g.BroadcastLocationAssistanceDataTypes != nil {
+		buf.Write(marshalAVP(0, *g.BroadcastLocationAssistanceDataTypes, false, false))
+	}
+
+	// Marshal AerialUeSubscriptionInformation (optional)
+	if g.AerialUeSubscriptionInformation != nil {
+		buf.Write(marshalAVP(0, *g.AerialUeSubscriptionInformation, false, false))
+	}
+
+	// Marshal CoreNetworkRestrictions (optional)
+	if g.CoreNetworkRestrictions != nil {
+		buf.Write(marshalAVP(0, *g.CoreNetworkRestrictions, false, false))
+	}
+
+	return buf.Bytes(), nil
+}
+
+// Unmarshal deserializes bytes into SubscriptionData
+func (g *SubscriptionData) Unmarshal(data []byte) error {
+	// Parse AVPs in the grouped data
+	avpData := data
+	for len(avpData) > 0 {
+		if len(avpData) < 8 {
+			break // Not enough data for AVP header
+		}
+
+		// Parse AVP header
+		avpCode := binary.BigEndian.Uint32(avpData[0:4])
+		avpFlags := avpData[4]
+		avpLength := binary.BigEndian.Uint32([]byte{0, avpData[5], avpData[6], avpData[7]})
+
+		if int(avpLength) > len(avpData) {
+			return fmt.Errorf("AVP length exceeds remaining data")
+		}
+
+		// Extract AVP data
+		headerSize := 8
+		var vendorID uint32
+		if avpFlags&0x80 != 0 { // V-bit set
+			if len(avpData) < 12 {
+				return fmt.Errorf("AVP data too short for vendor ID")
+			}
+			vendorID = binary.BigEndian.Uint32(avpData[8:12])
+			headerSize = 12
+		}
+		avpDataLen := int(avpLength) - headerSize
+		if avpDataLen < 0 {
+			return fmt.Errorf("invalid AVP data length")
+		}
+		avpValue := avpData[headerSize : headerSize+avpDataLen]
+
+		// Parse AVP based on code and vendor ID
+		switch avpCode {
+		case 1424: // Subscriber-Status
+			if vendorID != 10415 {
+				break // Vendor ID mismatch
+			}
+			val, err := models_base.DecodeEnumerated(avpValue)
+			if err == nil {
+				v := val.(models_base.Enumerated)
+				g.SubscriberStatus = &v
+			}
+		case 701: // MSISDN
+			if vendorID != 10415 {
+				break // Vendor ID mismatch
+			}
+			val, err := models_base.DecodeOctetString(avpValue)
+			if err == nil {
+				v := val.(models_base.OctetString)
+				g.Msisdn = &v
+			}
+		case 1643: // A-MSISDN
+			if vendorID != 10415 {
+				break // Vendor ID mismatch
+			}
+			val, err := models_base.DecodeOctetString(avpValue)
+			if err == nil {
+				v := val.(models_base.OctetString)
+				g.AMsisdn = &v
+			}
+		// case 0: // STN-SR (AVP code not defined)
+		// case 0: // ICS-Indicator (AVP code not defined)
+		// case 0: // Network-Access-Mode (AVP code not defined)
+		case 1425: // Operator-Determined-Barring
+			if vendorID != 10415 {
+				break // Vendor ID mismatch
+			}
+			val, err := models_base.DecodeUnsigned32(avpValue)
+			if err == nil {
+				v := val.(models_base.Unsigned32)
+				g.OperatorDeterminedBarring = &v
+			}
+		// case 0: // HPLMN-ODB (AVP code not defined)
+		// case 0: // Regional-Subscription-Zone-Code (AVP code not defined)
+		case 1426: // Access-Restriction-Data
+			if vendorID != 10415 {
+				break // Vendor ID mismatch
+			}
+			val, err := models_base.DecodeUnsigned32(avpValue)
+			if err == nil {
+				v := val.(models_base.Unsigned32)
+				g.AccessRestrictionData = &v
+			}
+		case 1427: // APN-OI-Replacement
+			if vendorID != 10415 {
+				break // Vendor ID mismatch
+			}
+			val, err := models_base.DecodeUTF8String(avpValue)
+			if err == nil {
+				v := val.(models_base.UTF8String)
+				g.ApnOiReplacement = &v
+			}
+		// case 0: // LCS-Info (AVP code not defined)
+		// case 0: // Teleservice-List (AVP code not defined)
+		// case 0: // Call-Barring-Info (AVP code not defined)
+		// case 0: // 3GPP-Charging-Characteristics (AVP code not defined)
+		case 1435: // AMBR
+			if vendorID != 10415 {
+				break // Vendor ID mismatch
+			}
+			grouped := &AMBR{}
+			if err := grouped.Unmarshal(avpValue); err == nil {
+				g.Ambr = grouped
+			}
+		case 1429: // APN-Configuration-Profile
+			if vendorID != 10415 {
+				break // Vendor ID mismatch
+			}
+			grouped := &APNConfigurationProfile{}
+			if err := grouped.Unmarshal(avpValue); err == nil {
+				g.ApnConfigurationProfile = grouped
+			}
+		// case 0: // RAT-Frequency-Selection-Priority-ID (AVP code not defined)
+		// case 0: // Trace-Data (AVP code not defined)
+		// case 0: // GPRS-Subscription-Data (AVP code not defined)
+		case 1436: // CSG-Subscription-Data
+			if vendorID != 10415 {
+				break // Vendor ID mismatch
+			}
+			grouped := &CSGSubscriptionData{}
+			if err := grouped.Unmarshal(avpValue); err == nil {
+				g.CsgSubscriptionData = append(g.CsgSubscriptionData, grouped)
+			}
+			// case 0: // Roaming-Restricted-Due-To-Unsupported-Feature (AVP code not defined)
+			// case 0: // Subscribed-Periodic-RAU-TAU-Timer (AVP code not defined)
+			// case 0: // MPS-Priority (AVP code not defined)
+			// case 0: // VPLMN-LIPA-Allowed (AVP code not defined)
+			// case 0: // Relay-Node-Indicator (AVP code not defined)
+			// case 0: // MDT-User-Consent (AVP code not defined)
+			// case 0: // Subscribed-VSRVCC (AVP code not defined)
+			// case 0: // ProSe-Subscription-Data (AVP code not defined)
+			// case 0: // Subscription-Data-Flags (AVP code not defined)
+			// case 0: // Adjacent-Access-Restriction-Data (AVP code not defined)
+			// case 0: // DL-Buffering-Suggested-Packet-Count (AVP code not defined)
+			// case 0: // IMSI-Group-Id (AVP code not defined)
+			// case 0: // UE-Usage-Type (AVP code not defined)
+			// case 0: // AESE-Communication-Pattern (AVP code not defined)
+			// case 0: // Monitoring-Event-Configuration (AVP code not defined)
+			// case 0: // Emergency-Info (AVP code not defined)
+			// case 0: // V2X-Subscription-Data (AVP code not defined)
+			// case 0: // eDRX-Cycle-Length (AVP code not defined)
+			// case 0: // External-Identifier (AVP code not defined)
+			// case 0: // Active-Time (AVP code not defined)
+			// case 0: // Service-Gap-Time (AVP code not defined)
+			// case 0: // Broadcast-Location-Assistance-Data-Types (AVP code not defined)
+			// case 0: // Aerial-UE-Subscription-Information (AVP code not defined)
+			// case 0: // Core-Network-Restrictions (AVP code not defined)
+		}
+
+		// Move to next AVP (with padding)
+		paddedLength := int(avpLength)
+		if paddedLength%4 != 0 {
+			paddedLength += 4 - (paddedLength % 4)
+		}
+		if paddedLength > len(avpData) {
+			break
+		}
+		avpData = avpData[paddedLength:]
+	}
+
+	return nil
+}
+
+// AMBR represents the AMBR grouped AVP (AVP Code 1435)
+type AMBR struct {
+	MaxRequestedBandwidthUl  models_base.OctetString  // Required - WARNING: AVP code not defined, DO NOT USE
+	MaxRequestedBandwidthDl  models_base.OctetString  // Required - WARNING: AVP code not defined, DO NOT USE
+	ExtendedMaxRequestedBwUl *models_base.OctetString // Optional - WARNING: AVP code not defined, DO NOT USE
+	ExtendedMaxRequestedBwDl *models_base.OctetString // Optional - WARNING: AVP code not defined, DO NOT USE
+}
+
+// Marshal serializes AMBR to bytes
+func (g *AMBR) Marshal() ([]byte, error) {
+	var buf bytes.Buffer
+
+	// Marshal MaxRequestedBandwidthUl (required)
+	buf.Write(marshalAVP(0, g.MaxRequestedBandwidthUl, false, false))
+
+	// Marshal MaxRequestedBandwidthDl (required)
+	buf.Write(marshalAVP(0, g.MaxRequestedBandwidthDl, false, false))
+
+	// Marshal ExtendedMaxRequestedBwUl (optional)
+	if g.ExtendedMaxRequestedBwUl != nil {
+		buf.Write(marshalAVP(0, *g.ExtendedMaxRequestedBwUl, false, false))
+	}
+
+	// Marshal ExtendedMaxRequestedBwDl (optional)
+	if g.ExtendedMaxRequestedBwDl != nil {
+		buf.Write(marshalAVP(0, *g.ExtendedMaxRequestedBwDl, false, false))
+	}
+
+	return buf.Bytes(), nil
+}
+
+// Unmarshal deserializes bytes into AMBR
+func (g *AMBR) Unmarshal(data []byte) error {
+	// Parse AVPs in the grouped data
+	avpData := data
+	for len(avpData) > 0 {
+		if len(avpData) < 8 {
+			break // Not enough data for AVP header
+		}
+
+		// Parse AVP header
+		_ = binary.BigEndian.Uint32(avpData[0:4]) // avpCode
+		avpFlags := avpData[4]
+		avpLength := binary.BigEndian.Uint32([]byte{0, avpData[5], avpData[6], avpData[7]})
+
+		if int(avpLength) > len(avpData) {
+			return fmt.Errorf("AVP length exceeds remaining data")
+		}
+
+		// Extract AVP data
+		headerSize := 8
+		if avpFlags&0x80 != 0 { // V-bit set
+			if len(avpData) < 12 {
+				return fmt.Errorf("AVP data too short for vendor ID")
+			}
+			_ = binary.BigEndian.Uint32(avpData[8:12]) // vendorID not used
+			headerSize = 12
+		}
+		avpDataLen := int(avpLength) - headerSize
+		if avpDataLen < 0 {
+			return fmt.Errorf("invalid AVP data length")
+		}
+		_ = avpDataLen // avpValue not needed when no fields are defined
+
+		// Move to next AVP (with padding)
+		paddedLength := int(avpLength)
+		if paddedLength%4 != 0 {
+			paddedLength += 4 - (paddedLength % 4)
+		}
+		if paddedLength > len(avpData) {
+			break
+		}
+		avpData = avpData[paddedLength:]
+	}
+
+	return nil
+}
+
+// APNConfigurationProfile represents the APN-Configuration-Profile grouped AVP (AVP Code 1429)
+type APNConfigurationProfile struct {
+	ContextIdentifier    models_base.Unsigned32 // Required
+	AllApnConfigIncluded models_base.Enumerated // Required
+	ApnConfiguration     []*APNConfiguration    // Optional
+}
+
+// Marshal serializes APNConfigurationProfile to bytes
+func (g *APNConfigurationProfile) Marshal() ([]byte, error) {
+	var buf bytes.Buffer
+
+	// Marshal ContextIdentifier (required)
+	buf.Write(marshalAVPWithVendor(1423, g.ContextIdentifier, true, false, 10415))
+
+	// Marshal AllApnConfigIncluded (required)
+	buf.Write(marshalAVPWithVendor(1428, g.AllApnConfigIncluded, true, false, 10415))
+
+	// Marshal ApnConfiguration (repeated, grouped)
+	for _, v := range g.ApnConfiguration {
+		if v != nil {
+			if groupedData, err := v.Marshal(); err == nil {
+				buf.Write(marshalAVPWithVendor(1430, models_base.Grouped(groupedData), true, false, 10415))
+			}
+		}
+	}
+
+	return buf.Bytes(), nil
+}
+
+// Unmarshal deserializes bytes into APNConfigurationProfile
+func (g *APNConfigurationProfile) Unmarshal(data []byte) error {
+	// Parse AVPs in the grouped data
+	avpData := data
+	for len(avpData) > 0 {
+		if len(avpData) < 8 {
+			break // Not enough data for AVP header
+		}
+
+		// Parse AVP header
+		avpCode := binary.BigEndian.Uint32(avpData[0:4])
+		avpFlags := avpData[4]
+		avpLength := binary.BigEndian.Uint32([]byte{0, avpData[5], avpData[6], avpData[7]})
+
+		if int(avpLength) > len(avpData) {
+			return fmt.Errorf("AVP length exceeds remaining data")
+		}
+
+		// Extract AVP data
+		headerSize := 8
+		var vendorID uint32
+		if avpFlags&0x80 != 0 { // V-bit set
+			if len(avpData) < 12 {
+				return fmt.Errorf("AVP data too short for vendor ID")
+			}
+			vendorID = binary.BigEndian.Uint32(avpData[8:12])
+			headerSize = 12
+		}
+		avpDataLen := int(avpLength) - headerSize
+		if avpDataLen < 0 {
+			return fmt.Errorf("invalid AVP data length")
+		}
+		avpValue := avpData[headerSize : headerSize+avpDataLen]
+
+		// Parse AVP based on code and vendor ID
+		switch avpCode {
+		case 1423: // Context-Identifier
+			if vendorID != 10415 {
+				break // Vendor ID mismatch
+			}
+			val, err := models_base.DecodeUnsigned32(avpValue)
+			if err == nil {
+				g.ContextIdentifier = val.(models_base.Unsigned32)
+			}
+		case 1428: // All-APN-Configurations-Included-Indicator
+			if vendorID != 10415 {
+				break // Vendor ID mismatch
+			}
+			val, err := models_base.DecodeEnumerated(avpValue)
+			if err == nil {
+				g.AllApnConfigIncluded = val.(models_base.Enumerated)
+			}
+		case 1430: // APN-Configuration
+			if vendorID != 10415 {
+				break // Vendor ID mismatch
+			}
+			grouped := &APNConfiguration{}
+			if err := grouped.Unmarshal(avpValue); err == nil {
+				g.ApnConfiguration = append(g.ApnConfiguration, grouped)
+			}
+		}
+
+		// Move to next AVP (with padding)
+		paddedLength := int(avpLength)
+		if paddedLength%4 != 0 {
+			paddedLength += 4 - (paddedLength % 4)
+		}
+		if paddedLength > len(avpData) {
+			break
+		}
+		avpData = avpData[paddedLength:]
+	}
+
+	return nil
+}
+
+// APNConfiguration represents the APN-Configuration grouped AVP (AVP Code 1430)
+type APNConfiguration struct {
+	ContextIdentifier           models_base.Unsigned32    // Required
+	ServedPartyIpAddress        []models_base.OctetString // Optional - WARNING: AVP code not defined, DO NOT USE
+	PdnType                     models_base.OctetString   // Required - WARNING: AVP code not defined, DO NOT USE
+	ServiceSelection            models_base.UTF8String    // Required
+	EpsSubscribedQosProfile     *EPSSubscribedQoSProfile  // Optional
+	VplmnDynamicAddressAllowed  *models_base.OctetString  // Optional - WARNING: AVP code not defined, DO NOT USE
+	Mip6AgentInfo               *MIP6AgentInfo            // Optional
+	VisitedNetworkIdentifier    *models_base.OctetString  // Optional - WARNING: AVP code not defined, DO NOT USE
+	PdnGwAllocationType         *models_base.OctetString  // Optional - WARNING: AVP code not defined, DO NOT USE
+	ChargingCharacteristics     *models_base.OctetString  // Optional - WARNING: AVP code not defined, DO NOT USE
+	Ambr                        *AMBR                     // Optional
+	SpecificApnInfo             []models_base.OctetString // Optional - WARNING: AVP code not defined, DO NOT USE
+	ApnOiReplacement            *models_base.UTF8String   // Optional
+	SiptoPermission             *models_base.OctetString  // Optional - WARNING: AVP code not defined, DO NOT USE
+	LipaPermission              *models_base.OctetString  // Optional - WARNING: AVP code not defined, DO NOT USE
+	RestorationPriority         *models_base.OctetString  // Optional - WARNING: AVP code not defined, DO NOT USE
+	SiptoLocalNetworkPermission *models_base.OctetString  // Optional - WARNING: AVP code not defined, DO NOT USE
+	WlanOffloadability          *models_base.OctetString  // Optional - WARNING: AVP code not defined, DO NOT USE
+	NonIpPdnTypeIndicator       *models_base.OctetString  // Optional - WARNING: AVP code not defined, DO NOT USE
+	NonIpDataDeliveryMechanism  *models_base.OctetString  // Optional - WARNING: AVP code not defined, DO NOT USE
+	ScefId                      *models_base.OctetString  // Optional - WARNING: AVP code not defined, DO NOT USE
+	ScefRealm                   *models_base.OctetString  // Optional - WARNING: AVP code not defined, DO NOT USE
+	PreferredDataMode           *models_base.OctetString  // Optional - WARNING: AVP code not defined, DO NOT USE
+	PdnConnectionContinuity     *models_base.OctetString  // Optional - WARNING: AVP code not defined, DO NOT USE
+}
+
+// Marshal serializes APNConfiguration to bytes
+func (g *APNConfiguration) Marshal() ([]byte, error) {
+	var buf bytes.Buffer
+
+	// Marshal ContextIdentifier (required)
+	buf.Write(marshalAVPWithVendor(1423, g.ContextIdentifier, true, false, 10415))
+
+	// Marshal ServedPartyIpAddress (repeated)
+	for _, v := range g.ServedPartyIpAddress {
+		buf.Write(marshalAVP(0, v, false, false))
+	}
+
+	// Marshal PdnType (required)
+	buf.Write(marshalAVP(0, g.PdnType, false, false))
+
+	// Marshal ServiceSelection (required)
+	buf.Write(marshalAVP(493, g.ServiceSelection, true, false))
+
+	// Marshal EpsSubscribedQosProfile (grouped)
+	if g.EpsSubscribedQosProfile != nil {
+		if groupedData, err := g.EpsSubscribedQosProfile.Marshal(); err == nil {
+			buf.Write(marshalAVPWithVendor(1431, models_base.Grouped(groupedData), true, false, 10415))
+		}
+	}
+
+	// Marshal VplmnDynamicAddressAllowed (optional)
+	if g.VplmnDynamicAddressAllowed != nil {
+		buf.Write(marshalAVP(0, *g.VplmnDynamicAddressAllowed, false, false))
+	}
+
+	// Marshal Mip6AgentInfo (grouped)
+	if g.Mip6AgentInfo != nil {
+		if groupedData, err := g.Mip6AgentInfo.Marshal(); err == nil {
+			buf.Write(marshalAVP(486, models_base.Grouped(groupedData), true, false))
+		}
+	}
+
+	// Marshal VisitedNetworkIdentifier (optional)
+	if g.VisitedNetworkIdentifier != nil {
+		buf.Write(marshalAVP(0, *g.VisitedNetworkIdentifier, false, false))
+	}
+
+	// Marshal PdnGwAllocationType (optional)
+	if g.PdnGwAllocationType != nil {
+		buf.Write(marshalAVP(0, *g.PdnGwAllocationType, false, false))
+	}
+
+	// Marshal ChargingCharacteristics (optional)
+	if g.ChargingCharacteristics != nil {
+		buf.Write(marshalAVP(0, *g.ChargingCharacteristics, false, false))
+	}
+
+	// Marshal Ambr (grouped)
+	if g.Ambr != nil {
+		if groupedData, err := g.Ambr.Marshal(); err == nil {
+			buf.Write(marshalAVPWithVendor(1435, models_base.Grouped(groupedData), true, false, 10415))
+		}
+	}
+
+	// Marshal SpecificApnInfo (repeated)
+	for _, v := range g.SpecificApnInfo {
+		buf.Write(marshalAVP(0, v, false, false))
+	}
+
+	// Marshal ApnOiReplacement (optional)
+	if g.ApnOiReplacement != nil {
+		buf.Write(marshalAVPWithVendor(1427, *g.ApnOiReplacement, true, false, 10415))
+	}
+
+	// Marshal SiptoPermission (optional)
+	if g.SiptoPermission != nil {
+		buf.Write(marshalAVP(0, *g.SiptoPermission, false, false))
+	}
+
+	// Marshal LipaPermission (optional)
+	if g.LipaPermission != nil {
+		buf.Write(marshalAVP(0, *g.LipaPermission, false, false))
+	}
+
+	// Marshal RestorationPriority (optional)
+	if g.RestorationPriority != nil {
+		buf.Write(marshalAVP(0, *g.RestorationPriority, false, false))
+	}
+
+	// Marshal SiptoLocalNetworkPermission (optional)
+	if g.SiptoLocalNetworkPermission != nil {
+		buf.Write(marshalAVP(0, *g.SiptoLocalNetworkPermission, false, false))
+	}
+
+	// Marshal WlanOffloadability (optional)
+	if g.WlanOffloadability != nil {
+		buf.Write(marshalAVP(0, *g.WlanOffloadability, false, false))
+	}
+
+	// Marshal NonIpPdnTypeIndicator (optional)
+	if g.NonIpPdnTypeIndicator != nil {
+		buf.Write(marshalAVP(0, *g.NonIpPdnTypeIndicator, false, false))
+	}
+
+	// Marshal NonIpDataDeliveryMechanism (optional)
+	if g.NonIpDataDeliveryMechanism != nil {
+		buf.Write(marshalAVP(0, *g.NonIpDataDeliveryMechanism, false, false))
+	}
+
+	// Marshal ScefId (optional)
+	if g.ScefId != nil {
+		buf.Write(marshalAVP(0, *g.ScefId, false, false))
+	}
+
+	// Marshal ScefRealm (optional)
+	if g.ScefRealm != nil {
+		buf.Write(marshalAVP(0, *g.ScefRealm, false, false))
+	}
+
+	// Marshal PreferredDataMode (optional)
+	if g.PreferredDataMode != nil {
+		buf.Write(marshalAVP(0, *g.PreferredDataMode, false, false))
+	}
+
+	// Marshal PdnConnectionContinuity (optional)
+	if g.PdnConnectionContinuity != nil {
+		buf.Write(marshalAVP(0, *g.PdnConnectionContinuity, false, false))
+	}
+
+	return buf.Bytes(), nil
+}
+
+// Unmarshal deserializes bytes into APNConfiguration
+func (g *APNConfiguration) Unmarshal(data []byte) error {
+	// Parse AVPs in the grouped data
+	avpData := data
+	for len(avpData) > 0 {
+		if len(avpData) < 8 {
+			break // Not enough data for AVP header
+		}
+
+		// Parse AVP header
+		avpCode := binary.BigEndian.Uint32(avpData[0:4])
+		avpFlags := avpData[4]
+		avpLength := binary.BigEndian.Uint32([]byte{0, avpData[5], avpData[6], avpData[7]})
+
+		if int(avpLength) > len(avpData) {
+			return fmt.Errorf("AVP length exceeds remaining data")
+		}
+
+		// Extract AVP data
+		headerSize := 8
+		var vendorID uint32
+		if avpFlags&0x80 != 0 { // V-bit set
+			if len(avpData) < 12 {
+				return fmt.Errorf("AVP data too short for vendor ID")
+			}
+			vendorID = binary.BigEndian.Uint32(avpData[8:12])
+			headerSize = 12
+		}
+		avpDataLen := int(avpLength) - headerSize
+		if avpDataLen < 0 {
+			return fmt.Errorf("invalid AVP data length")
+		}
+		avpValue := avpData[headerSize : headerSize+avpDataLen]
+
+		// Parse AVP based on code and vendor ID
+		switch avpCode {
+		case 1423: // Context-Identifier
+			if vendorID != 10415 {
+				break // Vendor ID mismatch
+			}
+			val, err := models_base.DecodeUnsigned32(avpValue)
+			if err == nil {
+				g.ContextIdentifier = val.(models_base.Unsigned32)
+			}
+		// case 0: // Served-Party-IP-Address (AVP code not defined)
+		// case 0: // PDN-Type (AVP code not defined)
+		case 493: // Service-Selection
+			val, err := models_base.DecodeUTF8String(avpValue)
+			if err == nil {
+				g.ServiceSelection = val.(models_base.UTF8String)
+			}
+		case 1431: // EPS-Subscribed-QoS-Profile
+			if vendorID != 10415 {
+				break // Vendor ID mismatch
+			}
+			grouped := &EPSSubscribedQoSProfile{}
+			if err := grouped.Unmarshal(avpValue); err == nil {
+				g.EpsSubscribedQosProfile = grouped
+			}
+		// case 0: // VPLMN-Dynamic-Address-Allowed (AVP code not defined)
+		case 486: // MIP6-Agent-Info
+			grouped := &MIP6AgentInfo{}
+			if err := grouped.Unmarshal(avpValue); err == nil {
+				g.Mip6AgentInfo = grouped
+			}
+		// case 0: // Visited-Network-Identifier (AVP code not defined)
+		// case 0: // PDN-GW-Allocation-Type (AVP code not defined)
+		// case 0: // 3GPP-Charging-Characteristics (AVP code not defined)
+		case 1435: // AMBR
+			if vendorID != 10415 {
+				break // Vendor ID mismatch
+			}
+			grouped := &AMBR{}
+			if err := grouped.Unmarshal(avpValue); err == nil {
+				g.Ambr = grouped
+			}
+		// case 0: // Specific-APN-Info (AVP code not defined)
+		case 1427: // APN-OI-Replacement
+			if vendorID != 10415 {
+				break // Vendor ID mismatch
+			}
+			val, err := models_base.DecodeUTF8String(avpValue)
+			if err == nil {
+				v := val.(models_base.UTF8String)
+				g.ApnOiReplacement = &v
+			}
+			// case 0: // SIPTO-Permission (AVP code not defined)
+			// case 0: // LIPA-Permission (AVP code not defined)
+			// case 0: // Restoration-Priority (AVP code not defined)
+			// case 0: // SIPTO-Local-Network-Permission (AVP code not defined)
+			// case 0: // WLAN-offloadability (AVP code not defined)
+			// case 0: // Non-IP-PDN-Type-Indicator (AVP code not defined)
+			// case 0: // Non-IP-Data-Delivery-Mechanism (AVP code not defined)
+			// case 0: // SCEF-ID (AVP code not defined)
+			// case 0: // SCEF-Realm (AVP code not defined)
+			// case 0: // Preferred-Data-Mode (AVP code not defined)
+			// case 0: // PDN-Connection-Continuity (AVP code not defined)
+		}
+
+		// Move to next AVP (with padding)
+		paddedLength := int(avpLength)
+		if paddedLength%4 != 0 {
+			paddedLength += 4 - (paddedLength % 4)
+		}
+		if paddedLength > len(avpData) {
+			break
+		}
+		avpData = avpData[paddedLength:]
+	}
+
+	return nil
+}
+
+// AuthenticationInfo represents the Authentication-Info grouped AVP (AVP Code 1413)
+type AuthenticationInfo struct {
+	EUtranVector []*EUTRANVector // Optional
+	UtranVector  []*UTRANVector  // Optional
+	GeranVector  []*GERANVector  // Optional
+}
+
+// Marshal serializes AuthenticationInfo to bytes
+func (g *AuthenticationInfo) Marshal() ([]byte, error) {
+	var buf bytes.Buffer
+
+	// Marshal EUtranVector (repeated, grouped)
+	for _, v := range g.EUtranVector {
+		if v != nil {
+			if groupedData, err := v.Marshal(); err == nil {
+				buf.Write(marshalAVPWithVendor(1414, models_base.Grouped(groupedData), true, false, 10415))
+			}
+		}
+	}
+
+	// Marshal UtranVector (repeated, grouped)
+	for _, v := range g.UtranVector {
+		if v != nil {
+			if groupedData, err := v.Marshal(); err == nil {
+				buf.Write(marshalAVPWithVendor(1415, models_base.Grouped(groupedData), true, false, 10415))
+			}
+		}
+	}
+
+	// Marshal GeranVector (repeated, grouped)
+	for _, v := range g.GeranVector {
+		if v != nil {
+			if groupedData, err := v.Marshal(); err == nil {
+				buf.Write(marshalAVPWithVendor(1416, models_base.Grouped(groupedData), true, false, 10415))
+			}
+		}
+	}
+
+	return buf.Bytes(), nil
+}
+
+// Unmarshal deserializes bytes into AuthenticationInfo
+func (g *AuthenticationInfo) Unmarshal(data []byte) error {
+	// Parse AVPs in the grouped data
+	avpData := data
+	for len(avpData) > 0 {
+		if len(avpData) < 8 {
+			break // Not enough data for AVP header
+		}
+
+		// Parse AVP header
+		avpCode := binary.BigEndian.Uint32(avpData[0:4])
+		avpFlags := avpData[4]
+		avpLength := binary.BigEndian.Uint32([]byte{0, avpData[5], avpData[6], avpData[7]})
+
+		if int(avpLength) > len(avpData) {
+			return fmt.Errorf("AVP length exceeds remaining data")
+		}
+
+		// Extract AVP data
+		headerSize := 8
+		var vendorID uint32
+		if avpFlags&0x80 != 0 { // V-bit set
+			if len(avpData) < 12 {
+				return fmt.Errorf("AVP data too short for vendor ID")
+			}
+			vendorID = binary.BigEndian.Uint32(avpData[8:12])
+			headerSize = 12
+		}
+		avpDataLen := int(avpLength) - headerSize
+		if avpDataLen < 0 {
+			return fmt.Errorf("invalid AVP data length")
+		}
+		avpValue := avpData[headerSize : headerSize+avpDataLen]
+
+		// Parse AVP based on code and vendor ID
+		switch avpCode {
+		case 1414: // E-UTRAN-Vector
+			if vendorID != 10415 {
+				break // Vendor ID mismatch
+			}
+			grouped := &EUTRANVector{}
+			if err := grouped.Unmarshal(avpValue); err == nil {
+				g.EUtranVector = append(g.EUtranVector, grouped)
+			}
+		case 1415: // UTRAN-Vector
+			if vendorID != 10415 {
+				break // Vendor ID mismatch
+			}
+			grouped := &UTRANVector{}
+			if err := grouped.Unmarshal(avpValue); err == nil {
+				g.UtranVector = append(g.UtranVector, grouped)
+			}
+		case 1416: // GERAN-Vector
+			if vendorID != 10415 {
+				break // Vendor ID mismatch
+			}
+			grouped := &GERANVector{}
+			if err := grouped.Unmarshal(avpValue); err == nil {
+				g.GeranVector = append(g.GeranVector, grouped)
+			}
+		}
+
+		// Move to next AVP (with padding)
+		paddedLength := int(avpLength)
+		if paddedLength%4 != 0 {
+			paddedLength += 4 - (paddedLength % 4)
+		}
+		if paddedLength > len(avpData) {
+			break
+		}
+		avpData = avpData[paddedLength:]
+	}
+
+	return nil
+}
+
+// CSGSubscriptionData represents the CSG-Subscription-Data grouped AVP (AVP Code 1436)
+type CSGSubscriptionData struct {
+	CsgId            models_base.OctetString  // Required - WARNING: AVP code not defined, DO NOT USE
+	ExpirationDate   *models_base.OctetString // Optional - WARNING: AVP code not defined, DO NOT USE
+	ServiceSelection []models_base.UTF8String // Optional
+	VisitedPlmnId    *models_base.OctetString // Optional
+}
+
+// Marshal serializes CSGSubscriptionData to bytes
+func (g *CSGSubscriptionData) Marshal() ([]byte, error) {
+	var buf bytes.Buffer
+
+	// Marshal CsgId (required)
+	buf.Write(marshalAVP(0, g.CsgId, false, false))
+
+	// Marshal ExpirationDate (optional)
+	if g.ExpirationDate != nil {
+		buf.Write(marshalAVP(0, *g.ExpirationDate, false, false))
+	}
+
+	// Marshal ServiceSelection (repeated)
+	for _, v := range g.ServiceSelection {
+		buf.Write(marshalAVP(493, v, true, false))
+	}
+
+	// Marshal VisitedPlmnId (optional)
+	if g.VisitedPlmnId != nil {
+		buf.Write(marshalAVPWithVendor(1407, *g.VisitedPlmnId, true, false, 10415))
+	}
+
+	return buf.Bytes(), nil
+}
+
+// Unmarshal deserializes bytes into CSGSubscriptionData
+func (g *CSGSubscriptionData) Unmarshal(data []byte) error {
+	// Parse AVPs in the grouped data
+	avpData := data
+	for len(avpData) > 0 {
+		if len(avpData) < 8 {
+			break // Not enough data for AVP header
+		}
+
+		// Parse AVP header
+		avpCode := binary.BigEndian.Uint32(avpData[0:4])
+		avpFlags := avpData[4]
+		avpLength := binary.BigEndian.Uint32([]byte{0, avpData[5], avpData[6], avpData[7]})
+
+		if int(avpLength) > len(avpData) {
+			return fmt.Errorf("AVP length exceeds remaining data")
+		}
+
+		// Extract AVP data
+		headerSize := 8
+		var vendorID uint32
+		if avpFlags&0x80 != 0 { // V-bit set
+			if len(avpData) < 12 {
+				return fmt.Errorf("AVP data too short for vendor ID")
+			}
+			vendorID = binary.BigEndian.Uint32(avpData[8:12])
+			headerSize = 12
+		}
+		avpDataLen := int(avpLength) - headerSize
+		if avpDataLen < 0 {
+			return fmt.Errorf("invalid AVP data length")
+		}
+		avpValue := avpData[headerSize : headerSize+avpDataLen]
+
+		// Parse AVP based on code and vendor ID
+		switch avpCode {
+		// case 0: // CSG-Id (AVP code not defined)
+		// case 0: // Expiration-Date (AVP code not defined)
+		case 493: // Service-Selection
+			val, err := models_base.DecodeUTF8String(avpValue)
+			if err == nil {
+				g.ServiceSelection = append(g.ServiceSelection, val.(models_base.UTF8String))
+			}
+		case 1407: // Visited-PLMN-Id
+			if vendorID != 10415 {
+				break // Vendor ID mismatch
+			}
+			val, err := models_base.DecodeOctetString(avpValue)
+			if err == nil {
+				v := val.(models_base.OctetString)
+				g.VisitedPlmnId = &v
+			}
+		}
+
+		// Move to next AVP (with padding)
+		paddedLength := int(avpLength)
+		if paddedLength%4 != 0 {
+			paddedLength += 4 - (paddedLength % 4)
+		}
+		if paddedLength > len(avpData) {
+			break
+		}
+		avpData = avpData[paddedLength:]
+	}
+
+	return nil
+}
+
+// TerminalInformation represents the Terminal-Information grouped AVP (AVP Code 1401)
+type TerminalInformation struct {
+	Imei            *models_base.UTF8String  // Optional
+	Meid            *models_base.OctetString // Optional
+	SoftwareVersion *models_base.UTF8String  // Optional
+}
+
+// Marshal serializes TerminalInformation to bytes
+func (g *TerminalInformation) Marshal() ([]byte, error) {
+	var buf bytes.Buffer
+
+	// Marshal Imei (optional)
+	if g.Imei != nil {
+		buf.Write(marshalAVPWithVendor(1402, *g.Imei, true, false, 10415))
+	}
+
+	// Marshal Meid (optional)
+	if g.Meid != nil {
+		buf.Write(marshalAVPWithVendor(1471, *g.Meid, true, false, 10415))
+	}
+
+	// Marshal SoftwareVersion (optional)
+	if g.SoftwareVersion != nil {
+		buf.Write(marshalAVPWithVendor(1403, *g.SoftwareVersion, true, false, 10415))
+	}
+
+	return buf.Bytes(), nil
+}
+
+// Unmarshal deserializes bytes into TerminalInformation
+func (g *TerminalInformation) Unmarshal(data []byte) error {
+	// Parse AVPs in the grouped data
+	avpData := data
+	for len(avpData) > 0 {
+		if len(avpData) < 8 {
+			break // Not enough data for AVP header
+		}
+
+		// Parse AVP header
+		avpCode := binary.BigEndian.Uint32(avpData[0:4])
+		avpFlags := avpData[4]
+		avpLength := binary.BigEndian.Uint32([]byte{0, avpData[5], avpData[6], avpData[7]})
+
+		if int(avpLength) > len(avpData) {
+			return fmt.Errorf("AVP length exceeds remaining data")
+		}
+
+		// Extract AVP data
+		headerSize := 8
+		var vendorID uint32
+		if avpFlags&0x80 != 0 { // V-bit set
+			if len(avpData) < 12 {
+				return fmt.Errorf("AVP data too short for vendor ID")
+			}
+			vendorID = binary.BigEndian.Uint32(avpData[8:12])
+			headerSize = 12
+		}
+		avpDataLen := int(avpLength) - headerSize
+		if avpDataLen < 0 {
+			return fmt.Errorf("invalid AVP data length")
+		}
+		avpValue := avpData[headerSize : headerSize+avpDataLen]
+
+		// Parse AVP based on code and vendor ID
+		switch avpCode {
+		case 1402: // IMEI
+			if vendorID != 10415 {
+				break // Vendor ID mismatch
+			}
+			val, err := models_base.DecodeUTF8String(avpValue)
+			if err == nil {
+				v := val.(models_base.UTF8String)
+				g.Imei = &v
+			}
+		case 1471: // 3GPP2-MEID
+			if vendorID != 10415 {
+				break // Vendor ID mismatch
+			}
+			val, err := models_base.DecodeOctetString(avpValue)
+			if err == nil {
+				v := val.(models_base.OctetString)
+				g.Meid = &v
+			}
+		case 1403: // Software-Version
+			if vendorID != 10415 {
+				break // Vendor ID mismatch
+			}
+			val, err := models_base.DecodeUTF8String(avpValue)
+			if err == nil {
+				v := val.(models_base.UTF8String)
+				g.SoftwareVersion = &v
+			}
+		}
+
+		// Move to next AVP (with padding)
+		paddedLength := int(avpLength)
+		if paddedLength%4 != 0 {
+			paddedLength += 4 - (paddedLength % 4)
+		}
+		if paddedLength > len(avpData) {
+			break
+		}
+		avpData = avpData[paddedLength:]
+	}
+
+	return nil
+}
+
+// GERANVector represents the GERAN-Vector grouped AVP (AVP Code 1416)
+type GERANVector struct {
+	ItemNumber *models_base.Unsigned32 // Optional
+	Rand       models_base.OctetString // Required
+	Sres       models_base.OctetString // Required
+	Kc         models_base.OctetString // Required
+}
+
+// Marshal serializes GERANVector to bytes
+func (g *GERANVector) Marshal() ([]byte, error) {
+	var buf bytes.Buffer
+
+	// Marshal ItemNumber (optional)
+	if g.ItemNumber != nil {
+		buf.Write(marshalAVPWithVendor(1419, *g.ItemNumber, true, false, 10415))
+	}
+
+	// Marshal Rand (required)
+	buf.Write(marshalAVPWithVendor(1447, g.Rand, true, false, 10415))
+
+	// Marshal Sres (required)
+	buf.Write(marshalAVPWithVendor(1454, g.Sres, true, false, 10415))
+
+	// Marshal Kc (required)
+	buf.Write(marshalAVPWithVendor(1453, g.Kc, true, false, 10415))
+
+	return buf.Bytes(), nil
+}
+
+// Unmarshal deserializes bytes into GERANVector
+func (g *GERANVector) Unmarshal(data []byte) error {
+	// Parse AVPs in the grouped data
+	avpData := data
+	for len(avpData) > 0 {
+		if len(avpData) < 8 {
+			break // Not enough data for AVP header
+		}
+
+		// Parse AVP header
+		avpCode := binary.BigEndian.Uint32(avpData[0:4])
+		avpFlags := avpData[4]
+		avpLength := binary.BigEndian.Uint32([]byte{0, avpData[5], avpData[6], avpData[7]})
+
+		if int(avpLength) > len(avpData) {
+			return fmt.Errorf("AVP length exceeds remaining data")
+		}
+
+		// Extract AVP data
+		headerSize := 8
+		var vendorID uint32
+		if avpFlags&0x80 != 0 { // V-bit set
+			if len(avpData) < 12 {
+				return fmt.Errorf("AVP data too short for vendor ID")
+			}
+			vendorID = binary.BigEndian.Uint32(avpData[8:12])
+			headerSize = 12
+		}
+		avpDataLen := int(avpLength) - headerSize
+		if avpDataLen < 0 {
+			return fmt.Errorf("invalid AVP data length")
+		}
+		avpValue := avpData[headerSize : headerSize+avpDataLen]
+
+		// Parse AVP based on code and vendor ID
+		switch avpCode {
+		case 1419: // Item-Number
+			if vendorID != 10415 {
+				break // Vendor ID mismatch
+			}
+			val, err := models_base.DecodeUnsigned32(avpValue)
+			if err == nil {
+				v := val.(models_base.Unsigned32)
+				g.ItemNumber = &v
+			}
+		case 1447: // RAND
+			if vendorID != 10415 {
+				break // Vendor ID mismatch
+			}
+			val, err := models_base.DecodeOctetString(avpValue)
+			if err == nil {
+				g.Rand = val.(models_base.OctetString)
+			}
+		case 1454: // SRES
+			if vendorID != 10415 {
+				break // Vendor ID mismatch
+			}
+			val, err := models_base.DecodeOctetString(avpValue)
+			if err == nil {
+				g.Sres = val.(models_base.OctetString)
+			}
+		case 1453: // Kc
+			if vendorID != 10415 {
+				break // Vendor ID mismatch
+			}
+			val, err := models_base.DecodeOctetString(avpValue)
+			if err == nil {
+				g.Kc = val.(models_base.OctetString)
+			}
+		}
+
+		// Move to next AVP (with padding)
+		paddedLength := int(avpLength)
+		if paddedLength%4 != 0 {
+			paddedLength += 4 - (paddedLength % 4)
+		}
+		if paddedLength > len(avpData) {
+			break
+		}
+		avpData = avpData[paddedLength:]
+	}
+
+	return nil
+}
+
+// EUTRANVector represents the E-UTRAN-Vector grouped AVP (AVP Code 1414)
+type EUTRANVector struct {
+	ItemNumber *models_base.Unsigned32 // Optional
+	Rand       models_base.OctetString // Required
+	Xres       models_base.OctetString // Required
+	Autn       models_base.OctetString // Required
+	Kasme      models_base.OctetString // Required
+}
+
+// Marshal serializes EUTRANVector to bytes
+func (g *EUTRANVector) Marshal() ([]byte, error) {
+	var buf bytes.Buffer
+
+	// Marshal ItemNumber (optional)
+	if g.ItemNumber != nil {
+		buf.Write(marshalAVPWithVendor(1419, *g.ItemNumber, true, false, 10415))
+	}
+
+	// Marshal Rand (required)
+	buf.Write(marshalAVPWithVendor(1447, g.Rand, true, false, 10415))
+
+	// Marshal Xres (required)
+	buf.Write(marshalAVPWithVendor(1448, g.Xres, true, false, 10415))
+
+	// Marshal Autn (required)
+	buf.Write(marshalAVPWithVendor(1449, g.Autn, true, false, 10415))
+
+	// Marshal Kasme (required)
+	buf.Write(marshalAVPWithVendor(1450, g.Kasme, true, false, 10415))
+
+	return buf.Bytes(), nil
+}
+
+// Unmarshal deserializes bytes into EUTRANVector
+func (g *EUTRANVector) Unmarshal(data []byte) error {
+	// Parse AVPs in the grouped data
+	avpData := data
+	for len(avpData) > 0 {
+		if len(avpData) < 8 {
+			break // Not enough data for AVP header
+		}
+
+		// Parse AVP header
+		avpCode := binary.BigEndian.Uint32(avpData[0:4])
+		avpFlags := avpData[4]
+		avpLength := binary.BigEndian.Uint32([]byte{0, avpData[5], avpData[6], avpData[7]})
+
+		if int(avpLength) > len(avpData) {
+			return fmt.Errorf("AVP length exceeds remaining data")
+		}
+
+		// Extract AVP data
+		headerSize := 8
+		var vendorID uint32
+		if avpFlags&0x80 != 0 { // V-bit set
+			if len(avpData) < 12 {
+				return fmt.Errorf("AVP data too short for vendor ID")
+			}
+			vendorID = binary.BigEndian.Uint32(avpData[8:12])
+			headerSize = 12
+		}
+		avpDataLen := int(avpLength) - headerSize
+		if avpDataLen < 0 {
+			return fmt.Errorf("invalid AVP data length")
+		}
+		avpValue := avpData[headerSize : headerSize+avpDataLen]
+
+		// Parse AVP based on code and vendor ID
+		switch avpCode {
+		case 1419: // Item-Number
+			if vendorID != 10415 {
+				break // Vendor ID mismatch
+			}
+			val, err := models_base.DecodeUnsigned32(avpValue)
+			if err == nil {
+				v := val.(models_base.Unsigned32)
+				g.ItemNumber = &v
+			}
+		case 1447: // RAND
+			if vendorID != 10415 {
+				break // Vendor ID mismatch
+			}
+			val, err := models_base.DecodeOctetString(avpValue)
+			if err == nil {
+				g.Rand = val.(models_base.OctetString)
+			}
+		case 1448: // XRES
+			if vendorID != 10415 {
+				break // Vendor ID mismatch
+			}
+			val, err := models_base.DecodeOctetString(avpValue)
+			if err == nil {
+				g.Xres = val.(models_base.OctetString)
+			}
+		case 1449: // AUTN
+			if vendorID != 10415 {
+				break // Vendor ID mismatch
+			}
+			val, err := models_base.DecodeOctetString(avpValue)
+			if err == nil {
+				g.Autn = val.(models_base.OctetString)
+			}
+		case 1450: // KASME
+			if vendorID != 10415 {
+				break // Vendor ID mismatch
+			}
+			val, err := models_base.DecodeOctetString(avpValue)
+			if err == nil {
+				g.Kasme = val.(models_base.OctetString)
+			}
+		}
+
+		// Move to next AVP (with padding)
+		paddedLength := int(avpLength)
+		if paddedLength%4 != 0 {
+			paddedLength += 4 - (paddedLength % 4)
+		}
+		if paddedLength > len(avpData) {
+			break
+		}
+		avpData = avpData[paddedLength:]
+	}
+
+	return nil
+}
+
+// ProxyInfo represents the Proxy-Info grouped AVP (AVP Code 284)
+type ProxyInfo struct {
+	ProxyHost  models_base.DiameterIdentity // Required
+	ProxyState models_base.OctetString      // Required
+}
+
+// Marshal serializes ProxyInfo to bytes
+func (g *ProxyInfo) Marshal() ([]byte, error) {
+	var buf bytes.Buffer
+
+	// Marshal ProxyHost (required)
+	buf.Write(marshalAVP(280, g.ProxyHost, true, false))
+
+	// Marshal ProxyState (required)
+	buf.Write(marshalAVP(33, g.ProxyState, true, false))
+
+	return buf.Bytes(), nil
+}
+
+// Unmarshal deserializes bytes into ProxyInfo
+func (g *ProxyInfo) Unmarshal(data []byte) error {
+	// Parse AVPs in the grouped data
+	avpData := data
+	for len(avpData) > 0 {
+		if len(avpData) < 8 {
+			break // Not enough data for AVP header
+		}
+
+		// Parse AVP header
+		avpCode := binary.BigEndian.Uint32(avpData[0:4])
+		avpFlags := avpData[4]
+		avpLength := binary.BigEndian.Uint32([]byte{0, avpData[5], avpData[6], avpData[7]})
+
+		if int(avpLength) > len(avpData) {
+			return fmt.Errorf("AVP length exceeds remaining data")
+		}
+
+		// Extract AVP data
+		headerSize := 8
+		if avpFlags&0x80 != 0 { // V-bit set
+			if len(avpData) < 12 {
+				return fmt.Errorf("AVP data too short for vendor ID")
+			}
+			_ = binary.BigEndian.Uint32(avpData[8:12]) // vendorID not used
+			headerSize = 12
+		}
+		avpDataLen := int(avpLength) - headerSize
+		if avpDataLen < 0 {
+			return fmt.Errorf("invalid AVP data length")
+		}
+		avpValue := avpData[headerSize : headerSize+avpDataLen]
+
+		// Parse AVP based on code and vendor ID
+		switch avpCode {
+		case 280: // Proxy-Host
+			val, err := models_base.DecodeDiameterIdentity(avpValue)
+			if err == nil {
+				g.ProxyHost = val.(models_base.DiameterIdentity)
+			}
+		case 33: // Proxy-State
+			val, err := models_base.DecodeOctetString(avpValue)
+			if err == nil {
+				g.ProxyState = val.(models_base.OctetString)
+			}
+		}
+
+		// Move to next AVP (with padding)
+		paddedLength := int(avpLength)
+		if paddedLength%4 != 0 {
+			paddedLength += 4 - (paddedLength % 4)
+		}
+		if paddedLength > len(avpData) {
+			break
+		}
+		avpData = avpData[paddedLength:]
+	}
+
+	return nil
+}
+
+// UTRANVector represents the UTRAN-Vector grouped AVP (AVP Code 1415)
+type UTRANVector struct {
+	ItemNumber *models_base.Unsigned32 // Optional
+	Rand       models_base.OctetString // Required
+	Xres       models_base.OctetString // Required
+	Autn       models_base.OctetString // Required
+	Ck         models_base.OctetString // Required
+	Ik         models_base.OctetString // Required
+}
+
+// Marshal serializes UTRANVector to bytes
+func (g *UTRANVector) Marshal() ([]byte, error) {
+	var buf bytes.Buffer
+
+	// Marshal ItemNumber (optional)
+	if g.ItemNumber != nil {
+		buf.Write(marshalAVPWithVendor(1419, *g.ItemNumber, true, false, 10415))
+	}
+
+	// Marshal Rand (required)
+	buf.Write(marshalAVPWithVendor(1447, g.Rand, true, false, 10415))
+
+	// Marshal Xres (required)
+	buf.Write(marshalAVPWithVendor(1448, g.Xres, true, false, 10415))
+
+	// Marshal Autn (required)
+	buf.Write(marshalAVPWithVendor(1449, g.Autn, true, false, 10415))
+
+	// Marshal Ck (required)
+	buf.Write(marshalAVPWithVendor(1451, g.Ck, true, false, 10415))
+
+	// Marshal Ik (required)
+	buf.Write(marshalAVPWithVendor(1452, g.Ik, true, false, 10415))
+
+	return buf.Bytes(), nil
+}
+
+// Unmarshal deserializes bytes into UTRANVector
+func (g *UTRANVector) Unmarshal(data []byte) error {
+	// Parse AVPs in the grouped data
+	avpData := data
+	for len(avpData) > 0 {
+		if len(avpData) < 8 {
+			break // Not enough data for AVP header
+		}
+
+		// Parse AVP header
+		avpCode := binary.BigEndian.Uint32(avpData[0:4])
+		avpFlags := avpData[4]
+		avpLength := binary.BigEndian.Uint32([]byte{0, avpData[5], avpData[6], avpData[7]})
+
+		if int(avpLength) > len(avpData) {
+			return fmt.Errorf("AVP length exceeds remaining data")
+		}
+
+		// Extract AVP data
+		headerSize := 8
+		var vendorID uint32
+		if avpFlags&0x80 != 0 { // V-bit set
+			if len(avpData) < 12 {
+				return fmt.Errorf("AVP data too short for vendor ID")
+			}
+			vendorID = binary.BigEndian.Uint32(avpData[8:12])
+			headerSize = 12
+		}
+		avpDataLen := int(avpLength) - headerSize
+		if avpDataLen < 0 {
+			return fmt.Errorf("invalid AVP data length")
+		}
+		avpValue := avpData[headerSize : headerSize+avpDataLen]
+
+		// Parse AVP based on code and vendor ID
+		switch avpCode {
+		case 1419: // Item-Number
+			if vendorID != 10415 {
+				break // Vendor ID mismatch
+			}
+			val, err := models_base.DecodeUnsigned32(avpValue)
+			if err == nil {
+				v := val.(models_base.Unsigned32)
+				g.ItemNumber = &v
+			}
+		case 1447: // RAND
+			if vendorID != 10415 {
+				break // Vendor ID mismatch
+			}
+			val, err := models_base.DecodeOctetString(avpValue)
+			if err == nil {
+				g.Rand = val.(models_base.OctetString)
+			}
+		case 1448: // XRES
+			if vendorID != 10415 {
+				break // Vendor ID mismatch
+			}
+			val, err := models_base.DecodeOctetString(avpValue)
+			if err == nil {
+				g.Xres = val.(models_base.OctetString)
+			}
+		case 1449: // AUTN
+			if vendorID != 10415 {
+				break // Vendor ID mismatch
+			}
+			val, err := models_base.DecodeOctetString(avpValue)
+			if err == nil {
+				g.Autn = val.(models_base.OctetString)
+			}
+		case 1451: // Confidentiality-Key
+			if vendorID != 10415 {
+				break // Vendor ID mismatch
+			}
+			val, err := models_base.DecodeOctetString(avpValue)
+			if err == nil {
+				g.Ck = val.(models_base.OctetString)
+			}
+		case 1452: // Integrity-Key
+			if vendorID != 10415 {
+				break // Vendor ID mismatch
+			}
+			val, err := models_base.DecodeOctetString(avpValue)
+			if err == nil {
+				g.Ik = val.(models_base.OctetString)
+			}
+		}
+
+		// Move to next AVP (with padding)
+		paddedLength := int(avpLength)
+		if paddedLength%4 != 0 {
+			paddedLength += 4 - (paddedLength % 4)
+		}
+		if paddedLength > len(avpData) {
+			break
+		}
+		avpData = avpData[paddedLength:]
+	}
+
+	return nil
+}
+
+// VendorSpecificApplicationId represents the Vendor-Specific-Application-Id grouped AVP (AVP Code 260)
+type VendorSpecificApplicationId struct {
+	VendorId          *models_base.Unsigned32 // Optional
+	AuthApplicationId *models_base.Unsigned32 // Optional
+	AcctApplicationId *models_base.Unsigned32 // Optional
+}
+
+// Marshal serializes VendorSpecificApplicationId to bytes
+func (g *VendorSpecificApplicationId) Marshal() ([]byte, error) {
+	var buf bytes.Buffer
+
+	// Marshal VendorId (optional)
+	if g.VendorId != nil {
+		buf.Write(marshalAVP(266, *g.VendorId, true, false))
+	}
+
+	// Marshal AuthApplicationId (optional)
+	if g.AuthApplicationId != nil {
+		buf.Write(marshalAVP(258, *g.AuthApplicationId, true, false))
+	}
+
+	// Marshal AcctApplicationId (optional)
+	if g.AcctApplicationId != nil {
+		buf.Write(marshalAVP(259, *g.AcctApplicationId, true, false))
+	}
+
+	return buf.Bytes(), nil
+}
+
+// Unmarshal deserializes bytes into VendorSpecificApplicationId
+func (g *VendorSpecificApplicationId) Unmarshal(data []byte) error {
+	// Parse AVPs in the grouped data
+	avpData := data
+	for len(avpData) > 0 {
+		if len(avpData) < 8 {
+			break // Not enough data for AVP header
+		}
+
+		// Parse AVP header
+		avpCode := binary.BigEndian.Uint32(avpData[0:4])
+		avpFlags := avpData[4]
+		avpLength := binary.BigEndian.Uint32([]byte{0, avpData[5], avpData[6], avpData[7]})
+
+		if int(avpLength) > len(avpData) {
+			return fmt.Errorf("AVP length exceeds remaining data")
+		}
+
+		// Extract AVP data
+		headerSize := 8
+		if avpFlags&0x80 != 0 { // V-bit set
+			if len(avpData) < 12 {
+				return fmt.Errorf("AVP data too short for vendor ID")
+			}
+			_ = binary.BigEndian.Uint32(avpData[8:12]) // vendorID not used
+			headerSize = 12
+		}
+		avpDataLen := int(avpLength) - headerSize
+		if avpDataLen < 0 {
+			return fmt.Errorf("invalid AVP data length")
+		}
+		avpValue := avpData[headerSize : headerSize+avpDataLen]
+
+		// Parse AVP based on code and vendor ID
+		switch avpCode {
+		case 266: // Vendor-Id
+			val, err := models_base.DecodeUnsigned32(avpValue)
+			if err == nil {
+				v := val.(models_base.Unsigned32)
+				g.VendorId = &v
+			}
+		case 258: // Auth-Application-Id
+			val, err := models_base.DecodeUnsigned32(avpValue)
+			if err == nil {
+				v := val.(models_base.Unsigned32)
+				g.AuthApplicationId = &v
+			}
+		case 259: // Acct-Application-Id
+			val, err := models_base.DecodeUnsigned32(avpValue)
+			if err == nil {
+				v := val.(models_base.Unsigned32)
+				g.AcctApplicationId = &v
+			}
+		}
+
+		// Move to next AVP (with padding)
+		paddedLength := int(avpLength)
+		if paddedLength%4 != 0 {
+			paddedLength += 4 - (paddedLength % 4)
+		}
+		if paddedLength > len(avpData) {
+			break
+		}
+		avpData = avpData[paddedLength:]
+	}
+
+	return nil
+}
+
+// E2ESequence represents the E2E-Sequence grouped AVP (AVP Code 300)
+type E2ESequence struct {
+	Avp models_base.OctetString // Required - WARNING: AVP code not defined, DO NOT USE
+}
+
+// Marshal serializes E2ESequence to bytes
+func (g *E2ESequence) Marshal() ([]byte, error) {
+	var buf bytes.Buffer
+
+	// Marshal Avp (required)
+	buf.Write(marshalAVP(0, g.Avp, false, false))
+
+	return buf.Bytes(), nil
+}
+
+// Unmarshal deserializes bytes into E2ESequence
+func (g *E2ESequence) Unmarshal(data []byte) error {
+	// Parse AVPs in the grouped data
+	avpData := data
+	for len(avpData) > 0 {
+		if len(avpData) < 8 {
+			break // Not enough data for AVP header
+		}
+
+		// Parse AVP header
+		_ = binary.BigEndian.Uint32(avpData[0:4]) // avpCode
+		avpFlags := avpData[4]
+		avpLength := binary.BigEndian.Uint32([]byte{0, avpData[5], avpData[6], avpData[7]})
+
+		if int(avpLength) > len(avpData) {
+			return fmt.Errorf("AVP length exceeds remaining data")
+		}
+
+		// Extract AVP data
+		headerSize := 8
+		if avpFlags&0x80 != 0 { // V-bit set
+			if len(avpData) < 12 {
+				return fmt.Errorf("AVP data too short for vendor ID")
+			}
+			_ = binary.BigEndian.Uint32(avpData[8:12]) // vendorID not used
+			headerSize = 12
+		}
+		avpDataLen := int(avpLength) - headerSize
+		if avpDataLen < 0 {
+			return fmt.Errorf("invalid AVP data length")
+		}
+		_ = avpDataLen // avpValue not needed when no fields are defined
+
+		// Move to next AVP (with padding)
+		paddedLength := int(avpLength)
+		if paddedLength%4 != 0 {
+			paddedLength += 4 - (paddedLength % 4)
+		}
+		if paddedLength > len(avpData) {
+			break
+		}
+		avpData = avpData[paddedLength:]
+	}
+
+	return nil
+}
+
+// MIP6AgentInfo represents the MIP6-Agent-Info grouped AVP (AVP Code 486)
+type MIP6AgentInfo struct {
+	MipHomeAgentAddress []models_base.Address    // Optional
+	MipHomeAgentHost    *MIPHomeAgentHost        // Optional
+	Mip6HomeLinkPrefix  *models_base.OctetString // Optional
+}
+
+// Marshal serializes MIP6AgentInfo to bytes
+func (g *MIP6AgentInfo) Marshal() ([]byte, error) {
+	var buf bytes.Buffer
+
+	// Marshal MipHomeAgentAddress (repeated)
+	for _, v := range g.MipHomeAgentAddress {
+		buf.Write(marshalAVP(334, v, true, false))
+	}
+
+	// Marshal MipHomeAgentHost (grouped)
+	if g.MipHomeAgentHost != nil {
+		if groupedData, err := g.MipHomeAgentHost.Marshal(); err == nil {
+			buf.Write(marshalAVP(348, models_base.Grouped(groupedData), true, false))
+		}
+	}
+
+	// Marshal Mip6HomeLinkPrefix (optional)
+	if g.Mip6HomeLinkPrefix != nil {
+		buf.Write(marshalAVP(125, *g.Mip6HomeLinkPrefix, true, false))
+	}
+
+	return buf.Bytes(), nil
+}
+
+// Unmarshal deserializes bytes into MIP6AgentInfo
+func (g *MIP6AgentInfo) Unmarshal(data []byte) error {
+	// Parse AVPs in the grouped data
+	avpData := data
+	for len(avpData) > 0 {
+		if len(avpData) < 8 {
+			break // Not enough data for AVP header
+		}
+
+		// Parse AVP header
+		avpCode := binary.BigEndian.Uint32(avpData[0:4])
+		avpFlags := avpData[4]
+		avpLength := binary.BigEndian.Uint32([]byte{0, avpData[5], avpData[6], avpData[7]})
+
+		if int(avpLength) > len(avpData) {
+			return fmt.Errorf("AVP length exceeds remaining data")
+		}
+
+		// Extract AVP data
+		headerSize := 8
+		if avpFlags&0x80 != 0 { // V-bit set
+			if len(avpData) < 12 {
+				return fmt.Errorf("AVP data too short for vendor ID")
+			}
+			_ = binary.BigEndian.Uint32(avpData[8:12]) // vendorID not used
+			headerSize = 12
+		}
+		avpDataLen := int(avpLength) - headerSize
+		if avpDataLen < 0 {
+			return fmt.Errorf("invalid AVP data length")
+		}
+		avpValue := avpData[headerSize : headerSize+avpDataLen]
+
+		// Parse AVP based on code and vendor ID
+		switch avpCode {
+		case 334: // MIP-Home-Agent-Address
+			val, err := models_base.DecodeAddress(avpValue)
+			if err == nil {
+				g.MipHomeAgentAddress = append(g.MipHomeAgentAddress, val.(models_base.Address))
+			}
+		case 348: // MIP-Home-Agent-Host
+			grouped := &MIPHomeAgentHost{}
+			if err := grouped.Unmarshal(avpValue); err == nil {
+				g.MipHomeAgentHost = grouped
+			}
+		case 125: // MIP6-Home-Link-Prefix
+			val, err := models_base.DecodeOctetString(avpValue)
+			if err == nil {
+				v := val.(models_base.OctetString)
+				g.Mip6HomeLinkPrefix = &v
+			}
+		}
+
+		// Move to next AVP (with padding)
+		paddedLength := int(avpLength)
+		if paddedLength%4 != 0 {
+			paddedLength += 4 - (paddedLength % 4)
+		}
+		if paddedLength > len(avpData) {
+			break
+		}
+		avpData = avpData[paddedLength:]
+	}
+
+	return nil
+}
+
+// ExperimentalResult represents the Experimental-Result grouped AVP (AVP Code 297)
+type ExperimentalResult struct {
+	VendorId               models_base.Unsigned32 // Required
+	ExperimentalResultCode models_base.Unsigned32 // Required
+}
+
+// Marshal serializes ExperimentalResult to bytes
+func (g *ExperimentalResult) Marshal() ([]byte, error) {
+	var buf bytes.Buffer
+
+	// Marshal VendorId (required)
+	buf.Write(marshalAVP(266, g.VendorId, true, false))
+
+	// Marshal ExperimentalResultCode (required)
+	buf.Write(marshalAVP(298, g.ExperimentalResultCode, true, false))
+
+	return buf.Bytes(), nil
+}
+
+// Unmarshal deserializes bytes into ExperimentalResult
+func (g *ExperimentalResult) Unmarshal(data []byte) error {
+	// Parse AVPs in the grouped data
+	avpData := data
+	for len(avpData) > 0 {
+		if len(avpData) < 8 {
+			break // Not enough data for AVP header
+		}
+
+		// Parse AVP header
+		avpCode := binary.BigEndian.Uint32(avpData[0:4])
+		avpFlags := avpData[4]
+		avpLength := binary.BigEndian.Uint32([]byte{0, avpData[5], avpData[6], avpData[7]})
+
+		if int(avpLength) > len(avpData) {
+			return fmt.Errorf("AVP length exceeds remaining data")
+		}
+
+		// Extract AVP data
+		headerSize := 8
+		if avpFlags&0x80 != 0 { // V-bit set
+			if len(avpData) < 12 {
+				return fmt.Errorf("AVP data too short for vendor ID")
+			}
+			_ = binary.BigEndian.Uint32(avpData[8:12]) // vendorID not used
+			headerSize = 12
+		}
+		avpDataLen := int(avpLength) - headerSize
+		if avpDataLen < 0 {
+			return fmt.Errorf("invalid AVP data length")
+		}
+		avpValue := avpData[headerSize : headerSize+avpDataLen]
+
+		// Parse AVP based on code and vendor ID
+		switch avpCode {
+		case 266: // Vendor-Id
+			val, err := models_base.DecodeUnsigned32(avpValue)
+			if err == nil {
+				g.VendorId = val.(models_base.Unsigned32)
+			}
+		case 298: // Experimental-Result-Code
+			val, err := models_base.DecodeUnsigned32(avpValue)
+			if err == nil {
+				g.ExperimentalResultCode = val.(models_base.Unsigned32)
+			}
+		}
+
+		// Move to next AVP (with padding)
+		paddedLength := int(avpLength)
+		if paddedLength%4 != 0 {
+			paddedLength += 4 - (paddedLength % 4)
+		}
+		if paddedLength > len(avpData) {
+			break
+		}
+		avpData = avpData[paddedLength:]
+	}
+
+	return nil
+}
+
+// EPSSubscribedQoSProfile represents the EPS-Subscribed-QoS-Profile grouped AVP (AVP Code 1431)
+type EPSSubscribedQoSProfile struct {
+	QosClassIdentifier          models_base.OctetString // Required - WARNING: AVP code not defined, DO NOT USE
+	AllocationRetentionPriority models_base.OctetString // Required - WARNING: AVP code not defined, DO NOT USE
+}
+
+// Marshal serializes EPSSubscribedQoSProfile to bytes
+func (g *EPSSubscribedQoSProfile) Marshal() ([]byte, error) {
+	var buf bytes.Buffer
+
+	// Marshal QosClassIdentifier (required)
+	buf.Write(marshalAVP(0, g.QosClassIdentifier, false, false))
+
+	// Marshal AllocationRetentionPriority (required)
+	buf.Write(marshalAVP(0, g.AllocationRetentionPriority, false, false))
+
+	return buf.Bytes(), nil
+}
+
+// Unmarshal deserializes bytes into EPSSubscribedQoSProfile
+func (g *EPSSubscribedQoSProfile) Unmarshal(data []byte) error {
+	// Parse AVPs in the grouped data
+	avpData := data
+	for len(avpData) > 0 {
+		if len(avpData) < 8 {
+			break // Not enough data for AVP header
+		}
+
+		// Parse AVP header
+		_ = binary.BigEndian.Uint32(avpData[0:4]) // avpCode
+		avpFlags := avpData[4]
+		avpLength := binary.BigEndian.Uint32([]byte{0, avpData[5], avpData[6], avpData[7]})
+
+		if int(avpLength) > len(avpData) {
+			return fmt.Errorf("AVP length exceeds remaining data")
+		}
+
+		// Extract AVP data
+		headerSize := 8
+		if avpFlags&0x80 != 0 { // V-bit set
+			if len(avpData) < 12 {
+				return fmt.Errorf("AVP data too short for vendor ID")
+			}
+			_ = binary.BigEndian.Uint32(avpData[8:12]) // vendorID not used
+			headerSize = 12
+		}
+		avpDataLen := int(avpLength) - headerSize
+		if avpDataLen < 0 {
+			return fmt.Errorf("invalid AVP data length")
+		}
+		_ = avpDataLen // avpValue not needed when no fields are defined
+
+		// Move to next AVP (with padding)
+		paddedLength := int(avpLength)
+		if paddedLength%4 != 0 {
+			paddedLength += 4 - (paddedLength % 4)
+		}
+		if paddedLength > len(avpData) {
+			break
+		}
+		avpData = avpData[paddedLength:]
+	}
+
+	return nil
+}
+
+// FailedAVP represents the Failed-AVP grouped AVP (AVP Code 279)
+type FailedAVP struct {
+	Avp []models_base.OctetString // Optional - WARNING: AVP code not defined, DO NOT USE
+}
+
+// Marshal serializes FailedAVP to bytes
+func (g *FailedAVP) Marshal() ([]byte, error) {
+	var buf bytes.Buffer
+
+	// Marshal Avp (repeated)
+	for _, v := range g.Avp {
+		buf.Write(marshalAVP(0, v, false, false))
+	}
+
+	return buf.Bytes(), nil
+}
+
+// Unmarshal deserializes bytes into FailedAVP
+func (g *FailedAVP) Unmarshal(data []byte) error {
+	// Parse AVPs in the grouped data
+	avpData := data
+	for len(avpData) > 0 {
+		if len(avpData) < 8 {
+			break // Not enough data for AVP header
+		}
+
+		// Parse AVP header
+		_ = binary.BigEndian.Uint32(avpData[0:4]) // avpCode
+		avpFlags := avpData[4]
+		avpLength := binary.BigEndian.Uint32([]byte{0, avpData[5], avpData[6], avpData[7]})
+
+		if int(avpLength) > len(avpData) {
+			return fmt.Errorf("AVP length exceeds remaining data")
+		}
+
+		// Extract AVP data
+		headerSize := 8
+		if avpFlags&0x80 != 0 { // V-bit set
+			if len(avpData) < 12 {
+				return fmt.Errorf("AVP data too short for vendor ID")
+			}
+			_ = binary.BigEndian.Uint32(avpData[8:12]) // vendorID not used
+			headerSize = 12
+		}
+		avpDataLen := int(avpLength) - headerSize
+		if avpDataLen < 0 {
+			return fmt.Errorf("invalid AVP data length")
+		}
+		_ = avpDataLen // avpValue not needed when no fields are defined
+
+		// Move to next AVP (with padding)
+		paddedLength := int(avpLength)
+		if paddedLength%4 != 0 {
+			paddedLength += 4 - (paddedLength % 4)
+		}
+		if paddedLength > len(avpData) {
+			break
+		}
+		avpData = avpData[paddedLength:]
+	}
+
+	return nil
+}
+
+// RequestedEUTRANAuthenticationInfo represents the Requested-EUTRAN-Authentication-Info grouped AVP (AVP Code 1408)
+type RequestedEUTRANAuthenticationInfo struct {
+	NumberOfRequestedVectors   *models_base.Unsigned32  // Optional
+	ImmediateResponsePreferred *models_base.Unsigned32  // Optional
+	ReSynchronizationInfo      *models_base.OctetString // Optional
+}
+
+// Marshal serializes RequestedEUTRANAuthenticationInfo to bytes
+func (g *RequestedEUTRANAuthenticationInfo) Marshal() ([]byte, error) {
+	var buf bytes.Buffer
+
+	// Marshal NumberOfRequestedVectors (optional)
+	if g.NumberOfRequestedVectors != nil {
+		buf.Write(marshalAVPWithVendor(1410, *g.NumberOfRequestedVectors, true, false, 10415))
+	}
+
+	// Marshal ImmediateResponsePreferred (optional)
+	if g.ImmediateResponsePreferred != nil {
+		buf.Write(marshalAVPWithVendor(1412, *g.ImmediateResponsePreferred, true, false, 10415))
+	}
+
+	// Marshal ReSynchronizationInfo (optional)
+	if g.ReSynchronizationInfo != nil {
+		buf.Write(marshalAVPWithVendor(1411, *g.ReSynchronizationInfo, true, false, 10415))
+	}
+
+	return buf.Bytes(), nil
+}
+
+// Unmarshal deserializes bytes into RequestedEUTRANAuthenticationInfo
+func (g *RequestedEUTRANAuthenticationInfo) Unmarshal(data []byte) error {
+	// Parse AVPs in the grouped data
+	avpData := data
+	for len(avpData) > 0 {
+		if len(avpData) < 8 {
+			break // Not enough data for AVP header
+		}
+
+		// Parse AVP header
+		avpCode := binary.BigEndian.Uint32(avpData[0:4])
+		avpFlags := avpData[4]
+		avpLength := binary.BigEndian.Uint32([]byte{0, avpData[5], avpData[6], avpData[7]})
+
+		if int(avpLength) > len(avpData) {
+			return fmt.Errorf("AVP length exceeds remaining data")
+		}
+
+		// Extract AVP data
+		headerSize := 8
+		var vendorID uint32
+		if avpFlags&0x80 != 0 { // V-bit set
+			if len(avpData) < 12 {
+				return fmt.Errorf("AVP data too short for vendor ID")
+			}
+			vendorID = binary.BigEndian.Uint32(avpData[8:12])
+			headerSize = 12
+		}
+		avpDataLen := int(avpLength) - headerSize
+		if avpDataLen < 0 {
+			return fmt.Errorf("invalid AVP data length")
+		}
+		avpValue := avpData[headerSize : headerSize+avpDataLen]
+
+		// Parse AVP based on code and vendor ID
+		switch avpCode {
+		case 1410: // Number-Of-Requested-Vectors
+			if vendorID != 10415 {
+				break // Vendor ID mismatch
+			}
+			val, err := models_base.DecodeUnsigned32(avpValue)
+			if err == nil {
+				v := val.(models_base.Unsigned32)
+				g.NumberOfRequestedVectors = &v
+			}
+		case 1412: // Immediate-Response-Preferred
+			if vendorID != 10415 {
+				break // Vendor ID mismatch
+			}
+			val, err := models_base.DecodeUnsigned32(avpValue)
+			if err == nil {
+				v := val.(models_base.Unsigned32)
+				g.ImmediateResponsePreferred = &v
+			}
+		case 1411: // Re-Synchronization-Info
+			if vendorID != 10415 {
+				break // Vendor ID mismatch
+			}
+			val, err := models_base.DecodeOctetString(avpValue)
+			if err == nil {
+				v := val.(models_base.OctetString)
+				g.ReSynchronizationInfo = &v
+			}
+		}
+
+		// Move to next AVP (with padding)
+		paddedLength := int(avpLength)
+		if paddedLength%4 != 0 {
+			paddedLength += 4 - (paddedLength % 4)
+		}
+		if paddedLength > len(avpData) {
+			break
+		}
+		avpData = avpData[paddedLength:]
+	}
+
+	return nil
+}
+
 // AVP Codes
 const (
-	AVPCodeHOMOGENEOUSSUPPORTOFIMSVOICEOVERPSSESSIONS uint32 = 1493
-	AVPCodeLOCATIONAREAIDENTITY                       uint32 = 1606
-	AVPCodeORIGINHOST                                 uint32 = 264
-	AVPCodeDSRFLAGS                                   uint32 = 1421
-	AVPCodeCSGSUBSCRIPTIONDATA                        uint32 = 1436
-	AVPCodePDNGWALLOCATIONTYPE                        uint32 = 1438
-	AVPCodeTRACENETYPELIST                            uint32 = 1463
-	AVPCodeGMLCRESTRICTION                            uint32 = 1481
-	AVPCodePURFLAGS                                   uint32 = 1635
-	AVPCodePROXYINFO                                  uint32 = 284
-	AVPCodeMAXREQUESTEDBANDWIDTHUL                    uint32 = 516
-	AVPCodeAPNCONFIGURATION                           uint32 = 1430
-	AVPCodeERRORDIAGNOSTIC                            uint32 = 1614
-	AVPCodeMMENUMBERFORMTSMS                          uint32 = 1645
-	AVPCodeGPRSSUBSCRIPTIONDATA                       uint32 = 1467
-	AVPCodeSGSNLOCATIONINFORMATION                    uint32 = 1601
-	AVPCodeSUPPORTEDFEATURES                          uint32 = 628
-	AVPCodeTERMINALINFORMATION                        uint32 = 1401
-	AVPCodeXRES                                       uint32 = 1448
-	AVPCodeTRACEREFERENCE                             uint32 = 1459
-	AVPCodeSSSTATUS                                   uint32 = 1477
-	AVPCodeEQUIVALENTPLMNLIST                         uint32 = 1637
-	AVPCodeOPERATORDETERMINEDBARRING                  uint32 = 1425
-	AVPCodeVPLMNDYNAMICADDRESSALLOWED                 uint32 = 1432
-	AVPCodeMIP6AGENTINFO                              uint32 = 486
-	AVPCodeAIRFLAGS                                   uint32 = 1679
-	AVPCodeNOTIFICATIONTOUEUSER                       uint32 = 1478
-	AVPCodeLASTUEACTIVITYTIME                         uint32 = 1494
-	AVPCodeUSERNAME                                   uint32 = 1
-	AVPCodeHPLMNODB                                   uint32 = 1418
-	AVPCodeNORFLAGS                                   uint32 = 1443
-	AVPCodeTSCODE                                     uint32 = 1487
-	AVPCodeROUTINGAREAIDENTITY                        uint32 = 1605
-	AVPCodeUSERSTATE                                  uint32 = 1499
-	AVPCodeEXTPDPTYPE                                 uint32 = 1620
-	AVPCodeIMMEDIATERESPONSEPREFERRED                 uint32 = 1412
-	AVPCodeIDAFLAGS                                   uint32 = 1441
-	AVPCodeEPSLOCATIONINFORMATION                     uint32 = 1496
-	AVPCodeEXPIRATIONDATE                             uint32 = 1439
-	AVPCodeEUTRANVECTOR                               uint32 = 1414
-	AVPCodeMOLR                                       uint32 = 1485
-	AVPCodeEXPERIMENTALRESULT                         uint32 = 297
-	AVPCodeGEODETICINFORMATION                        uint32 = 1609
-	AVPCodeRAND                                       uint32 = 1447
-	AVPCodeEXTERNALCLIENT                             uint32 = 1479
-	AVPCodeSERVICETYPE                                uint32 = 1483
-	AVPCodeSERVICETYPEIDENTITY                        uint32 = 1484
-	AVPCodeMMELOCATIONINFORMATION                     uint32 = 1600
-	AVPCodeSUBSCRIBEDPERIODICRAUTAUTIMER              uint32 = 1619
-	AVPCodeDESTINATIONREALM                           uint32 = 283
-	AVPCodeCSGID                                      uint32 = 1437
-	AVPCodeTRACEDATA                                  uint32 = 1458
-	AVPCodeEUTRANCELLGLOBALIDENTITY                   uint32 = 1602
-	AVPCodeUEUSAGETYPE                                uint32 = 1680
-	AVPCodeIMEI                                       uint32 = 1402
-	AVPCodeULAFLAGS                                   uint32 = 1406
-	AVPCodeDSAFLAGS                                   uint32 = 1422
-	AVPCodeEQUIPMENTSTATUS                            uint32 = 1445
-	AVPCodeCOMPLETEDATALISTINCLUDEDINDICATOR          uint32 = 1468
-	AVPCodeSGSNNUMBER                                 uint32 = 1489
-	AVPCodeLOCALTIMEZONE                              uint32 = 1649
-	AVPCodeTRACEINTERFACELIST                         uint32 = 1464
-	AVPCodeRESULTCODE                                 uint32 = 268
-	AVPCodeRESYNCHRONIZATIONINFO                      uint32 = 1411
-	AVPCodeGMLCNUMBER                                 uint32 = 1474
-	AVPCodePLMNCLIENT                                 uint32 = 1482
-	AVPCodeVPLMNLIPAALLOWED                           uint32 = 1617
-	AVPCode3GPP2MEID                                  uint32 = 1471
-	AVPCodeEPSSUBSCRIBEDQOSPROFILE                    uint32 = 1431
-	AVPCodeDRMP                                       uint32 = 301
-	AVPCodeVISITEDNETWORKIDENTIFIER                   uint32 = 600
-	AVPCodeCURRENTLOCATIONRETRIEVED                   uint32 = 1610
-	AVPCodeACCESSRESTRICTIONDATA                      uint32 = 1426
-	AVPCodeRATFREQUENCYSELECTIONPRIORITYID            uint32 = 1440
-	AVPCodePDPTYPE                                    uint32 = 1470
-	AVPCodeQOSSUBSCRIBED                              uint32 = 1404
-	AVPCodeTELESERVICELIST                            uint32 = 1486
-	AVPCodeIMSVOICEOVERPSSESSIONSSUPPORTED            uint32 = 1492
-	AVPCodeSMSREGISTERREQUEST                         uint32 = 1648
-	AVPCodeUSERID                                     uint32 = 1444
-	AVPCodeCANCELLATIONTYPE                           uint32 = 1420
-	AVPCodeSOFTWAREVERSION                            uint32 = 1403
-	AVPCodeREQUESTEDEUTRANAUTHENTICATIONINFO          uint32 = 1408
-	AVPCodeUTRANVECTOR                                uint32 = 1415
-	AVPCodeCLRFLAGS                                   uint32 = 1638
-	AVPCodeSUBSCRIBERSTATUS                           uint32 = 1424
-	AVPCodeREGIONALSUBSCRIPTIONZONECODE               uint32 = 1446
-	AVPCodeREQUESTEDUTRANGERANAUTHENTICATIONINFO      uint32 = 1409
-	AVPCodeKC                                         uint32 = 1453
-	AVPCodeCONTEXTIDENTIFIER                          uint32 = 1423
-	AVPCodeAPNOIREPLACEMENT                           uint32 = 1427
-	AVPCodeTRACEDEPTH                                 uint32 = 1462
-	AVPCodeCLIENTIDENTITY                             uint32 = 1480
-	AVPCodeLCSINFO                                    uint32 = 1473
-	AVPCodeICSINDICATOR                               uint32 = 1491
-	AVPCodeTRACKINGAREAIDENTITY                       uint32 = 1603
-	AVPCodeACTIVEAPN                                  uint32 = 1612
-	AVPCodeMPSPRIORITY                                uint32 = 1616
-	AVPCodeEXPERIMENTALRESULTCODE                     uint32 = 298
-	AVPCodeROUTERECORD                                uint32 = 282
-	AVPCodeNUMBEROFREQUESTEDVECTORS                   uint32 = 1410
-	AVPCodeOMCID                                      uint32 = 1466
-	AVPCodeLCSPRIVACYEXCEPTION                        uint32 = 1475
-	AVPCodeSGSNUSERSTATE                              uint32 = 1498
-	AVPCodeGEOGRAPHICALINFORMATION                    uint32 = 1608
-	AVPCodeRATTYPE                                    uint32 = 1032
-	AVPCodeDESTINATIONHOST                            uint32 = 293
-	AVPCodeAUTN                                       uint32 = 1449
-	AVPCodeAMBR                                       uint32 = 1435
-	AVPCodeROAMINGRESTRICTEDDUETOUNSUPPORTEDFEATURE   uint32 = 1457
-	AVPCodeLIPAPERMISSION                             uint32 = 1618
-	AVPCodeFAILEDAVP                                  uint32 = 279
-	AVPCodeKASME                                      uint32 = 1450
-	AVPCodeALERTREASON                                uint32 = 1434
-	AVPCodePUAFLAGS                                   uint32 = 1442
-	AVPCodePDNTYPE                                    uint32 = 1456
-	AVPCodeIDRFLAGS                                   uint32 = 1490
-	AVPCodeSERVICEAREAIDENTITY                        uint32 = 1607
-	AVPCodeOCOLR                                      uint32 = 623
-	AVPCodeLOAD                                       uint32 = 650
-	AVPCodeSERVICESELECTION                           uint32 = 493
-	AVPCodeGERANVECTOR                                uint32 = 1416
-	AVPCodeSESSIONID                                  uint32 = 263
-	AVPCodeVISITEDPLMNID                              uint32 = 1407
-	AVPCodeORIGINREALM                                uint32 = 296
-	AVPCodeAGEOFLOCATIONINFORMATION                   uint32 = 1611
-	AVPCodeULRFLAGS                                   uint32 = 1405
-	AVPCodeALLAPNCONFIGURATIONSINCLUDEDINDICATOR      uint32 = 1428
-	AVPCodeCELLGLOBALIDENTITY                         uint32 = 1604
-	AVPCodeFEATURELIST                                uint32 = 630
-	AVPCodeVENDORSPECIFICAPPLICATIONID                uint32 = 260
-	AVPCodeNETWORKACCESSMODE                          uint32 = 1417
-	AVPCodeMAXREQUESTEDBANDWIDTHDL                    uint32 = 515
-	AVPCodeTRACEEVENTLIST                             uint32 = 1465
-	AVPCodeSSCODE                                     uint32 = 1476
-	AVPCodeCALLBARRINGINFO                            uint32 = 1488
-	AVPCodeUESRVCCCAPABILITY                          uint32 = 1615
-	AVPCodeGMLCADDRESS                                uint32 = 2405
-	AVPCodeRESETID                                    uint32 = 1670
-	AVPCodeSRES                                       uint32 = 1454
-	AVPCodeITEMNUMBER                                 uint32 = 1419
-	AVPCodeAPNCONFIGURATIONPROFILE                    uint32 = 1429
-	AVPCodeSTNSR                                      uint32 = 1433
-	AVPCodeTRACECOLLECTIONENTITY                      uint32 = 1452
-	AVPCodeMMEUSERSTATE                               uint32 = 1497
-	AVPCodeOCSUPPORTEDFEATURES                        uint32 = 621
-	AVPCodeSUBSCRIPTIONDATA                           uint32 = 1400
-	AVPCodePDPCONTEXT                                 uint32 = 1469
-	AVPCodeEPSUSERSTATE                               uint32 = 1495
-	AVPCodeFEATURELISTID                              uint32 = 629
-	AVPCodeAUTHSESSIONSTATE                           uint32 = 277
-	AVPCodeAUTHENTICATIONINFO                         uint32 = 1413
-	AVPCodeSPECIFICAPNINFO                            uint32 = 1472
+	AVPCode3GPP2MEID                             uint32 = 1471
+	AVPCodeSUBSCRIPTIONDATA                      uint32 = 1400
+	AVPCodeAMBR                                  uint32 = 1435
+	AVPCodeSESSIONID                             uint32 = 263
+	AVPCodeACCTINTERIMINTERVAL                   uint32 = 85
+	AVPCodeCONFIDENTIALITYKEY                    uint32 = 1451
+	AVPCodeXRES                                  uint32 = 1448
+	AVPCodeALERTREASON                           uint32 = 1434
+	AVPCodeREDIRECTHOST                          uint32 = 292
+	AVPCodeACCOUNTINGREALTIMEREQUIRED            uint32 = 483
+	AVPCodeEXPERIMENTALRESULTCODE                uint32 = 298
+	AVPCodeACCTSESSIONID                         uint32 = 44
+	AVPCodePURFLAGS                              uint32 = 1635
+	AVPCodeACCTAPPLICATIONID                     uint32 = 259
+	AVPCodeDESTINATIONREALM                      uint32 = 283
+	AVPCodeAUTHORIZATIONLIFETIME                 uint32 = 291
+	AVPCodeMIPHOMEAGENTADDRESS                   uint32 = 334
+	AVPCodeSUPPORTEDVENDORID                     uint32 = 265
+	AVPCodeTERMINATIONCAUSE                      uint32 = 295
+	AVPCodePROXYHOST                             uint32 = 280
+	AVPCodeEVENTTIMESTAMP                        uint32 = 55
+	AVPCodeSESSIONTIMEOUT                        uint32 = 27
+	AVPCodeAUTHSESSIONSTATE                      uint32 = 277
+	AVPCodeAUTHGRACEPERIOD                       uint32 = 276
+	AVPCodeNUMBEROFREQUESTEDVECTORS              uint32 = 1410
+	AVPCodeAPNCONFIGURATIONPROFILE               uint32 = 1429
+	AVPCodeAPNCONFIGURATION                      uint32 = 1430
+	AVPCodeAUTHENTICATIONINFO                    uint32 = 1413
+	AVPCodeCSGSUBSCRIPTIONDATA                   uint32 = 1436
+	AVPCodeSESSIONSERVERFAILOVER                 uint32 = 271
+	AVPCodeTERMINALINFORMATION                   uint32 = 1401
+	AVPCodeDSAFLAGS                              uint32 = 1422
+	AVPCodeUESRVCCCAPABILITY                     uint32 = 1615
+	AVPCodeITEMNUMBER                            uint32 = 1419
+	AVPCodeAMSISDN                               uint32 = 1643
+	AVPCodeAUTHAPPLICATIONID                     uint32 = 258
+	AVPCodeINBANDSECURITYID                      uint32 = 299
+	AVPCodeERRORDIAGNOSTIC                       uint32 = 1614
+	AVPCodeGERANVECTOR                           uint32 = 1416
+	AVPCodeMSISDN                                uint32 = 701
+	AVPCodeIMMEDIATERESPONSEPREFERRED            uint32 = 1412
+	AVPCodeRAND                                  uint32 = 1447
+	AVPCodePRODUCTNAME                           uint32 = 269
+	AVPCodeCLASS                                 uint32 = 25
+	AVPCodeORIGINREALM                           uint32 = 296
+	AVPCodeIDAFLAGS                              uint32 = 1441
+	AVPCodeVISITEDPLMNID                         uint32 = 1407
+	AVPCodeEUTRANVECTOR                          uint32 = 1414
+	AVPCodeALLAPNCONFIGURATIONSINCLUDEDINDICATOR uint32 = 1428
+	AVPCodeREDIRECTMAXCACHETIME                  uint32 = 262
+	AVPCodePROXYINFO                             uint32 = 284
+	AVPCodeFIRMWAREREVISION                      uint32 = 267
+	AVPCodeREAUTHREQUESTTYPE                     uint32 = 285
+	AVPCodeEQUIPMENTSTATUS                       uint32 = 1445
+	AVPCodeDSRFLAGS                              uint32 = 1421
+	AVPCodeUTRANVECTOR                           uint32 = 1415
+	AVPCodeAUTN                                  uint32 = 1449
+	AVPCodeDESTINATIONHOST                       uint32 = 293
+	AVPCodeREDIRECTHOSTUSAGE                     uint32 = 261
+	AVPCodeVENDORSPECIFICAPPLICATIONID           uint32 = 260
+	AVPCodeE2ESEQUENCE                           uint32 = 300
+	AVPCodeMIP6AGENTINFO                         uint32 = 486
+	AVPCodeEXPERIMENTALRESULT                    uint32 = 297
+	AVPCodeSOFTWAREVERSION                       uint32 = 1403
+	AVPCodeAIRFLAGS                              uint32 = 1679
+	AVPCodeAUTHREQUESTTYPE                       uint32 = 274
+	AVPCodeACCOUNTINGRECORDTYPE                  uint32 = 480
+	AVPCodeEPSSUBSCRIBEDQOSPROFILE               uint32 = 1431
+	AVPCodeSGSNNUMBER                            uint32 = 1489
+	AVPCodeULRFLAGS                              uint32 = 1405
+	AVPCodeAPNOIREPLACEMENT                      uint32 = 1427
+	AVPCodeKC                                    uint32 = 1453
+	AVPCodeRESULTCODE                            uint32 = 268
+	AVPCodeROUTERECORD                           uint32 = 282
+	AVPCodeFAILEDAVP                             uint32 = 279
+	AVPCodeACCESSRESTRICTIONDATA                 uint32 = 1426
+	AVPCodeRESYNCHRONIZATIONINFO                 uint32 = 1411
+	AVPCodeREQUESTEDEUTRANAUTHENTICATIONINFO     uint32 = 1408
+	AVPCodeINTEGRITYKEY                          uint32 = 1452
+	AVPCodeORIGINHOST                            uint32 = 264
+	AVPCodeSRES                                  uint32 = 1454
+	AVPCodeCANCELLATIONTYPE                      uint32 = 1420
+	AVPCodeCONTEXTIDENTIFIER                     uint32 = 1423
+	AVPCodeSERVICESELECTION                      uint32 = 493
+	AVPCodeULAFLAGS                              uint32 = 1406
+	AVPCodePUAFLAGS                              uint32 = 1442
+	AVPCodeNORFLAGS                              uint32 = 1443
+	AVPCodeACCTMULTISESSIONID                    uint32 = 50
+	AVPCodeHOSTIPADDRESS                         uint32 = 257
+	AVPCodeACCOUNTINGRECORDNUMBER                uint32 = 485
+	AVPCodeVENDORID                              uint32 = 266
+	AVPCodeERRORREPORTINGHOST                    uint32 = 294
+	AVPCodeSUBSCRIBERSTATUS                      uint32 = 1424
+	AVPCodeREQUESTEDUTRANGERANAUTHENTICATIONINFO uint32 = 1409
+	AVPCodeCLRFLAGS                              uint32 = 1638
+	AVPCodeORIGINSTATEID                         uint32 = 278
+	AVPCodePROXYSTATE                            uint32 = 33
+	AVPCodeIMEI                                  uint32 = 1402
+	AVPCodeOPERATORDETERMINEDBARRING             uint32 = 1425
+	AVPCodeKASME                                 uint32 = 1450
+	AVPCodeRATTYPE                               uint32 = 1032
+	AVPCodeERRORMESSAGE                          uint32 = 281
+	AVPCodeDISCONNECTCAUSE                       uint32 = 273
+	AVPCodeUSERNAME                              uint32 = 1
+	AVPCodeACCOUNTINGSUBSESSIONID                uint32 = 287
+	AVPCodeSESSIONBINDING                        uint32 = 270
+	AVPCodeIDRFLAGS                              uint32 = 1490
+	AVPCodeMIPHOMEAGENTHOST                      uint32 = 348
+	AVPCodeMIP6HOMELINKPREFIX                    uint32 = 125
+	AVPCodeMULTIROUNDTIMEOUT                     uint32 = 272
 )
 
 // Command Codes
@@ -212,29 +2625,34 @@ type UpdateLocationRequest struct {
 	Header DiameterHeader
 
 	SessionId                   models_base.UTF8String         // Required
-	Drmp                        *models_base.Enumerated        // Optional
-	VendorSpecificApplicationId *models_base.Grouped           // Optional
 	AuthSessionState            models_base.Enumerated         // Required
 	OriginHost                  models_base.DiameterIdentity   // Required
 	OriginRealm                 models_base.DiameterIdentity   // Required
-	DestinationHost             *models_base.DiameterIdentity  // Optional
 	DestinationRealm            models_base.DiameterIdentity   // Required
 	UserName                    models_base.UTF8String         // Required
-	OcSupportedFeatures         *models_base.Grouped           // Optional
-	SupportedFeatures           []models_base.Grouped          // Optional
-	TerminalInformation         *models_base.Grouped           // Optional
 	RatType                     models_base.Enumerated         // Required
 	UlrFlags                    models_base.Unsigned32         // Required
-	UeSrvccCapability           *models_base.Enumerated        // Optional
 	VisitedPlmnId               models_base.OctetString        // Required
+	Drmp                        *models_base.OctetString       // Optional - WARNING: AVP code not defined, DO NOT USE
+	VendorSpecificApplicationId *VendorSpecificApplicationId   // Optional
+	DestinationHost             *models_base.DiameterIdentity  // Optional
+	OcSupportedFeatures         *models_base.OctetString       // Optional - WARNING: AVP code not defined, DO NOT USE
+	SupportedFeatures           []models_base.OctetString      // Optional - WARNING: AVP code not defined, DO NOT USE
+	TerminalInformation         *TerminalInformation           // Optional
+	UeSrvccCapability           *models_base.Enumerated        // Optional
 	SgsnNumber                  *models_base.OctetString       // Optional
-	HomogeneousSupportImsVoice  *models_base.Enumerated        // Optional
-	GmlcAddress                 *models_base.Address           // Optional
-	ActiveApn                   []models_base.Grouped          // Optional
-	EquivalentPlmnList          *models_base.Grouped           // Optional
-	MmeNumberForMtSms           *models_base.OctetString       // Optional
-	SmsRegisterRequest          *models_base.Enumerated        // Optional
-	ProxyInfo                   []models_base.Grouped          // Optional
+	HomogeneousSupportImsVoice  *models_base.OctetString       // Optional - WARNING: AVP code not defined, DO NOT USE
+	GmlcAddress                 *models_base.OctetString       // Optional - WARNING: AVP code not defined, DO NOT USE
+	ActiveApn                   []models_base.OctetString      // Optional - WARNING: AVP code not defined, DO NOT USE
+	EquivalentPlmnList          *models_base.OctetString       // Optional - WARNING: AVP code not defined, DO NOT USE
+	MmeNumberForMtSms           *models_base.OctetString       // Optional - WARNING: AVP code not defined, DO NOT USE
+	SmsRegisterRequest          *models_base.OctetString       // Optional - WARNING: AVP code not defined, DO NOT USE
+	SgsMmeIdentity              *models_base.OctetString       // Optional - WARNING: AVP code not defined, DO NOT USE
+	CoupledNodeDiameterId       *models_base.OctetString       // Optional - WARNING: AVP code not defined, DO NOT USE
+	AdjacentPlmns               *models_base.OctetString       // Optional - WARNING: AVP code not defined, DO NOT USE
+	SupportedServices           *models_base.OctetString       // Optional - WARNING: AVP code not defined, DO NOT USE
+	Avp                         []models_base.OctetString      // Optional - WARNING: AVP code not defined, DO NOT USE
+	ProxyInfo                   []*ProxyInfo                   // Optional
 	RouteRecord                 []models_base.DiameterIdentity // Optional
 }
 
@@ -297,16 +2715,6 @@ func (m *UpdateLocationRequest) Marshal() ([]byte, error) {
 	// Marshal SessionId (required)
 	buf.Write(marshalAVP(263, m.SessionId, true, false))
 
-	// Marshal Drmp (optional)
-	if m.Drmp != nil {
-		buf.Write(marshalAVP(301, *m.Drmp, false, false))
-	}
-
-	// Marshal VendorSpecificApplicationId (optional)
-	if m.VendorSpecificApplicationId != nil {
-		buf.Write(marshalAVP(260, *m.VendorSpecificApplicationId, false, false))
-	}
-
 	// Marshal AuthSessionState (required)
 	buf.Write(marshalAVP(277, m.AuthSessionState, true, false))
 
@@ -316,89 +2724,132 @@ func (m *UpdateLocationRequest) Marshal() ([]byte, error) {
 	// Marshal OriginRealm (required)
 	buf.Write(marshalAVP(296, m.OriginRealm, true, false))
 
-	// Marshal DestinationHost (optional)
-	if m.DestinationHost != nil {
-		buf.Write(marshalAVP(293, *m.DestinationHost, false, false))
-	}
-
 	// Marshal DestinationRealm (required)
 	buf.Write(marshalAVP(283, m.DestinationRealm, true, false))
 
 	// Marshal UserName (required)
-	buf.Write(marshalAVP(1, m.UserName, false, true))
+	buf.Write(marshalAVP(1, m.UserName, true, true))
+
+	// Marshal RatType (required)
+	buf.Write(marshalAVPWithVendor(1032, m.RatType, true, false, 10415))
+
+	// Marshal UlrFlags (required)
+	buf.Write(marshalAVPWithVendor(1405, m.UlrFlags, true, false, 10415))
+
+	// Marshal VisitedPlmnId (required)
+	buf.Write(marshalAVPWithVendor(1407, m.VisitedPlmnId, true, false, 10415))
+
+	// Marshal Drmp (optional)
+	if m.Drmp != nil {
+		buf.Write(marshalAVP(0, *m.Drmp, false, false))
+	}
+
+	// Marshal VendorSpecificApplicationId (grouped)
+	if m.VendorSpecificApplicationId != nil {
+		if groupedData, err := m.VendorSpecificApplicationId.Marshal(); err == nil {
+			buf.Write(marshalAVP(260, models_base.Grouped(groupedData), true, false))
+		}
+	}
+
+	// Marshal DestinationHost (optional)
+	if m.DestinationHost != nil {
+		buf.Write(marshalAVP(293, *m.DestinationHost, true, false))
+	}
 
 	// Marshal OcSupportedFeatures (optional)
 	if m.OcSupportedFeatures != nil {
-		buf.Write(marshalAVP(621, *m.OcSupportedFeatures, false, false))
+		buf.Write(marshalAVP(0, *m.OcSupportedFeatures, false, false))
 	}
 
 	// Marshal SupportedFeatures (repeated)
 	for _, v := range m.SupportedFeatures {
-		buf.Write(marshalAVP(628, v, false, false))
+		buf.Write(marshalAVP(0, v, false, false))
 	}
 
-	// Marshal TerminalInformation (optional)
+	// Marshal TerminalInformation (grouped)
 	if m.TerminalInformation != nil {
-		buf.Write(marshalAVP(1401, *m.TerminalInformation, true, false))
+		if groupedData, err := m.TerminalInformation.Marshal(); err == nil {
+			buf.Write(marshalAVPWithVendor(1401, models_base.Grouped(groupedData), true, false, 10415))
+		}
 	}
-
-	// Marshal RatType (required)
-	buf.Write(marshalAVP(1032, m.RatType, true, false))
-
-	// Marshal UlrFlags (required)
-	buf.Write(marshalAVP(1405, m.UlrFlags, true, false))
 
 	// Marshal UeSrvccCapability (optional)
 	if m.UeSrvccCapability != nil {
-		buf.Write(marshalAVP(1615, *m.UeSrvccCapability, true, false))
+		buf.Write(marshalAVPWithVendor(1615, *m.UeSrvccCapability, true, false, 10415))
 	}
-
-	// Marshal VisitedPlmnId (required)
-	buf.Write(marshalAVP(1407, m.VisitedPlmnId, true, false))
 
 	// Marshal SgsnNumber (optional)
 	if m.SgsnNumber != nil {
-		buf.Write(marshalAVP(1489, *m.SgsnNumber, true, false))
+		buf.Write(marshalAVPWithVendor(1489, *m.SgsnNumber, true, false, 10415))
 	}
 
 	// Marshal HomogeneousSupportImsVoice (optional)
 	if m.HomogeneousSupportImsVoice != nil {
-		buf.Write(marshalAVP(1493, *m.HomogeneousSupportImsVoice, true, false))
+		buf.Write(marshalAVP(0, *m.HomogeneousSupportImsVoice, false, false))
 	}
 
 	// Marshal GmlcAddress (optional)
 	if m.GmlcAddress != nil {
-		buf.Write(marshalAVP(2405, *m.GmlcAddress, true, false))
+		buf.Write(marshalAVP(0, *m.GmlcAddress, false, false))
 	}
 
 	// Marshal ActiveApn (repeated)
 	for _, v := range m.ActiveApn {
-		buf.Write(marshalAVP(1612, v, true, false))
+		buf.Write(marshalAVP(0, v, false, false))
 	}
 
 	// Marshal EquivalentPlmnList (optional)
 	if m.EquivalentPlmnList != nil {
-		buf.Write(marshalAVP(1637, *m.EquivalentPlmnList, false, false))
+		buf.Write(marshalAVP(0, *m.EquivalentPlmnList, false, false))
 	}
 
 	// Marshal MmeNumberForMtSms (optional)
 	if m.MmeNumberForMtSms != nil {
-		buf.Write(marshalAVP(1645, *m.MmeNumberForMtSms, false, false))
+		buf.Write(marshalAVP(0, *m.MmeNumberForMtSms, false, false))
 	}
 
 	// Marshal SmsRegisterRequest (optional)
 	if m.SmsRegisterRequest != nil {
-		buf.Write(marshalAVP(1648, *m.SmsRegisterRequest, false, false))
+		buf.Write(marshalAVP(0, *m.SmsRegisterRequest, false, false))
 	}
 
-	// Marshal ProxyInfo (repeated)
+	// Marshal SgsMmeIdentity (optional)
+	if m.SgsMmeIdentity != nil {
+		buf.Write(marshalAVP(0, *m.SgsMmeIdentity, false, false))
+	}
+
+	// Marshal CoupledNodeDiameterId (optional)
+	if m.CoupledNodeDiameterId != nil {
+		buf.Write(marshalAVP(0, *m.CoupledNodeDiameterId, false, false))
+	}
+
+	// Marshal AdjacentPlmns (optional)
+	if m.AdjacentPlmns != nil {
+		buf.Write(marshalAVP(0, *m.AdjacentPlmns, false, false))
+	}
+
+	// Marshal SupportedServices (optional)
+	if m.SupportedServices != nil {
+		buf.Write(marshalAVP(0, *m.SupportedServices, false, false))
+	}
+
+	// Marshal Avp (repeated)
+	for _, v := range m.Avp {
+		buf.Write(marshalAVP(0, v, false, false))
+	}
+
+	// Marshal ProxyInfo (repeated, grouped)
 	for _, v := range m.ProxyInfo {
-		buf.Write(marshalAVP(284, v, false, false))
+		if v != nil {
+			if groupedData, err := v.Marshal(); err == nil {
+				buf.Write(marshalAVP(284, models_base.Grouped(groupedData), true, false))
+			}
+		}
 	}
 
 	// Marshal RouteRecord (repeated)
 	for _, v := range m.RouteRecord {
-		buf.Write(marshalAVP(282, v, false, false))
+		buf.Write(marshalAVP(282, v, true, false))
 	}
 
 	// Get the final message
@@ -443,7 +2894,12 @@ func (m *UpdateLocationRequest) Unmarshal(data []byte) error {
 
 		// Extract AVP data
 		headerSize := 8
+		var vendorID uint32
 		if avpFlags&0x80 != 0 { // V-bit set
+			if len(avpData) < 12 {
+				return fmt.Errorf("AVP data too short for vendor ID")
+			}
+			vendorID = binary.BigEndian.Uint32(avpData[8:12])
 			headerSize = 12
 		}
 		avpDataLen := int(avpLength) - headerSize
@@ -452,24 +2908,12 @@ func (m *UpdateLocationRequest) Unmarshal(data []byte) error {
 		}
 		avpValue := avpData[headerSize : headerSize+avpDataLen]
 
-		// Parse AVP based on code
+		// Parse AVP based on code and vendor ID
 		switch avpCode {
 		case 263: // Session-Id
 			val, err := models_base.DecodeUTF8String(avpValue)
 			if err == nil {
 				m.SessionId = val.(models_base.UTF8String)
-			}
-		case 301: // DRMP
-			val, err := models_base.DecodeEnumerated(avpValue)
-			if err == nil {
-				v := val.(models_base.Enumerated)
-				m.Drmp = &v
-			}
-		case 260: // Vendor-Specific-Application-Id
-			val, err := models_base.DecodeGrouped(avpValue)
-			if err == nil {
-				v := val.(models_base.Grouped)
-				m.VendorSpecificApplicationId = &v
 			}
 		case 277: // Auth-Session-State
 			val, err := models_base.DecodeEnumerated(avpValue)
@@ -486,12 +2930,6 @@ func (m *UpdateLocationRequest) Unmarshal(data []byte) error {
 			if err == nil {
 				m.OriginRealm = val.(models_base.DiameterIdentity)
 			}
-		case 293: // Destination-Host
-			val, err := models_base.DecodeDiameterIdentity(avpValue)
-			if err == nil {
-				v := val.(models_base.DiameterIdentity)
-				m.DestinationHost = &v
-			}
 		case 283: // Destination-Realm
 			val, err := models_base.DecodeDiameterIdentity(avpValue)
 			if err == nil {
@@ -502,89 +2940,85 @@ func (m *UpdateLocationRequest) Unmarshal(data []byte) error {
 			if err == nil {
 				m.UserName = val.(models_base.UTF8String)
 			}
-		case 621: // OC-Supported-Features
-			val, err := models_base.DecodeGrouped(avpValue)
-			if err == nil {
-				v := val.(models_base.Grouped)
-				m.OcSupportedFeatures = &v
-			}
-		case 628: // Supported-Features
-			val, err := models_base.DecodeGrouped(avpValue)
-			if err == nil {
-				m.SupportedFeatures = append(m.SupportedFeatures, val.(models_base.Grouped))
-			}
-		case 1401: // Terminal-Information
-			val, err := models_base.DecodeGrouped(avpValue)
-			if err == nil {
-				v := val.(models_base.Grouped)
-				m.TerminalInformation = &v
-			}
 		case 1032: // RAT-Type
+			if vendorID != 10415 {
+				break // Vendor ID mismatch
+			}
 			val, err := models_base.DecodeEnumerated(avpValue)
 			if err == nil {
 				m.RatType = val.(models_base.Enumerated)
 			}
 		case 1405: // ULR-Flags
+			if vendorID != 10415 {
+				break // Vendor ID mismatch
+			}
 			val, err := models_base.DecodeUnsigned32(avpValue)
 			if err == nil {
 				m.UlrFlags = val.(models_base.Unsigned32)
 			}
+		case 1407: // Visited-PLMN-Id
+			if vendorID != 10415 {
+				break // Vendor ID mismatch
+			}
+			val, err := models_base.DecodeOctetString(avpValue)
+			if err == nil {
+				m.VisitedPlmnId = val.(models_base.OctetString)
+			}
+		// case 0: // DRMP (AVP code not defined)
+		case 260: // Vendor-Specific-Application-Id
+			grouped := &VendorSpecificApplicationId{}
+			if err := grouped.Unmarshal(avpValue); err == nil {
+				m.VendorSpecificApplicationId = grouped
+			}
+		case 293: // Destination-Host
+			val, err := models_base.DecodeDiameterIdentity(avpValue)
+			if err == nil {
+				v := val.(models_base.DiameterIdentity)
+				m.DestinationHost = &v
+			}
+		// case 0: // OC-Supported-Features (AVP code not defined)
+		// case 0: // Supported-Features (AVP code not defined)
+		case 1401: // Terminal-Information
+			if vendorID != 10415 {
+				break // Vendor ID mismatch
+			}
+			grouped := &TerminalInformation{}
+			if err := grouped.Unmarshal(avpValue); err == nil {
+				m.TerminalInformation = grouped
+			}
 		case 1615: // UE-SRVCC-Capability
+			if vendorID != 10415 {
+				break // Vendor ID mismatch
+			}
 			val, err := models_base.DecodeEnumerated(avpValue)
 			if err == nil {
 				v := val.(models_base.Enumerated)
 				m.UeSrvccCapability = &v
 			}
-		case 1407: // Visited-PLMN-Id
-			val, err := models_base.DecodeOctetString(avpValue)
-			if err == nil {
-				m.VisitedPlmnId = val.(models_base.OctetString)
-			}
 		case 1489: // SGSN-Number
+			if vendorID != 10415 {
+				break // Vendor ID mismatch
+			}
 			val, err := models_base.DecodeOctetString(avpValue)
 			if err == nil {
 				v := val.(models_base.OctetString)
 				m.SgsnNumber = &v
 			}
-		case 1493: // Homogeneous-Support-of-IMS-Voice-Over-PS-Sessions
-			val, err := models_base.DecodeEnumerated(avpValue)
-			if err == nil {
-				v := val.(models_base.Enumerated)
-				m.HomogeneousSupportImsVoice = &v
-			}
-		case 2405: // GMLC-Address
-			val, err := models_base.DecodeAddress(avpValue)
-			if err == nil {
-				v := val.(models_base.Address)
-				m.GmlcAddress = &v
-			}
-		case 1612: // Active-APN
-			val, err := models_base.DecodeGrouped(avpValue)
-			if err == nil {
-				m.ActiveApn = append(m.ActiveApn, val.(models_base.Grouped))
-			}
-		case 1637: // Equivalent-PLMN-List
-			val, err := models_base.DecodeGrouped(avpValue)
-			if err == nil {
-				v := val.(models_base.Grouped)
-				m.EquivalentPlmnList = &v
-			}
-		case 1645: // MME-Number-for-MT-SMS
-			val, err := models_base.DecodeOctetString(avpValue)
-			if err == nil {
-				v := val.(models_base.OctetString)
-				m.MmeNumberForMtSms = &v
-			}
-		case 1648: // SMS-Register-Request
-			val, err := models_base.DecodeEnumerated(avpValue)
-			if err == nil {
-				v := val.(models_base.Enumerated)
-				m.SmsRegisterRequest = &v
-			}
+		// case 0: // Homogeneous-Support-of-IMS-Voice-Over-PS-Sessions (AVP code not defined)
+		// case 0: // GMLC-Address (AVP code not defined)
+		// case 0: // Active-APN (AVP code not defined)
+		// case 0: // Equivalent-PLMN-List (AVP code not defined)
+		// case 0: // MME-Number-for-MT-SMS (AVP code not defined)
+		// case 0: // SMS-Register-Request (AVP code not defined)
+		// case 0: // SGs-MME-Identity (AVP code not defined)
+		// case 0: // Coupled-Node-Diameter-ID (AVP code not defined)
+		// case 0: // Adjacent-PLMNs (AVP code not defined)
+		// case 0: // Supported-Services (AVP code not defined)
+		// case 0: // AVP (AVP code not defined)
 		case 284: // Proxy-Info
-			val, err := models_base.DecodeGrouped(avpValue)
-			if err == nil {
-				m.ProxyInfo = append(m.ProxyInfo, val.(models_base.Grouped))
+			grouped := &ProxyInfo{}
+			if err := grouped.Unmarshal(avpValue); err == nil {
+				m.ProxyInfo = append(m.ProxyInfo, grouped)
 			}
 		case 282: // Route-Record
 			val, err := models_base.DecodeDiameterIdentity(avpValue)
@@ -615,7 +3049,7 @@ func (m *UpdateLocationRequest) Len() int {
 
 // String returns a string representation of UpdateLocationRequest
 func (m *UpdateLocationRequest) String() string {
-	return fmt.Sprintf("UpdateLocationRequest{SessionId:%v, Drmp:%v, VendorSpecificApplicationId:%v, AuthSessionState:%v, OriginHost:%v, OriginRealm:%v, DestinationHost:%v, DestinationRealm:%v, UserName:%v, OcSupportedFeatures:%v, SupportedFeatures:%v, TerminalInformation:%v, RatType:%v, UlrFlags:%v, UeSrvccCapability:%v, VisitedPlmnId:%v, SgsnNumber:%v, HomogeneousSupportImsVoice:%v, GmlcAddress:%v, ActiveApn:%v, EquivalentPlmnList:%v, MmeNumberForMtSms:%v, SmsRegisterRequest:%v, ProxyInfo:%v, RouteRecord:%v}", m.SessionId, m.Drmp, m.VendorSpecificApplicationId, m.AuthSessionState, m.OriginHost, m.OriginRealm, m.DestinationHost, m.DestinationRealm, m.UserName, m.OcSupportedFeatures, m.SupportedFeatures, m.TerminalInformation, m.RatType, m.UlrFlags, m.UeSrvccCapability, m.VisitedPlmnId, m.SgsnNumber, m.HomogeneousSupportImsVoice, m.GmlcAddress, m.ActiveApn, m.EquivalentPlmnList, m.MmeNumberForMtSms, m.SmsRegisterRequest, m.ProxyInfo, m.RouteRecord)
+	return fmt.Sprintf("UpdateLocationRequest{SessionId:%v, AuthSessionState:%v, OriginHost:%v, OriginRealm:%v, DestinationRealm:%v, UserName:%v, RatType:%v, UlrFlags:%v, VisitedPlmnId:%v, Drmp:%v, VendorSpecificApplicationId:%v, DestinationHost:%v, OcSupportedFeatures:%v, SupportedFeatures:%v, TerminalInformation:%v, UeSrvccCapability:%v, SgsnNumber:%v, HomogeneousSupportImsVoice:%v, GmlcAddress:%v, ActiveApn:%v, EquivalentPlmnList:%v, MmeNumberForMtSms:%v, SmsRegisterRequest:%v, SgsMmeIdentity:%v, CoupledNodeDiameterId:%v, AdjacentPlmns:%v, SupportedServices:%v, Avp:%v, ProxyInfo:%v, RouteRecord:%v}", m.SessionId, m.AuthSessionState, m.OriginHost, m.OriginRealm, m.DestinationRealm, m.UserName, m.RatType, m.UlrFlags, m.VisitedPlmnId, m.Drmp, m.VendorSpecificApplicationId, m.DestinationHost, m.OcSupportedFeatures, m.SupportedFeatures, m.TerminalInformation, m.UeSrvccCapability, m.SgsnNumber, m.HomogeneousSupportImsVoice, m.GmlcAddress, m.ActiveApn, m.EquivalentPlmnList, m.MmeNumberForMtSms, m.SmsRegisterRequest, m.SgsMmeIdentity, m.CoupledNodeDiameterId, m.AdjacentPlmns, m.SupportedServices, m.Avp, m.ProxyInfo, m.RouteRecord)
 }
 
 // UpdateLocationAnswer represents the Update-Location-Answer (ULA) Diameter command
@@ -624,23 +3058,24 @@ type UpdateLocationAnswer struct {
 	Header DiameterHeader
 
 	SessionId                   models_base.UTF8String         // Required
-	Drmp                        *models_base.Enumerated        // Optional
-	VendorSpecificApplicationId *models_base.Grouped           // Optional
-	ResultCode                  *models_base.Unsigned32        // Optional
-	ExperimentalResult          *models_base.Grouped           // Optional
-	ErrorDiagnostic             *models_base.Enumerated        // Optional
 	AuthSessionState            models_base.Enumerated         // Required
 	OriginHost                  models_base.DiameterIdentity   // Required
 	OriginRealm                 models_base.DiameterIdentity   // Required
-	OcSupportedFeatures         *models_base.Grouped           // Optional
-	OcOlr                       *models_base.Grouped           // Optional
-	Load                        []models_base.Grouped          // Optional
-	SupportedFeatures           []models_base.Grouped          // Optional
+	Drmp                        *models_base.OctetString       // Optional - WARNING: AVP code not defined, DO NOT USE
+	VendorSpecificApplicationId *VendorSpecificApplicationId   // Optional
+	ResultCode                  *models_base.Unsigned32        // Optional
+	ExperimentalResult          *ExperimentalResult            // Optional
+	ErrorDiagnostic             *models_base.Enumerated        // Optional
+	OcSupportedFeatures         *models_base.OctetString       // Optional - WARNING: AVP code not defined, DO NOT USE
+	OcOlr                       *models_base.OctetString       // Optional - WARNING: AVP code not defined, DO NOT USE
+	Load                        []models_base.OctetString      // Optional - WARNING: AVP code not defined, DO NOT USE
+	SupportedFeatures           []models_base.OctetString      // Optional - WARNING: AVP code not defined, DO NOT USE
 	UlaFlags                    *models_base.Unsigned32        // Optional
-	SubscriptionData            *models_base.Grouped           // Optional
-	ResetId                     []models_base.OctetString      // Optional
-	FailedAvp                   *models_base.Grouped           // Optional
-	ProxyInfo                   []models_base.Grouped          // Optional
+	SubscriptionData            *SubscriptionData              // Optional
+	ResetId                     []models_base.OctetString      // Optional - WARNING: AVP code not defined, DO NOT USE
+	Avp                         []models_base.OctetString      // Optional - WARNING: AVP code not defined, DO NOT USE
+	FailedAvp                   *FailedAVP                     // Optional
+	ProxyInfo                   []*ProxyInfo                   // Optional
 	RouteRecord                 []models_base.DiameterIdentity // Optional
 }
 
@@ -694,31 +3129,6 @@ func (m *UpdateLocationAnswer) Marshal() ([]byte, error) {
 	// Marshal SessionId (required)
 	buf.Write(marshalAVP(263, m.SessionId, true, false))
 
-	// Marshal Drmp (optional)
-	if m.Drmp != nil {
-		buf.Write(marshalAVP(301, *m.Drmp, false, false))
-	}
-
-	// Marshal VendorSpecificApplicationId (optional)
-	if m.VendorSpecificApplicationId != nil {
-		buf.Write(marshalAVP(260, *m.VendorSpecificApplicationId, false, false))
-	}
-
-	// Marshal ResultCode (optional)
-	if m.ResultCode != nil {
-		buf.Write(marshalAVP(268, *m.ResultCode, true, false))
-	}
-
-	// Marshal ExperimentalResult (optional)
-	if m.ExperimentalResult != nil {
-		buf.Write(marshalAVP(297, *m.ExperimentalResult, true, false))
-	}
-
-	// Marshal ErrorDiagnostic (optional)
-	if m.ErrorDiagnostic != nil {
-		buf.Write(marshalAVP(1614, *m.ErrorDiagnostic, false, false))
-	}
-
 	// Marshal AuthSessionState (required)
 	buf.Write(marshalAVP(277, m.AuthSessionState, true, false))
 
@@ -728,54 +3138,96 @@ func (m *UpdateLocationAnswer) Marshal() ([]byte, error) {
 	// Marshal OriginRealm (required)
 	buf.Write(marshalAVP(296, m.OriginRealm, true, false))
 
+	// Marshal Drmp (optional)
+	if m.Drmp != nil {
+		buf.Write(marshalAVP(0, *m.Drmp, false, false))
+	}
+
+	// Marshal VendorSpecificApplicationId (grouped)
+	if m.VendorSpecificApplicationId != nil {
+		if groupedData, err := m.VendorSpecificApplicationId.Marshal(); err == nil {
+			buf.Write(marshalAVP(260, models_base.Grouped(groupedData), true, false))
+		}
+	}
+
+	// Marshal ResultCode (optional)
+	if m.ResultCode != nil {
+		buf.Write(marshalAVP(268, *m.ResultCode, true, false))
+	}
+
+	// Marshal ExperimentalResult (grouped)
+	if m.ExperimentalResult != nil {
+		if groupedData, err := m.ExperimentalResult.Marshal(); err == nil {
+			buf.Write(marshalAVP(297, models_base.Grouped(groupedData), true, false))
+		}
+	}
+
+	// Marshal ErrorDiagnostic (optional)
+	if m.ErrorDiagnostic != nil {
+		buf.Write(marshalAVPWithVendor(1614, *m.ErrorDiagnostic, false, false, 10415))
+	}
+
 	// Marshal OcSupportedFeatures (optional)
 	if m.OcSupportedFeatures != nil {
-		buf.Write(marshalAVP(621, *m.OcSupportedFeatures, false, false))
+		buf.Write(marshalAVP(0, *m.OcSupportedFeatures, false, false))
 	}
 
 	// Marshal OcOlr (optional)
 	if m.OcOlr != nil {
-		buf.Write(marshalAVP(623, *m.OcOlr, false, false))
+		buf.Write(marshalAVP(0, *m.OcOlr, false, false))
 	}
 
 	// Marshal Load (repeated)
 	for _, v := range m.Load {
-		buf.Write(marshalAVP(650, v, false, false))
+		buf.Write(marshalAVP(0, v, false, false))
 	}
 
 	// Marshal SupportedFeatures (repeated)
 	for _, v := range m.SupportedFeatures {
-		buf.Write(marshalAVP(628, v, false, false))
+		buf.Write(marshalAVP(0, v, false, false))
 	}
 
 	// Marshal UlaFlags (optional)
 	if m.UlaFlags != nil {
-		buf.Write(marshalAVP(1406, *m.UlaFlags, true, false))
+		buf.Write(marshalAVPWithVendor(1406, *m.UlaFlags, true, false, 10415))
 	}
 
-	// Marshal SubscriptionData (optional)
+	// Marshal SubscriptionData (grouped)
 	if m.SubscriptionData != nil {
-		buf.Write(marshalAVP(1400, *m.SubscriptionData, true, false))
+		if groupedData, err := m.SubscriptionData.Marshal(); err == nil {
+			buf.Write(marshalAVPWithVendor(1400, models_base.Grouped(groupedData), true, false, 10415))
+		}
 	}
 
 	// Marshal ResetId (repeated)
 	for _, v := range m.ResetId {
-		buf.Write(marshalAVP(1670, v, false, false))
+		buf.Write(marshalAVP(0, v, false, false))
 	}
 
-	// Marshal FailedAvp (optional)
+	// Marshal Avp (repeated)
+	for _, v := range m.Avp {
+		buf.Write(marshalAVP(0, v, false, false))
+	}
+
+	// Marshal FailedAvp (grouped)
 	if m.FailedAvp != nil {
-		buf.Write(marshalAVP(279, *m.FailedAvp, false, false))
+		if groupedData, err := m.FailedAvp.Marshal(); err == nil {
+			buf.Write(marshalAVP(279, models_base.Grouped(groupedData), true, false))
+		}
 	}
 
-	// Marshal ProxyInfo (repeated)
+	// Marshal ProxyInfo (repeated, grouped)
 	for _, v := range m.ProxyInfo {
-		buf.Write(marshalAVP(284, v, false, false))
+		if v != nil {
+			if groupedData, err := v.Marshal(); err == nil {
+				buf.Write(marshalAVP(284, models_base.Grouped(groupedData), true, false))
+			}
+		}
 	}
 
 	// Marshal RouteRecord (repeated)
 	for _, v := range m.RouteRecord {
-		buf.Write(marshalAVP(282, v, false, false))
+		buf.Write(marshalAVP(282, v, true, false))
 	}
 
 	// Get the final message
@@ -820,7 +3272,12 @@ func (m *UpdateLocationAnswer) Unmarshal(data []byte) error {
 
 		// Extract AVP data
 		headerSize := 8
+		var vendorID uint32
 		if avpFlags&0x80 != 0 { // V-bit set
+			if len(avpData) < 12 {
+				return fmt.Errorf("AVP data too short for vendor ID")
+			}
+			vendorID = binary.BigEndian.Uint32(avpData[8:12])
 			headerSize = 12
 		}
 		avpDataLen := int(avpLength) - headerSize
@@ -829,42 +3286,12 @@ func (m *UpdateLocationAnswer) Unmarshal(data []byte) error {
 		}
 		avpValue := avpData[headerSize : headerSize+avpDataLen]
 
-		// Parse AVP based on code
+		// Parse AVP based on code and vendor ID
 		switch avpCode {
 		case 263: // Session-Id
 			val, err := models_base.DecodeUTF8String(avpValue)
 			if err == nil {
 				m.SessionId = val.(models_base.UTF8String)
-			}
-		case 301: // DRMP
-			val, err := models_base.DecodeEnumerated(avpValue)
-			if err == nil {
-				v := val.(models_base.Enumerated)
-				m.Drmp = &v
-			}
-		case 260: // Vendor-Specific-Application-Id
-			val, err := models_base.DecodeGrouped(avpValue)
-			if err == nil {
-				v := val.(models_base.Grouped)
-				m.VendorSpecificApplicationId = &v
-			}
-		case 268: // Result-Code
-			val, err := models_base.DecodeUnsigned32(avpValue)
-			if err == nil {
-				v := val.(models_base.Unsigned32)
-				m.ResultCode = &v
-			}
-		case 297: // Experimental-Result
-			val, err := models_base.DecodeGrouped(avpValue)
-			if err == nil {
-				v := val.(models_base.Grouped)
-				m.ExperimentalResult = &v
-			}
-		case 1614: // Error-Diagnostic
-			val, err := models_base.DecodeEnumerated(avpValue)
-			if err == nil {
-				v := val.(models_base.Enumerated)
-				m.ErrorDiagnostic = &v
 			}
 		case 277: // Auth-Session-State
 			val, err := models_base.DecodeEnumerated(avpValue)
@@ -881,55 +3308,64 @@ func (m *UpdateLocationAnswer) Unmarshal(data []byte) error {
 			if err == nil {
 				m.OriginRealm = val.(models_base.DiameterIdentity)
 			}
-		case 621: // OC-Supported-Features
-			val, err := models_base.DecodeGrouped(avpValue)
-			if err == nil {
-				v := val.(models_base.Grouped)
-				m.OcSupportedFeatures = &v
+		// case 0: // DRMP (AVP code not defined)
+		case 260: // Vendor-Specific-Application-Id
+			grouped := &VendorSpecificApplicationId{}
+			if err := grouped.Unmarshal(avpValue); err == nil {
+				m.VendorSpecificApplicationId = grouped
 			}
-		case 623: // OC-OLR
-			val, err := models_base.DecodeGrouped(avpValue)
+		case 268: // Result-Code
+			val, err := models_base.DecodeUnsigned32(avpValue)
 			if err == nil {
-				v := val.(models_base.Grouped)
-				m.OcOlr = &v
+				v := val.(models_base.Unsigned32)
+				m.ResultCode = &v
 			}
-		case 650: // Load
-			val, err := models_base.DecodeGrouped(avpValue)
+		case 297: // Experimental-Result
+			grouped := &ExperimentalResult{}
+			if err := grouped.Unmarshal(avpValue); err == nil {
+				m.ExperimentalResult = grouped
+			}
+		case 1614: // Error-Diagnostic
+			if vendorID != 10415 {
+				break // Vendor ID mismatch
+			}
+			val, err := models_base.DecodeEnumerated(avpValue)
 			if err == nil {
-				m.Load = append(m.Load, val.(models_base.Grouped))
+				v := val.(models_base.Enumerated)
+				m.ErrorDiagnostic = &v
 			}
-		case 628: // Supported-Features
-			val, err := models_base.DecodeGrouped(avpValue)
-			if err == nil {
-				m.SupportedFeatures = append(m.SupportedFeatures, val.(models_base.Grouped))
-			}
+		// case 0: // OC-Supported-Features (AVP code not defined)
+		// case 0: // OC-OLR (AVP code not defined)
+		// case 0: // Load (AVP code not defined)
+		// case 0: // Supported-Features (AVP code not defined)
 		case 1406: // ULA-Flags
+			if vendorID != 10415 {
+				break // Vendor ID mismatch
+			}
 			val, err := models_base.DecodeUnsigned32(avpValue)
 			if err == nil {
 				v := val.(models_base.Unsigned32)
 				m.UlaFlags = &v
 			}
 		case 1400: // Subscription-Data
-			val, err := models_base.DecodeGrouped(avpValue)
-			if err == nil {
-				v := val.(models_base.Grouped)
-				m.SubscriptionData = &v
+			if vendorID != 10415 {
+				break // Vendor ID mismatch
 			}
-		case 1670: // Reset-ID
-			val, err := models_base.DecodeOctetString(avpValue)
-			if err == nil {
-				m.ResetId = append(m.ResetId, val.(models_base.OctetString))
+			grouped := &SubscriptionData{}
+			if err := grouped.Unmarshal(avpValue); err == nil {
+				m.SubscriptionData = grouped
 			}
+		// case 0: // Reset-ID (AVP code not defined)
+		// case 0: // AVP (AVP code not defined)
 		case 279: // Failed-AVP
-			val, err := models_base.DecodeGrouped(avpValue)
-			if err == nil {
-				v := val.(models_base.Grouped)
-				m.FailedAvp = &v
+			grouped := &FailedAVP{}
+			if err := grouped.Unmarshal(avpValue); err == nil {
+				m.FailedAvp = grouped
 			}
 		case 284: // Proxy-Info
-			val, err := models_base.DecodeGrouped(avpValue)
-			if err == nil {
-				m.ProxyInfo = append(m.ProxyInfo, val.(models_base.Grouped))
+			grouped := &ProxyInfo{}
+			if err := grouped.Unmarshal(avpValue); err == nil {
+				m.ProxyInfo = append(m.ProxyInfo, grouped)
 			}
 		case 282: // Route-Record
 			val, err := models_base.DecodeDiameterIdentity(avpValue)
@@ -960,7 +3396,7 @@ func (m *UpdateLocationAnswer) Len() int {
 
 // String returns a string representation of UpdateLocationAnswer
 func (m *UpdateLocationAnswer) String() string {
-	return fmt.Sprintf("UpdateLocationAnswer{SessionId:%v, Drmp:%v, VendorSpecificApplicationId:%v, ResultCode:%v, ExperimentalResult:%v, ErrorDiagnostic:%v, AuthSessionState:%v, OriginHost:%v, OriginRealm:%v, OcSupportedFeatures:%v, OcOlr:%v, Load:%v, SupportedFeatures:%v, UlaFlags:%v, SubscriptionData:%v, ResetId:%v, FailedAvp:%v, ProxyInfo:%v, RouteRecord:%v}", m.SessionId, m.Drmp, m.VendorSpecificApplicationId, m.ResultCode, m.ExperimentalResult, m.ErrorDiagnostic, m.AuthSessionState, m.OriginHost, m.OriginRealm, m.OcSupportedFeatures, m.OcOlr, m.Load, m.SupportedFeatures, m.UlaFlags, m.SubscriptionData, m.ResetId, m.FailedAvp, m.ProxyInfo, m.RouteRecord)
+	return fmt.Sprintf("UpdateLocationAnswer{SessionId:%v, AuthSessionState:%v, OriginHost:%v, OriginRealm:%v, Drmp:%v, VendorSpecificApplicationId:%v, ResultCode:%v, ExperimentalResult:%v, ErrorDiagnostic:%v, OcSupportedFeatures:%v, OcOlr:%v, Load:%v, SupportedFeatures:%v, UlaFlags:%v, SubscriptionData:%v, ResetId:%v, Avp:%v, FailedAvp:%v, ProxyInfo:%v, RouteRecord:%v}", m.SessionId, m.AuthSessionState, m.OriginHost, m.OriginRealm, m.Drmp, m.VendorSpecificApplicationId, m.ResultCode, m.ExperimentalResult, m.ErrorDiagnostic, m.OcSupportedFeatures, m.OcOlr, m.Load, m.SupportedFeatures, m.UlaFlags, m.SubscriptionData, m.ResetId, m.Avp, m.FailedAvp, m.ProxyInfo, m.RouteRecord)
 }
 
 // AuthenticationInformationRequest represents the Authentication-Information-Request (AIR) Diameter command
@@ -968,23 +3404,24 @@ func (m *UpdateLocationAnswer) String() string {
 type AuthenticationInformationRequest struct {
 	Header DiameterHeader
 
-	SessionId                   models_base.UTF8String         // Required
-	Drmp                        *models_base.Enumerated        // Optional
-	VendorSpecificApplicationId *models_base.Grouped           // Optional
-	AuthSessionState            models_base.Enumerated         // Required
-	OriginHost                  models_base.DiameterIdentity   // Required
-	OriginRealm                 models_base.DiameterIdentity   // Required
-	DestinationHost             *models_base.DiameterIdentity  // Optional
-	DestinationRealm            models_base.DiameterIdentity   // Required
-	UserName                    models_base.UTF8String         // Required
-	OcSupportedFeatures         *models_base.Grouped           // Optional
-	SupportedFeatures           []models_base.Grouped          // Optional
-	RequestedEutranAuthInfo     *models_base.Grouped           // Optional
-	RequestedUtranGeranAuthInfo *models_base.Grouped           // Optional
-	VisitedPlmnId               models_base.OctetString        // Required
-	AirFlags                    *models_base.Unsigned32        // Optional
-	ProxyInfo                   []models_base.Grouped          // Optional
-	RouteRecord                 []models_base.DiameterIdentity // Optional
+	SessionId                             models_base.UTF8String                 // Required
+	AuthSessionState                      models_base.Enumerated                 // Required
+	OriginHost                            models_base.DiameterIdentity           // Required
+	OriginRealm                           models_base.DiameterIdentity           // Required
+	DestinationRealm                      models_base.DiameterIdentity           // Required
+	UserName                              models_base.UTF8String                 // Required
+	VisitedPlmnId                         models_base.OctetString                // Required
+	Drmp                                  *models_base.OctetString               // Optional - WARNING: AVP code not defined, DO NOT USE
+	VendorSpecificApplicationId           *VendorSpecificApplicationId           // Optional
+	DestinationHost                       *models_base.DiameterIdentity          // Optional
+	OcSupportedFeatures                   *models_base.OctetString               // Optional - WARNING: AVP code not defined, DO NOT USE
+	SupportedFeatures                     []models_base.OctetString              // Optional - WARNING: AVP code not defined, DO NOT USE
+	RequestedEutranAuthenticationInfo     *RequestedEUTRANAuthenticationInfo     // Optional
+	RequestedUtranGeranAuthenticationInfo *RequestedUTRANGERANAuthenticationInfo // Optional
+	AirFlags                              *models_base.Unsigned32                // Optional
+	Avp                                   []models_base.OctetString              // Optional - WARNING: AVP code not defined, DO NOT USE
+	ProxyInfo                             []*ProxyInfo                           // Optional
+	RouteRecord                           []models_base.DiameterIdentity         // Optional
 }
 
 // NewAuthenticationInformationRequest creates a new AIR message
@@ -1046,16 +3483,6 @@ func (m *AuthenticationInformationRequest) Marshal() ([]byte, error) {
 	// Marshal SessionId (required)
 	buf.Write(marshalAVP(263, m.SessionId, true, false))
 
-	// Marshal Drmp (optional)
-	if m.Drmp != nil {
-		buf.Write(marshalAVP(301, *m.Drmp, false, false))
-	}
-
-	// Marshal VendorSpecificApplicationId (optional)
-	if m.VendorSpecificApplicationId != nil {
-		buf.Write(marshalAVP(260, *m.VendorSpecificApplicationId, false, false))
-	}
-
 	// Marshal AuthSessionState (required)
 	buf.Write(marshalAVP(277, m.AuthSessionState, true, false))
 
@@ -1065,53 +3492,78 @@ func (m *AuthenticationInformationRequest) Marshal() ([]byte, error) {
 	// Marshal OriginRealm (required)
 	buf.Write(marshalAVP(296, m.OriginRealm, true, false))
 
-	// Marshal DestinationHost (optional)
-	if m.DestinationHost != nil {
-		buf.Write(marshalAVP(293, *m.DestinationHost, false, false))
-	}
-
 	// Marshal DestinationRealm (required)
 	buf.Write(marshalAVP(283, m.DestinationRealm, true, false))
 
 	// Marshal UserName (required)
-	buf.Write(marshalAVP(1, m.UserName, false, true))
+	buf.Write(marshalAVP(1, m.UserName, true, true))
+
+	// Marshal VisitedPlmnId (required)
+	buf.Write(marshalAVPWithVendor(1407, m.VisitedPlmnId, true, false, 10415))
+
+	// Marshal Drmp (optional)
+	if m.Drmp != nil {
+		buf.Write(marshalAVP(0, *m.Drmp, false, false))
+	}
+
+	// Marshal VendorSpecificApplicationId (grouped)
+	if m.VendorSpecificApplicationId != nil {
+		if groupedData, err := m.VendorSpecificApplicationId.Marshal(); err == nil {
+			buf.Write(marshalAVP(260, models_base.Grouped(groupedData), true, false))
+		}
+	}
+
+	// Marshal DestinationHost (optional)
+	if m.DestinationHost != nil {
+		buf.Write(marshalAVP(293, *m.DestinationHost, true, false))
+	}
 
 	// Marshal OcSupportedFeatures (optional)
 	if m.OcSupportedFeatures != nil {
-		buf.Write(marshalAVP(621, *m.OcSupportedFeatures, false, false))
+		buf.Write(marshalAVP(0, *m.OcSupportedFeatures, false, false))
 	}
 
 	// Marshal SupportedFeatures (repeated)
 	for _, v := range m.SupportedFeatures {
-		buf.Write(marshalAVP(628, v, false, false))
+		buf.Write(marshalAVP(0, v, false, false))
 	}
 
-	// Marshal RequestedEutranAuthInfo (optional)
-	if m.RequestedEutranAuthInfo != nil {
-		buf.Write(marshalAVP(1408, *m.RequestedEutranAuthInfo, true, false))
+	// Marshal RequestedEutranAuthenticationInfo (grouped)
+	if m.RequestedEutranAuthenticationInfo != nil {
+		if groupedData, err := m.RequestedEutranAuthenticationInfo.Marshal(); err == nil {
+			buf.Write(marshalAVPWithVendor(1408, models_base.Grouped(groupedData), true, false, 10415))
+		}
 	}
 
-	// Marshal RequestedUtranGeranAuthInfo (optional)
-	if m.RequestedUtranGeranAuthInfo != nil {
-		buf.Write(marshalAVP(1409, *m.RequestedUtranGeranAuthInfo, true, false))
+	// Marshal RequestedUtranGeranAuthenticationInfo (grouped)
+	if m.RequestedUtranGeranAuthenticationInfo != nil {
+		if groupedData, err := m.RequestedUtranGeranAuthenticationInfo.Marshal(); err == nil {
+			buf.Write(marshalAVPWithVendor(1409, models_base.Grouped(groupedData), true, false, 10415))
+		}
 	}
-
-	// Marshal VisitedPlmnId (required)
-	buf.Write(marshalAVP(1407, m.VisitedPlmnId, true, false))
 
 	// Marshal AirFlags (optional)
 	if m.AirFlags != nil {
-		buf.Write(marshalAVP(1679, *m.AirFlags, false, false))
+		buf.Write(marshalAVPWithVendor(1679, *m.AirFlags, true, false, 10415))
 	}
 
-	// Marshal ProxyInfo (repeated)
+	// Marshal Avp (repeated)
+	for _, v := range m.Avp {
+		buf.Write(marshalAVP(0, v, false, false))
+	}
+
+	// Marshal ProxyInfo (repeated, grouped)
 	for _, v := range m.ProxyInfo {
-		buf.Write(marshalAVP(284, v, false, false))
+		if v != nil {
+			if groupedData, err := v.Marshal(); err == nil {
+				buf.Write(marshalAVP(284, models_base.Grouped(groupedData), true, false))
+			}
+		}
 	}
 
 	// Marshal RouteRecord (repeated)
 	for _, v := range m.RouteRecord {
-		buf.Write(marshalAVP(282, v, false, false))
+		buf.Write(marshalAVP(282, v, true, false))
 	}
 
 	// Get the final message
@@ -1156,7 +3608,12 @@ func (m *AuthenticationInformationRequest) Unmarshal(data []byte) error {
 
 		// Extract AVP data
 		headerSize := 8
+		var vendorID uint32
 		if avpFlags&0x80 != 0 { // V-bit set
+			if len(avpData) < 12 {
+				return fmt.Errorf("AVP data too short for vendor ID")
+			}
+			vendorID = binary.BigEndian.Uint32(avpData[8:12])
 			headerSize = 12
 		}
 		avpDataLen := int(avpLength) - headerSize
@@ -1165,24 +3622,12 @@ func (m *AuthenticationInformationRequest) Unmarshal(data []byte) error {
 		}
 		avpValue := avpData[headerSize : headerSize+avpDataLen]
 
-		// Parse AVP based on code
+		// Parse AVP based on code and vendor ID
 		switch avpCode {
 		case 263: // Session-Id
 			val, err := models_base.DecodeUTF8String(avpValue)
 			if err == nil {
 				m.SessionId = val.(models_base.UTF8String)
-			}
-		case 301: // DRMP
-			val, err := models_base.DecodeEnumerated(avpValue)
-			if err == nil {
-				v := val.(models_base.Enumerated)
-				m.Drmp = &v
-			}
-		case 260: // Vendor-Specific-Application-Id
-			val, err := models_base.DecodeGrouped(avpValue)
-			if err == nil {
-				v := val.(models_base.Grouped)
-				m.VendorSpecificApplicationId = &v
 			}
 		case 277: // Auth-Session-State
 			val, err := models_base.DecodeEnumerated(avpValue)
@@ -1199,12 +3644,6 @@ func (m *AuthenticationInformationRequest) Unmarshal(data []byte) error {
 			if err == nil {
 				m.OriginRealm = val.(models_base.DiameterIdentity)
 			}
-		case 293: // Destination-Host
-			val, err := models_base.DecodeDiameterIdentity(avpValue)
-			if err == nil {
-				v := val.(models_base.DiameterIdentity)
-				m.DestinationHost = &v
-			}
 		case 283: // Destination-Realm
 			val, err := models_base.DecodeDiameterIdentity(avpValue)
 			if err == nil {
@@ -1215,44 +3654,58 @@ func (m *AuthenticationInformationRequest) Unmarshal(data []byte) error {
 			if err == nil {
 				m.UserName = val.(models_base.UTF8String)
 			}
-		case 621: // OC-Supported-Features
-			val, err := models_base.DecodeGrouped(avpValue)
-			if err == nil {
-				v := val.(models_base.Grouped)
-				m.OcSupportedFeatures = &v
-			}
-		case 628: // Supported-Features
-			val, err := models_base.DecodeGrouped(avpValue)
-			if err == nil {
-				m.SupportedFeatures = append(m.SupportedFeatures, val.(models_base.Grouped))
-			}
-		case 1408: // Requested-EUTRAN-Authentication-Info
-			val, err := models_base.DecodeGrouped(avpValue)
-			if err == nil {
-				v := val.(models_base.Grouped)
-				m.RequestedEutranAuthInfo = &v
-			}
-		case 1409: // Requested-UTRAN-GERAN-Authentication-Info
-			val, err := models_base.DecodeGrouped(avpValue)
-			if err == nil {
-				v := val.(models_base.Grouped)
-				m.RequestedUtranGeranAuthInfo = &v
-			}
 		case 1407: // Visited-PLMN-Id
+			if vendorID != 10415 {
+				break // Vendor ID mismatch
+			}
 			val, err := models_base.DecodeOctetString(avpValue)
 			if err == nil {
 				m.VisitedPlmnId = val.(models_base.OctetString)
 			}
+		// case 0: // DRMP (AVP code not defined)
+		case 260: // Vendor-Specific-Application-Id
+			grouped := &VendorSpecificApplicationId{}
+			if err := grouped.Unmarshal(avpValue); err == nil {
+				m.VendorSpecificApplicationId = grouped
+			}
+		case 293: // Destination-Host
+			val, err := models_base.DecodeDiameterIdentity(avpValue)
+			if err == nil {
+				v := val.(models_base.DiameterIdentity)
+				m.DestinationHost = &v
+			}
+		// case 0: // OC-Supported-Features (AVP code not defined)
+		// case 0: // Supported-Features (AVP code not defined)
+		case 1408: // Requested-EUTRAN-Authentication-Info
+			if vendorID != 10415 {
+				break // Vendor ID mismatch
+			}
+			grouped := &RequestedEUTRANAuthenticationInfo{}
+			if err := grouped.Unmarshal(avpValue); err == nil {
+				m.RequestedEutranAuthenticationInfo = grouped
+			}
+		case 1409: // Requested-UTRAN-GERAN-Authentication-Info
+			if vendorID != 10415 {
+				break // Vendor ID mismatch
+			}
+			grouped := &RequestedUTRANGERANAuthenticationInfo{}
+			if err := grouped.Unmarshal(avpValue); err == nil {
+				m.RequestedUtranGeranAuthenticationInfo = grouped
+			}
 		case 1679: // AIR-Flags
+			if vendorID != 10415 {
+				break // Vendor ID mismatch
+			}
 			val, err := models_base.DecodeUnsigned32(avpValue)
 			if err == nil {
 				v := val.(models_base.Unsigned32)
 				m.AirFlags = &v
 			}
+		// case 0: // AVP (AVP code not defined)
 		case 284: // Proxy-Info
-			val, err := models_base.DecodeGrouped(avpValue)
-			if err == nil {
-				m.ProxyInfo = append(m.ProxyInfo, val.(models_base.Grouped))
+			grouped := &ProxyInfo{}
+			if err := grouped.Unmarshal(avpValue); err == nil {
+				m.ProxyInfo = append(m.ProxyInfo, grouped)
 			}
 		case 282: // Route-Record
 			val, err := models_base.DecodeDiameterIdentity(avpValue)
@@ -1283,7 +3736,7 @@ func (m *AuthenticationInformationRequest) Len() int {
 
 // String returns a string representation of AuthenticationInformationRequest
 func (m *AuthenticationInformationRequest) String() string {
-	return fmt.Sprintf("AuthenticationInformationRequest{SessionId:%v, Drmp:%v, VendorSpecificApplicationId:%v, AuthSessionState:%v, OriginHost:%v, OriginRealm:%v, DestinationHost:%v, DestinationRealm:%v, UserName:%v, OcSupportedFeatures:%v, SupportedFeatures:%v, RequestedEutranAuthInfo:%v, RequestedUtranGeranAuthInfo:%v, VisitedPlmnId:%v, AirFlags:%v, ProxyInfo:%v, RouteRecord:%v}", m.SessionId, m.Drmp, m.VendorSpecificApplicationId, m.AuthSessionState, m.OriginHost, m.OriginRealm, m.DestinationHost, m.DestinationRealm, m.UserName, m.OcSupportedFeatures, m.SupportedFeatures, m.RequestedEutranAuthInfo, m.RequestedUtranGeranAuthInfo, m.VisitedPlmnId, m.AirFlags, m.ProxyInfo, m.RouteRecord)
+	return fmt.Sprintf("AuthenticationInformationRequest{SessionId:%v, AuthSessionState:%v, OriginHost:%v, OriginRealm:%v, DestinationRealm:%v, UserName:%v, VisitedPlmnId:%v, Drmp:%v, VendorSpecificApplicationId:%v, DestinationHost:%v, OcSupportedFeatures:%v, SupportedFeatures:%v, RequestedEutranAuthenticationInfo:%v, RequestedUtranGeranAuthenticationInfo:%v, AirFlags:%v, Avp:%v, ProxyInfo:%v, RouteRecord:%v}", m.SessionId, m.AuthSessionState, m.OriginHost, m.OriginRealm, m.DestinationRealm, m.UserName, m.VisitedPlmnId, m.Drmp, m.VendorSpecificApplicationId, m.DestinationHost, m.OcSupportedFeatures, m.SupportedFeatures, m.RequestedEutranAuthenticationInfo, m.RequestedUtranGeranAuthenticationInfo, m.AirFlags, m.Avp, m.ProxyInfo, m.RouteRecord)
 }
 
 // AuthenticationInformationAnswer represents the Authentication-Information-Answer (AIA) Diameter command
@@ -1292,22 +3745,23 @@ type AuthenticationInformationAnswer struct {
 	Header DiameterHeader
 
 	SessionId                   models_base.UTF8String         // Required
-	Drmp                        *models_base.Enumerated        // Optional
-	VendorSpecificApplicationId *models_base.Grouped           // Optional
-	ResultCode                  *models_base.Unsigned32        // Optional
-	ExperimentalResult          *models_base.Grouped           // Optional
-	ErrorDiagnostic             *models_base.Enumerated        // Optional
 	AuthSessionState            models_base.Enumerated         // Required
 	OriginHost                  models_base.DiameterIdentity   // Required
 	OriginRealm                 models_base.DiameterIdentity   // Required
-	OcSupportedFeatures         *models_base.Grouped           // Optional
-	OcOlr                       *models_base.Grouped           // Optional
-	Load                        []models_base.Grouped          // Optional
-	SupportedFeatures           []models_base.Grouped          // Optional
-	AuthenticationInfo          *models_base.Grouped           // Optional
-	UeUsageType                 *models_base.Unsigned32        // Optional
-	FailedAvp                   *models_base.Grouped           // Optional
-	ProxyInfo                   []models_base.Grouped          // Optional
+	Drmp                        *models_base.OctetString       // Optional - WARNING: AVP code not defined, DO NOT USE
+	VendorSpecificApplicationId *VendorSpecificApplicationId   // Optional
+	ResultCode                  *models_base.Unsigned32        // Optional
+	ExperimentalResult          *ExperimentalResult            // Optional
+	ErrorDiagnostic             *models_base.Enumerated        // Optional
+	OcSupportedFeatures         *models_base.OctetString       // Optional - WARNING: AVP code not defined, DO NOT USE
+	OcOlr                       *models_base.OctetString       // Optional - WARNING: AVP code not defined, DO NOT USE
+	Load                        []models_base.OctetString      // Optional - WARNING: AVP code not defined, DO NOT USE
+	SupportedFeatures           []models_base.OctetString      // Optional - WARNING: AVP code not defined, DO NOT USE
+	AuthenticationInfo          *AuthenticationInfo            // Optional
+	UeUsageType                 *models_base.OctetString       // Optional - WARNING: AVP code not defined, DO NOT USE
+	Avp                         []models_base.OctetString      // Optional - WARNING: AVP code not defined, DO NOT USE
+	FailedAvp                   *FailedAVP                     // Optional
+	ProxyInfo                   []*ProxyInfo                   // Optional
 	RouteRecord                 []models_base.DiameterIdentity // Optional
 }
 
@@ -1361,31 +3815,6 @@ func (m *AuthenticationInformationAnswer) Marshal() ([]byte, error) {
 	// Marshal SessionId (required)
 	buf.Write(marshalAVP(263, m.SessionId, true, false))
 
-	// Marshal Drmp (optional)
-	if m.Drmp != nil {
-		buf.Write(marshalAVP(301, *m.Drmp, false, false))
-	}
-
-	// Marshal VendorSpecificApplicationId (optional)
-	if m.VendorSpecificApplicationId != nil {
-		buf.Write(marshalAVP(260, *m.VendorSpecificApplicationId, false, false))
-	}
-
-	// Marshal ResultCode (optional)
-	if m.ResultCode != nil {
-		buf.Write(marshalAVP(268, *m.ResultCode, true, false))
-	}
-
-	// Marshal ExperimentalResult (optional)
-	if m.ExperimentalResult != nil {
-		buf.Write(marshalAVP(297, *m.ExperimentalResult, true, false))
-	}
-
-	// Marshal ErrorDiagnostic (optional)
-	if m.ErrorDiagnostic != nil {
-		buf.Write(marshalAVP(1614, *m.ErrorDiagnostic, false, false))
-	}
-
 	// Marshal AuthSessionState (required)
 	buf.Write(marshalAVP(277, m.AuthSessionState, true, false))
 
@@ -1395,49 +3824,91 @@ func (m *AuthenticationInformationAnswer) Marshal() ([]byte, error) {
 	// Marshal OriginRealm (required)
 	buf.Write(marshalAVP(296, m.OriginRealm, true, false))
 
+	// Marshal Drmp (optional)
+	if m.Drmp != nil {
+		buf.Write(marshalAVP(0, *m.Drmp, false, false))
+	}
+
+	// Marshal VendorSpecificApplicationId (grouped)
+	if m.VendorSpecificApplicationId != nil {
+		if groupedData, err := m.VendorSpecificApplicationId.Marshal(); err == nil {
+			buf.Write(marshalAVP(260, models_base.Grouped(groupedData), true, false))
+		}
+	}
+
+	// Marshal ResultCode (optional)
+	if m.ResultCode != nil {
+		buf.Write(marshalAVP(268, *m.ResultCode, true, false))
+	}
+
+	// Marshal ExperimentalResult (grouped)
+	if m.ExperimentalResult != nil {
+		if groupedData, err := m.ExperimentalResult.Marshal(); err == nil {
+			buf.Write(marshalAVP(297, models_base.Grouped(groupedData), true, false))
+		}
+	}
+
+	// Marshal ErrorDiagnostic (optional)
+	if m.ErrorDiagnostic != nil {
+		buf.Write(marshalAVPWithVendor(1614, *m.ErrorDiagnostic, false, false, 10415))
+	}
+
 	// Marshal OcSupportedFeatures (optional)
 	if m.OcSupportedFeatures != nil {
-		buf.Write(marshalAVP(621, *m.OcSupportedFeatures, false, false))
+		buf.Write(marshalAVP(0, *m.OcSupportedFeatures, false, false))
 	}
 
 	// Marshal OcOlr (optional)
 	if m.OcOlr != nil {
-		buf.Write(marshalAVP(623, *m.OcOlr, false, false))
+		buf.Write(marshalAVP(0, *m.OcOlr, false, false))
 	}
 
 	// Marshal Load (repeated)
 	for _, v := range m.Load {
-		buf.Write(marshalAVP(650, v, false, false))
+		buf.Write(marshalAVP(0, v, false, false))
 	}
 
 	// Marshal SupportedFeatures (repeated)
 	for _, v := range m.SupportedFeatures {
-		buf.Write(marshalAVP(628, v, false, false))
+		buf.Write(marshalAVP(0, v, false, false))
 	}
 
-	// Marshal AuthenticationInfo (optional)
+	// Marshal AuthenticationInfo (grouped)
 	if m.AuthenticationInfo != nil {
-		buf.Write(marshalAVP(1413, *m.AuthenticationInfo, true, false))
+		if groupedData, err := m.AuthenticationInfo.Marshal(); err == nil {
+			buf.Write(marshalAVPWithVendor(1413, models_base.Grouped(groupedData), true, false, 10415))
+		}
 	}
 
 	// Marshal UeUsageType (optional)
 	if m.UeUsageType != nil {
-		buf.Write(marshalAVP(1680, *m.UeUsageType, false, false))
+		buf.Write(marshalAVP(0, *m.UeUsageType, false, false))
 	}
 
-	// Marshal FailedAvp (optional)
+	// Marshal Avp (repeated)
+	for _, v := range m.Avp {
+		buf.Write(marshalAVP(0, v, false, false))
+	}
+
+	// Marshal FailedAvp (grouped)
 	if m.FailedAvp != nil {
-		buf.Write(marshalAVP(279, *m.FailedAvp, false, false))
+		if groupedData, err := m.FailedAvp.Marshal(); err == nil {
+			buf.Write(marshalAVP(279, models_base.Grouped(groupedData), true, false))
+		}
 	}
 
-	// Marshal ProxyInfo (repeated)
+	// Marshal ProxyInfo (repeated, grouped)
 	for _, v := range m.ProxyInfo {
-		buf.Write(marshalAVP(284, v, false, false))
+		if v != nil {
+			if groupedData, err := v.Marshal(); err == nil {
+				buf.Write(marshalAVP(284, models_base.Grouped(groupedData), true, false))
+			}
+		}
 	}
 
 	// Marshal RouteRecord (repeated)
 	for _, v := range m.RouteRecord {
-		buf.Write(marshalAVP(282, v, false, false))
+		buf.Write(marshalAVP(282, v, true, false))
 	}
 
 	// Get the final message
@@ -1482,7 +3953,12 @@ func (m *AuthenticationInformationAnswer) Unmarshal(data []byte) error {
 
 		// Extract AVP data
 		headerSize := 8
+		var vendorID uint32
 		if avpFlags&0x80 != 0 { // V-bit set
+			if len(avpData) < 12 {
+				return fmt.Errorf("AVP data too short for vendor ID")
+			}
+			vendorID = binary.BigEndian.Uint32(avpData[8:12])
 			headerSize = 12
 		}
 		avpDataLen := int(avpLength) - headerSize
@@ -1491,42 +3967,12 @@ func (m *AuthenticationInformationAnswer) Unmarshal(data []byte) error {
 		}
 		avpValue := avpData[headerSize : headerSize+avpDataLen]
 
-		// Parse AVP based on code
+		// Parse AVP based on code and vendor ID
 		switch avpCode {
 		case 263: // Session-Id
 			val, err := models_base.DecodeUTF8String(avpValue)
 			if err == nil {
 				m.SessionId = val.(models_base.UTF8String)
-			}
-		case 301: // DRMP
-			val, err := models_base.DecodeEnumerated(avpValue)
-			if err == nil {
-				v := val.(models_base.Enumerated)
-				m.Drmp = &v
-			}
-		case 260: // Vendor-Specific-Application-Id
-			val, err := models_base.DecodeGrouped(avpValue)
-			if err == nil {
-				v := val.(models_base.Grouped)
-				m.VendorSpecificApplicationId = &v
-			}
-		case 268: // Result-Code
-			val, err := models_base.DecodeUnsigned32(avpValue)
-			if err == nil {
-				v := val.(models_base.Unsigned32)
-				m.ResultCode = &v
-			}
-		case 297: // Experimental-Result
-			val, err := models_base.DecodeGrouped(avpValue)
-			if err == nil {
-				v := val.(models_base.Grouped)
-				m.ExperimentalResult = &v
-			}
-		case 1614: // Error-Diagnostic
-			val, err := models_base.DecodeEnumerated(avpValue)
-			if err == nil {
-				v := val.(models_base.Enumerated)
-				m.ErrorDiagnostic = &v
 			}
 		case 277: // Auth-Session-State
 			val, err := models_base.DecodeEnumerated(avpValue)
@@ -1543,50 +3989,55 @@ func (m *AuthenticationInformationAnswer) Unmarshal(data []byte) error {
 			if err == nil {
 				m.OriginRealm = val.(models_base.DiameterIdentity)
 			}
-		case 621: // OC-Supported-Features
-			val, err := models_base.DecodeGrouped(avpValue)
-			if err == nil {
-				v := val.(models_base.Grouped)
-				m.OcSupportedFeatures = &v
+		// case 0: // DRMP (AVP code not defined)
+		case 260: // Vendor-Specific-Application-Id
+			grouped := &VendorSpecificApplicationId{}
+			if err := grouped.Unmarshal(avpValue); err == nil {
+				m.VendorSpecificApplicationId = grouped
 			}
-		case 623: // OC-OLR
-			val, err := models_base.DecodeGrouped(avpValue)
-			if err == nil {
-				v := val.(models_base.Grouped)
-				m.OcOlr = &v
-			}
-		case 650: // Load
-			val, err := models_base.DecodeGrouped(avpValue)
-			if err == nil {
-				m.Load = append(m.Load, val.(models_base.Grouped))
-			}
-		case 628: // Supported-Features
-			val, err := models_base.DecodeGrouped(avpValue)
-			if err == nil {
-				m.SupportedFeatures = append(m.SupportedFeatures, val.(models_base.Grouped))
-			}
-		case 1413: // Authentication-Info
-			val, err := models_base.DecodeGrouped(avpValue)
-			if err == nil {
-				v := val.(models_base.Grouped)
-				m.AuthenticationInfo = &v
-			}
-		case 1680: // UE-Usage-Type
+		case 268: // Result-Code
 			val, err := models_base.DecodeUnsigned32(avpValue)
 			if err == nil {
 				v := val.(models_base.Unsigned32)
-				m.UeUsageType = &v
+				m.ResultCode = &v
 			}
-		case 279: // Failed-AVP
-			val, err := models_base.DecodeGrouped(avpValue)
+		case 297: // Experimental-Result
+			grouped := &ExperimentalResult{}
+			if err := grouped.Unmarshal(avpValue); err == nil {
+				m.ExperimentalResult = grouped
+			}
+		case 1614: // Error-Diagnostic
+			if vendorID != 10415 {
+				break // Vendor ID mismatch
+			}
+			val, err := models_base.DecodeEnumerated(avpValue)
 			if err == nil {
-				v := val.(models_base.Grouped)
-				m.FailedAvp = &v
+				v := val.(models_base.Enumerated)
+				m.ErrorDiagnostic = &v
+			}
+		// case 0: // OC-Supported-Features (AVP code not defined)
+		// case 0: // OC-OLR (AVP code not defined)
+		// case 0: // Load (AVP code not defined)
+		// case 0: // Supported-Features (AVP code not defined)
+		case 1413: // Authentication-Info
+			if vendorID != 10415 {
+				break // Vendor ID mismatch
+			}
+			grouped := &AuthenticationInfo{}
+			if err := grouped.Unmarshal(avpValue); err == nil {
+				m.AuthenticationInfo = grouped
+			}
+		// case 0: // UE-Usage-Type (AVP code not defined)
+		// case 0: // AVP (AVP code not defined)
+		case 279: // Failed-AVP
+			grouped := &FailedAVP{}
+			if err := grouped.Unmarshal(avpValue); err == nil {
+				m.FailedAvp = grouped
 			}
 		case 284: // Proxy-Info
-			val, err := models_base.DecodeGrouped(avpValue)
-			if err == nil {
-				m.ProxyInfo = append(m.ProxyInfo, val.(models_base.Grouped))
+			grouped := &ProxyInfo{}
+			if err := grouped.Unmarshal(avpValue); err == nil {
+				m.ProxyInfo = append(m.ProxyInfo, grouped)
 			}
 		case 282: // Route-Record
 			val, err := models_base.DecodeDiameterIdentity(avpValue)
@@ -1617,7 +4068,7 @@ func (m *AuthenticationInformationAnswer) Len() int {
 
 // String returns a string representation of AuthenticationInformationAnswer
 func (m *AuthenticationInformationAnswer) String() string {
-	return fmt.Sprintf("AuthenticationInformationAnswer{SessionId:%v, Drmp:%v, VendorSpecificApplicationId:%v, ResultCode:%v, ExperimentalResult:%v, ErrorDiagnostic:%v, AuthSessionState:%v, OriginHost:%v, OriginRealm:%v, OcSupportedFeatures:%v, OcOlr:%v, Load:%v, SupportedFeatures:%v, AuthenticationInfo:%v, UeUsageType:%v, FailedAvp:%v, ProxyInfo:%v, RouteRecord:%v}", m.SessionId, m.Drmp, m.VendorSpecificApplicationId, m.ResultCode, m.ExperimentalResult, m.ErrorDiagnostic, m.AuthSessionState, m.OriginHost, m.OriginRealm, m.OcSupportedFeatures, m.OcOlr, m.Load, m.SupportedFeatures, m.AuthenticationInfo, m.UeUsageType, m.FailedAvp, m.ProxyInfo, m.RouteRecord)
+	return fmt.Sprintf("AuthenticationInformationAnswer{SessionId:%v, AuthSessionState:%v, OriginHost:%v, OriginRealm:%v, Drmp:%v, VendorSpecificApplicationId:%v, ResultCode:%v, ExperimentalResult:%v, ErrorDiagnostic:%v, OcSupportedFeatures:%v, OcOlr:%v, Load:%v, SupportedFeatures:%v, AuthenticationInfo:%v, UeUsageType:%v, Avp:%v, FailedAvp:%v, ProxyInfo:%v, RouteRecord:%v}", m.SessionId, m.AuthSessionState, m.OriginHost, m.OriginRealm, m.Drmp, m.VendorSpecificApplicationId, m.ResultCode, m.ExperimentalResult, m.ErrorDiagnostic, m.OcSupportedFeatures, m.OcOlr, m.Load, m.SupportedFeatures, m.AuthenticationInfo, m.UeUsageType, m.Avp, m.FailedAvp, m.ProxyInfo, m.RouteRecord)
 }
 
 // CancelLocationRequest represents the Cancel-Location-Request (CLR) Diameter command
@@ -1626,18 +4077,19 @@ type CancelLocationRequest struct {
 	Header DiameterHeader
 
 	SessionId                   models_base.UTF8String         // Required
-	Drmp                        *models_base.Enumerated        // Optional
-	VendorSpecificApplicationId *models_base.Grouped           // Optional
 	AuthSessionState            models_base.Enumerated         // Required
 	OriginHost                  models_base.DiameterIdentity   // Required
 	OriginRealm                 models_base.DiameterIdentity   // Required
 	DestinationHost             models_base.DiameterIdentity   // Required
 	DestinationRealm            models_base.DiameterIdentity   // Required
 	UserName                    models_base.UTF8String         // Required
-	SupportedFeatures           []models_base.Grouped          // Optional
 	CancellationType            models_base.Enumerated         // Required
+	Drmp                        *models_base.OctetString       // Optional - WARNING: AVP code not defined, DO NOT USE
+	VendorSpecificApplicationId *VendorSpecificApplicationId   // Optional
+	SupportedFeatures           []models_base.OctetString      // Optional - WARNING: AVP code not defined, DO NOT USE
 	ClrFlags                    *models_base.Unsigned32        // Optional
-	ProxyInfo                   []models_base.Grouped          // Optional
+	Avp                         []models_base.OctetString      // Optional - WARNING: AVP code not defined, DO NOT USE
+	ProxyInfo                   []*ProxyInfo                   // Optional
 	RouteRecord                 []models_base.DiameterIdentity // Optional
 }
 
@@ -1700,16 +4152,6 @@ func (m *CancelLocationRequest) Marshal() ([]byte, error) {
 	// Marshal SessionId (required)
 	buf.Write(marshalAVP(263, m.SessionId, true, false))
 
-	// Marshal Drmp (optional)
-	if m.Drmp != nil {
-		buf.Write(marshalAVP(301, *m.Drmp, false, false))
-	}
-
-	// Marshal VendorSpecificApplicationId (optional)
-	if m.VendorSpecificApplicationId != nil {
-		buf.Write(marshalAVP(260, *m.VendorSpecificApplicationId, false, false))
-	}
-
 	// Marshal AuthSessionState (required)
 	buf.Write(marshalAVP(277, m.AuthSessionState, true, false))
 
@@ -1720,35 +4162,56 @@ func (m *CancelLocationRequest) Marshal() ([]byte, error) {
 	buf.Write(marshalAVP(296, m.OriginRealm, true, false))
 
 	// Marshal DestinationHost (required)
-	buf.Write(marshalAVP(293, m.DestinationHost, false, false))
+	buf.Write(marshalAVP(293, m.DestinationHost, true, false))
 
 	// Marshal DestinationRealm (required)
 	buf.Write(marshalAVP(283, m.DestinationRealm, true, false))
 
 	// Marshal UserName (required)
-	buf.Write(marshalAVP(1, m.UserName, false, true))
+	buf.Write(marshalAVP(1, m.UserName, true, true))
+
+	// Marshal CancellationType (required)
+	buf.Write(marshalAVPWithVendor(1420, m.CancellationType, true, false, 10415))
+
+	// Marshal Drmp (optional)
+	if m.Drmp != nil {
+		buf.Write(marshalAVP(0, *m.Drmp, false, false))
+	}
+
+	// Marshal VendorSpecificApplicationId (grouped)
+	if m.VendorSpecificApplicationId != nil {
+		if groupedData, err := m.VendorSpecificApplicationId.Marshal(); err == nil {
+			buf.Write(marshalAVP(260, models_base.Grouped(groupedData), true, false))
+		}
+	}
 
 	// Marshal SupportedFeatures (repeated)
 	for _, v := range m.SupportedFeatures {
-		buf.Write(marshalAVP(628, v, false, false))
+		buf.Write(marshalAVP(0, v, false, false))
 	}
-
-	// Marshal CancellationType (required)
-	buf.Write(marshalAVP(1420, m.CancellationType, true, false))
 
 	// Marshal ClrFlags (optional)
 	if m.ClrFlags != nil {
-		buf.Write(marshalAVP(1638, *m.ClrFlags, false, false))
+		buf.Write(marshalAVPWithVendor(1638, *m.ClrFlags, true, false, 10415))
 	}
 
-	// Marshal ProxyInfo (repeated)
+	// Marshal Avp (repeated)
+	for _, v := range m.Avp {
+		buf.Write(marshalAVP(0, v, false, false))
+	}
+
+	// Marshal ProxyInfo (repeated, grouped)
 	for _, v := range m.ProxyInfo {
-		buf.Write(marshalAVP(284, v, false, false))
+		if v != nil {
+			if groupedData, err := v.Marshal(); err == nil {
+				buf.Write(marshalAVP(284, models_base.Grouped(groupedData), true, false))
+			}
+		}
 	}
 
 	// Marshal RouteRecord (repeated)
 	for _, v := range m.RouteRecord {
-		buf.Write(marshalAVP(282, v, false, false))
+		buf.Write(marshalAVP(282, v, true, false))
 	}
 
 	// Get the final message
@@ -1793,7 +4256,12 @@ func (m *CancelLocationRequest) Unmarshal(data []byte) error {
 
 		// Extract AVP data
 		headerSize := 8
+		var vendorID uint32
 		if avpFlags&0x80 != 0 { // V-bit set
+			if len(avpData) < 12 {
+				return fmt.Errorf("AVP data too short for vendor ID")
+			}
+			vendorID = binary.BigEndian.Uint32(avpData[8:12])
 			headerSize = 12
 		}
 		avpDataLen := int(avpLength) - headerSize
@@ -1802,24 +4270,12 @@ func (m *CancelLocationRequest) Unmarshal(data []byte) error {
 		}
 		avpValue := avpData[headerSize : headerSize+avpDataLen]
 
-		// Parse AVP based on code
+		// Parse AVP based on code and vendor ID
 		switch avpCode {
 		case 263: // Session-Id
 			val, err := models_base.DecodeUTF8String(avpValue)
 			if err == nil {
 				m.SessionId = val.(models_base.UTF8String)
-			}
-		case 301: // DRMP
-			val, err := models_base.DecodeEnumerated(avpValue)
-			if err == nil {
-				v := val.(models_base.Enumerated)
-				m.Drmp = &v
-			}
-		case 260: // Vendor-Specific-Application-Id
-			val, err := models_base.DecodeGrouped(avpValue)
-			if err == nil {
-				v := val.(models_base.Grouped)
-				m.VendorSpecificApplicationId = &v
 			}
 		case 277: // Auth-Session-State
 			val, err := models_base.DecodeEnumerated(avpValue)
@@ -1851,26 +4307,35 @@ func (m *CancelLocationRequest) Unmarshal(data []byte) error {
 			if err == nil {
 				m.UserName = val.(models_base.UTF8String)
 			}
-		case 628: // Supported-Features
-			val, err := models_base.DecodeGrouped(avpValue)
-			if err == nil {
-				m.SupportedFeatures = append(m.SupportedFeatures, val.(models_base.Grouped))
-			}
 		case 1420: // Cancellation-Type
+			if vendorID != 10415 {
+				break // Vendor ID mismatch
+			}
 			val, err := models_base.DecodeEnumerated(avpValue)
 			if err == nil {
 				m.CancellationType = val.(models_base.Enumerated)
 			}
+		// case 0: // DRMP (AVP code not defined)
+		case 260: // Vendor-Specific-Application-Id
+			grouped := &VendorSpecificApplicationId{}
+			if err := grouped.Unmarshal(avpValue); err == nil {
+				m.VendorSpecificApplicationId = grouped
+			}
+		// case 0: // Supported-Features (AVP code not defined)
 		case 1638: // CLR-Flags
+			if vendorID != 10415 {
+				break // Vendor ID mismatch
+			}
 			val, err := models_base.DecodeUnsigned32(avpValue)
 			if err == nil {
 				v := val.(models_base.Unsigned32)
 				m.ClrFlags = &v
 			}
+		// case 0: // AVP (AVP code not defined)
 		case 284: // Proxy-Info
-			val, err := models_base.DecodeGrouped(avpValue)
-			if err == nil {
-				m.ProxyInfo = append(m.ProxyInfo, val.(models_base.Grouped))
+			grouped := &ProxyInfo{}
+			if err := grouped.Unmarshal(avpValue); err == nil {
+				m.ProxyInfo = append(m.ProxyInfo, grouped)
 			}
 		case 282: // Route-Record
 			val, err := models_base.DecodeDiameterIdentity(avpValue)
@@ -1901,7 +4366,7 @@ func (m *CancelLocationRequest) Len() int {
 
 // String returns a string representation of CancelLocationRequest
 func (m *CancelLocationRequest) String() string {
-	return fmt.Sprintf("CancelLocationRequest{SessionId:%v, Drmp:%v, VendorSpecificApplicationId:%v, AuthSessionState:%v, OriginHost:%v, OriginRealm:%v, DestinationHost:%v, DestinationRealm:%v, UserName:%v, SupportedFeatures:%v, CancellationType:%v, ClrFlags:%v, ProxyInfo:%v, RouteRecord:%v}", m.SessionId, m.Drmp, m.VendorSpecificApplicationId, m.AuthSessionState, m.OriginHost, m.OriginRealm, m.DestinationHost, m.DestinationRealm, m.UserName, m.SupportedFeatures, m.CancellationType, m.ClrFlags, m.ProxyInfo, m.RouteRecord)
+	return fmt.Sprintf("CancelLocationRequest{SessionId:%v, AuthSessionState:%v, OriginHost:%v, OriginRealm:%v, DestinationHost:%v, DestinationRealm:%v, UserName:%v, CancellationType:%v, Drmp:%v, VendorSpecificApplicationId:%v, SupportedFeatures:%v, ClrFlags:%v, Avp:%v, ProxyInfo:%v, RouteRecord:%v}", m.SessionId, m.AuthSessionState, m.OriginHost, m.OriginRealm, m.DestinationHost, m.DestinationRealm, m.UserName, m.CancellationType, m.Drmp, m.VendorSpecificApplicationId, m.SupportedFeatures, m.ClrFlags, m.Avp, m.ProxyInfo, m.RouteRecord)
 }
 
 // CancelLocationAnswer represents the Cancel-Location-Answer (CLA) Diameter command
@@ -1910,16 +4375,17 @@ type CancelLocationAnswer struct {
 	Header DiameterHeader
 
 	SessionId                   models_base.UTF8String         // Required
-	Drmp                        *models_base.Enumerated        // Optional
-	VendorSpecificApplicationId *models_base.Grouped           // Optional
-	SupportedFeatures           []models_base.Grouped          // Optional
-	ResultCode                  *models_base.Unsigned32        // Optional
-	ExperimentalResult          *models_base.Grouped           // Optional
 	AuthSessionState            models_base.Enumerated         // Required
 	OriginHost                  models_base.DiameterIdentity   // Required
 	OriginRealm                 models_base.DiameterIdentity   // Required
-	FailedAvp                   *models_base.Grouped           // Optional
-	ProxyInfo                   []models_base.Grouped          // Optional
+	Drmp                        *models_base.OctetString       // Optional - WARNING: AVP code not defined, DO NOT USE
+	VendorSpecificApplicationId *VendorSpecificApplicationId   // Optional
+	SupportedFeatures           []models_base.OctetString      // Optional - WARNING: AVP code not defined, DO NOT USE
+	ResultCode                  *models_base.Unsigned32        // Optional
+	ExperimentalResult          *ExperimentalResult            // Optional
+	Avp                         []models_base.OctetString      // Optional - WARNING: AVP code not defined, DO NOT USE
+	FailedAvp                   *FailedAVP                     // Optional
+	ProxyInfo                   []*ProxyInfo                   // Optional
 	RouteRecord                 []models_base.DiameterIdentity // Optional
 }
 
@@ -1973,31 +4439,6 @@ func (m *CancelLocationAnswer) Marshal() ([]byte, error) {
 	// Marshal SessionId (required)
 	buf.Write(marshalAVP(263, m.SessionId, true, false))
 
-	// Marshal Drmp (optional)
-	if m.Drmp != nil {
-		buf.Write(marshalAVP(301, *m.Drmp, false, false))
-	}
-
-	// Marshal VendorSpecificApplicationId (optional)
-	if m.VendorSpecificApplicationId != nil {
-		buf.Write(marshalAVP(260, *m.VendorSpecificApplicationId, false, false))
-	}
-
-	// Marshal SupportedFeatures (repeated)
-	for _, v := range m.SupportedFeatures {
-		buf.Write(marshalAVP(628, v, false, false))
-	}
-
-	// Marshal ResultCode (optional)
-	if m.ResultCode != nil {
-		buf.Write(marshalAVP(268, *m.ResultCode, true, false))
-	}
-
-	// Marshal ExperimentalResult (optional)
-	if m.ExperimentalResult != nil {
-		buf.Write(marshalAVP(297, *m.ExperimentalResult, true, false))
-	}
-
 	// Marshal AuthSessionState (required)
 	buf.Write(marshalAVP(277, m.AuthSessionState, true, false))
 
@@ -2007,19 +4448,59 @@ func (m *CancelLocationAnswer) Marshal() ([]byte, error) {
 	// Marshal OriginRealm (required)
 	buf.Write(marshalAVP(296, m.OriginRealm, true, false))
 
-	// Marshal FailedAvp (optional)
-	if m.FailedAvp != nil {
-		buf.Write(marshalAVP(279, *m.FailedAvp, false, false))
+	// Marshal Drmp (optional)
+	if m.Drmp != nil {
+		buf.Write(marshalAVP(0, *m.Drmp, false, false))
 	}
 
-	// Marshal ProxyInfo (repeated)
+	// Marshal VendorSpecificApplicationId (grouped)
+	if m.VendorSpecificApplicationId != nil {
+		if groupedData, err := m.VendorSpecificApplicationId.Marshal(); err == nil {
+			buf.Write(marshalAVP(260, models_base.Grouped(groupedData), true, false))
+		}
+	}
+
+	// Marshal SupportedFeatures (repeated)
+	for _, v := range m.SupportedFeatures {
+		buf.Write(marshalAVP(0, v, false, false))
+	}
+
+	// Marshal ResultCode (optional)
+	if m.ResultCode != nil {
+		buf.Write(marshalAVP(268, *m.ResultCode, true, false))
+	}
+
+	// Marshal ExperimentalResult (grouped)
+	if m.ExperimentalResult != nil {
+		if groupedData, err := m.ExperimentalResult.Marshal(); err == nil {
+			buf.Write(marshalAVP(297, models_base.Grouped(groupedData), true, false))
+		}
+	}
+
+	// Marshal Avp (repeated)
+	for _, v := range m.Avp {
+		buf.Write(marshalAVP(0, v, false, false))
+	}
+
+	// Marshal FailedAvp (grouped)
+	if m.FailedAvp != nil {
+		if groupedData, err := m.FailedAvp.Marshal(); err == nil {
+			buf.Write(marshalAVP(279, models_base.Grouped(groupedData), true, false))
+		}
+	}
+
+	// Marshal ProxyInfo (repeated, grouped)
 	for _, v := range m.ProxyInfo {
-		buf.Write(marshalAVP(284, v, false, false))
+		if v != nil {
+			if groupedData, err := v.Marshal(); err == nil {
+				buf.Write(marshalAVP(284, models_base.Grouped(groupedData), true, false))
+			}
+		}
 	}
 
 	// Marshal RouteRecord (repeated)
 	for _, v := range m.RouteRecord {
-		buf.Write(marshalAVP(282, v, false, false))
+		buf.Write(marshalAVP(282, v, true, false))
 	}
 
 	// Get the final message
@@ -2065,6 +4546,10 @@ func (m *CancelLocationAnswer) Unmarshal(data []byte) error {
 		// Extract AVP data
 		headerSize := 8
 		if avpFlags&0x80 != 0 { // V-bit set
+			if len(avpData) < 12 {
+				return fmt.Errorf("AVP data too short for vendor ID")
+			}
+			_ = binary.BigEndian.Uint32(avpData[8:12]) // vendorID not used
 			headerSize = 12
 		}
 		avpDataLen := int(avpLength) - headerSize
@@ -2073,41 +4558,12 @@ func (m *CancelLocationAnswer) Unmarshal(data []byte) error {
 		}
 		avpValue := avpData[headerSize : headerSize+avpDataLen]
 
-		// Parse AVP based on code
+		// Parse AVP based on code and vendor ID
 		switch avpCode {
 		case 263: // Session-Id
 			val, err := models_base.DecodeUTF8String(avpValue)
 			if err == nil {
 				m.SessionId = val.(models_base.UTF8String)
-			}
-		case 301: // DRMP
-			val, err := models_base.DecodeEnumerated(avpValue)
-			if err == nil {
-				v := val.(models_base.Enumerated)
-				m.Drmp = &v
-			}
-		case 260: // Vendor-Specific-Application-Id
-			val, err := models_base.DecodeGrouped(avpValue)
-			if err == nil {
-				v := val.(models_base.Grouped)
-				m.VendorSpecificApplicationId = &v
-			}
-		case 628: // Supported-Features
-			val, err := models_base.DecodeGrouped(avpValue)
-			if err == nil {
-				m.SupportedFeatures = append(m.SupportedFeatures, val.(models_base.Grouped))
-			}
-		case 268: // Result-Code
-			val, err := models_base.DecodeUnsigned32(avpValue)
-			if err == nil {
-				v := val.(models_base.Unsigned32)
-				m.ResultCode = &v
-			}
-		case 297: // Experimental-Result
-			val, err := models_base.DecodeGrouped(avpValue)
-			if err == nil {
-				v := val.(models_base.Grouped)
-				m.ExperimentalResult = &v
 			}
 		case 277: // Auth-Session-State
 			val, err := models_base.DecodeEnumerated(avpValue)
@@ -2124,16 +4580,34 @@ func (m *CancelLocationAnswer) Unmarshal(data []byte) error {
 			if err == nil {
 				m.OriginRealm = val.(models_base.DiameterIdentity)
 			}
-		case 279: // Failed-AVP
-			val, err := models_base.DecodeGrouped(avpValue)
+		// case 0: // DRMP (AVP code not defined)
+		case 260: // Vendor-Specific-Application-Id
+			grouped := &VendorSpecificApplicationId{}
+			if err := grouped.Unmarshal(avpValue); err == nil {
+				m.VendorSpecificApplicationId = grouped
+			}
+		// case 0: // Supported-Features (AVP code not defined)
+		case 268: // Result-Code
+			val, err := models_base.DecodeUnsigned32(avpValue)
 			if err == nil {
-				v := val.(models_base.Grouped)
-				m.FailedAvp = &v
+				v := val.(models_base.Unsigned32)
+				m.ResultCode = &v
+			}
+		case 297: // Experimental-Result
+			grouped := &ExperimentalResult{}
+			if err := grouped.Unmarshal(avpValue); err == nil {
+				m.ExperimentalResult = grouped
+			}
+		// case 0: // AVP (AVP code not defined)
+		case 279: // Failed-AVP
+			grouped := &FailedAVP{}
+			if err := grouped.Unmarshal(avpValue); err == nil {
+				m.FailedAvp = grouped
 			}
 		case 284: // Proxy-Info
-			val, err := models_base.DecodeGrouped(avpValue)
-			if err == nil {
-				m.ProxyInfo = append(m.ProxyInfo, val.(models_base.Grouped))
+			grouped := &ProxyInfo{}
+			if err := grouped.Unmarshal(avpValue); err == nil {
+				m.ProxyInfo = append(m.ProxyInfo, grouped)
 			}
 		case 282: // Route-Record
 			val, err := models_base.DecodeDiameterIdentity(avpValue)
@@ -2164,7 +4638,7 @@ func (m *CancelLocationAnswer) Len() int {
 
 // String returns a string representation of CancelLocationAnswer
 func (m *CancelLocationAnswer) String() string {
-	return fmt.Sprintf("CancelLocationAnswer{SessionId:%v, Drmp:%v, VendorSpecificApplicationId:%v, SupportedFeatures:%v, ResultCode:%v, ExperimentalResult:%v, AuthSessionState:%v, OriginHost:%v, OriginRealm:%v, FailedAvp:%v, ProxyInfo:%v, RouteRecord:%v}", m.SessionId, m.Drmp, m.VendorSpecificApplicationId, m.SupportedFeatures, m.ResultCode, m.ExperimentalResult, m.AuthSessionState, m.OriginHost, m.OriginRealm, m.FailedAvp, m.ProxyInfo, m.RouteRecord)
+	return fmt.Sprintf("CancelLocationAnswer{SessionId:%v, AuthSessionState:%v, OriginHost:%v, OriginRealm:%v, Drmp:%v, VendorSpecificApplicationId:%v, SupportedFeatures:%v, ResultCode:%v, ExperimentalResult:%v, Avp:%v, FailedAvp:%v, ProxyInfo:%v, RouteRecord:%v}", m.SessionId, m.AuthSessionState, m.OriginHost, m.OriginRealm, m.Drmp, m.VendorSpecificApplicationId, m.SupportedFeatures, m.ResultCode, m.ExperimentalResult, m.Avp, m.FailedAvp, m.ProxyInfo, m.RouteRecord)
 }
 
 // InsertSubscriberDataRequest represents the Insert-Subscriber-Data-Request (ISDR) Diameter command
@@ -2173,19 +4647,20 @@ type InsertSubscriberDataRequest struct {
 	Header DiameterHeader
 
 	SessionId                   models_base.UTF8String         // Required
-	Drmp                        *models_base.Enumerated        // Optional
-	VendorSpecificApplicationId *models_base.Grouped           // Optional
 	AuthSessionState            models_base.Enumerated         // Required
 	OriginHost                  models_base.DiameterIdentity   // Required
 	OriginRealm                 models_base.DiameterIdentity   // Required
 	DestinationHost             models_base.DiameterIdentity   // Required
 	DestinationRealm            models_base.DiameterIdentity   // Required
 	UserName                    models_base.UTF8String         // Required
-	SupportedFeatures           []models_base.Grouped          // Optional
-	SubscriptionData            models_base.Grouped            // Required
+	SubscriptionData            *SubscriptionData              // Required
+	Drmp                        *models_base.OctetString       // Optional - WARNING: AVP code not defined, DO NOT USE
+	VendorSpecificApplicationId *VendorSpecificApplicationId   // Optional
+	SupportedFeatures           []models_base.OctetString      // Optional - WARNING: AVP code not defined, DO NOT USE
 	IdrFlags                    *models_base.Unsigned32        // Optional
-	ResetId                     []models_base.OctetString      // Optional
-	ProxyInfo                   []models_base.Grouped          // Optional
+	ResetId                     []models_base.OctetString      // Optional - WARNING: AVP code not defined, DO NOT USE
+	Avp                         []models_base.OctetString      // Optional - WARNING: AVP code not defined, DO NOT USE
+	ProxyInfo                   []*ProxyInfo                   // Optional
 	RouteRecord                 []models_base.DiameterIdentity // Optional
 }
 
@@ -2225,6 +4700,9 @@ func (m *InsertSubscriberDataRequest) Validate() error {
 	if m.UserName == "" {
 		return fmt.Errorf("required field User-Name is empty")
 	}
+	if m.SubscriptionData == nil {
+		return fmt.Errorf("required field Subscription-Data is nil")
+	}
 
 	return nil
 }
@@ -2248,16 +4726,6 @@ func (m *InsertSubscriberDataRequest) Marshal() ([]byte, error) {
 	// Marshal SessionId (required)
 	buf.Write(marshalAVP(263, m.SessionId, true, false))
 
-	// Marshal Drmp (optional)
-	if m.Drmp != nil {
-		buf.Write(marshalAVP(301, *m.Drmp, false, false))
-	}
-
-	// Marshal VendorSpecificApplicationId (optional)
-	if m.VendorSpecificApplicationId != nil {
-		buf.Write(marshalAVP(260, *m.VendorSpecificApplicationId, false, false))
-	}
-
 	// Marshal AuthSessionState (required)
 	buf.Write(marshalAVP(277, m.AuthSessionState, true, false))
 
@@ -2268,40 +4736,65 @@ func (m *InsertSubscriberDataRequest) Marshal() ([]byte, error) {
 	buf.Write(marshalAVP(296, m.OriginRealm, true, false))
 
 	// Marshal DestinationHost (required)
-	buf.Write(marshalAVP(293, m.DestinationHost, false, false))
+	buf.Write(marshalAVP(293, m.DestinationHost, true, false))
 
 	// Marshal DestinationRealm (required)
 	buf.Write(marshalAVP(283, m.DestinationRealm, true, false))
 
 	// Marshal UserName (required)
-	buf.Write(marshalAVP(1, m.UserName, false, true))
+	buf.Write(marshalAVP(1, m.UserName, true, true))
+
+	// Marshal SubscriptionData (grouped)
+	if m.SubscriptionData != nil {
+		if groupedData, err := m.SubscriptionData.Marshal(); err == nil {
+			buf.Write(marshalAVPWithVendor(1400, models_base.Grouped(groupedData), true, false, 10415))
+		}
+	}
+
+	// Marshal Drmp (optional)
+	if m.Drmp != nil {
+		buf.Write(marshalAVP(0, *m.Drmp, false, false))
+	}
+
+	// Marshal VendorSpecificApplicationId (grouped)
+	if m.VendorSpecificApplicationId != nil {
+		if groupedData, err := m.VendorSpecificApplicationId.Marshal(); err == nil {
+			buf.Write(marshalAVP(260, models_base.Grouped(groupedData), true, false))
+		}
+	}
 
 	// Marshal SupportedFeatures (repeated)
 	for _, v := range m.SupportedFeatures {
-		buf.Write(marshalAVP(628, v, false, false))
+		buf.Write(marshalAVP(0, v, false, false))
 	}
-
-	// Marshal SubscriptionData (required)
-	buf.Write(marshalAVP(1400, m.SubscriptionData, true, false))
 
 	// Marshal IdrFlags (optional)
 	if m.IdrFlags != nil {
-		buf.Write(marshalAVP(1490, *m.IdrFlags, true, false))
+		buf.Write(marshalAVPWithVendor(1490, *m.IdrFlags, true, false, 10415))
 	}
 
 	// Marshal ResetId (repeated)
 	for _, v := range m.ResetId {
-		buf.Write(marshalAVP(1670, v, false, false))
+		buf.Write(marshalAVP(0, v, false, false))
 	}
 
-	// Marshal ProxyInfo (repeated)
+	// Marshal Avp (repeated)
+	for _, v := range m.Avp {
+		buf.Write(marshalAVP(0, v, false, false))
+	}
+
+	// Marshal ProxyInfo (repeated, grouped)
 	for _, v := range m.ProxyInfo {
-		buf.Write(marshalAVP(284, v, false, false))
+		if v != nil {
+			if groupedData, err := v.Marshal(); err == nil {
+				buf.Write(marshalAVP(284, models_base.Grouped(groupedData), true, false))
+			}
+		}
 	}
 
 	// Marshal RouteRecord (repeated)
 	for _, v := range m.RouteRecord {
-		buf.Write(marshalAVP(282, v, false, false))
+		buf.Write(marshalAVP(282, v, true, false))
 	}
 
 	// Get the final message
@@ -2346,7 +4839,12 @@ func (m *InsertSubscriberDataRequest) Unmarshal(data []byte) error {
 
 		// Extract AVP data
 		headerSize := 8
+		var vendorID uint32
 		if avpFlags&0x80 != 0 { // V-bit set
+			if len(avpData) < 12 {
+				return fmt.Errorf("AVP data too short for vendor ID")
+			}
+			vendorID = binary.BigEndian.Uint32(avpData[8:12])
 			headerSize = 12
 		}
 		avpDataLen := int(avpLength) - headerSize
@@ -2355,24 +4853,12 @@ func (m *InsertSubscriberDataRequest) Unmarshal(data []byte) error {
 		}
 		avpValue := avpData[headerSize : headerSize+avpDataLen]
 
-		// Parse AVP based on code
+		// Parse AVP based on code and vendor ID
 		switch avpCode {
 		case 263: // Session-Id
 			val, err := models_base.DecodeUTF8String(avpValue)
 			if err == nil {
 				m.SessionId = val.(models_base.UTF8String)
-			}
-		case 301: // DRMP
-			val, err := models_base.DecodeEnumerated(avpValue)
-			if err == nil {
-				v := val.(models_base.Enumerated)
-				m.Drmp = &v
-			}
-		case 260: // Vendor-Specific-Application-Id
-			val, err := models_base.DecodeGrouped(avpValue)
-			if err == nil {
-				v := val.(models_base.Grouped)
-				m.VendorSpecificApplicationId = &v
 			}
 		case 277: // Auth-Session-State
 			val, err := models_base.DecodeEnumerated(avpValue)
@@ -2404,31 +4890,36 @@ func (m *InsertSubscriberDataRequest) Unmarshal(data []byte) error {
 			if err == nil {
 				m.UserName = val.(models_base.UTF8String)
 			}
-		case 628: // Supported-Features
-			val, err := models_base.DecodeGrouped(avpValue)
-			if err == nil {
-				m.SupportedFeatures = append(m.SupportedFeatures, val.(models_base.Grouped))
-			}
 		case 1400: // Subscription-Data
-			val, err := models_base.DecodeGrouped(avpValue)
-			if err == nil {
-				m.SubscriptionData = val.(models_base.Grouped)
+			if vendorID != 10415 {
+				break // Vendor ID mismatch
 			}
+			grouped := &SubscriptionData{}
+			if err := grouped.Unmarshal(avpValue); err == nil {
+				m.SubscriptionData = grouped
+			}
+		// case 0: // DRMP (AVP code not defined)
+		case 260: // Vendor-Specific-Application-Id
+			grouped := &VendorSpecificApplicationId{}
+			if err := grouped.Unmarshal(avpValue); err == nil {
+				m.VendorSpecificApplicationId = grouped
+			}
+		// case 0: // Supported-Features (AVP code not defined)
 		case 1490: // IDR-Flags
+			if vendorID != 10415 {
+				break // Vendor ID mismatch
+			}
 			val, err := models_base.DecodeUnsigned32(avpValue)
 			if err == nil {
 				v := val.(models_base.Unsigned32)
 				m.IdrFlags = &v
 			}
-		case 1670: // Reset-ID
-			val, err := models_base.DecodeOctetString(avpValue)
-			if err == nil {
-				m.ResetId = append(m.ResetId, val.(models_base.OctetString))
-			}
+		// case 0: // Reset-ID (AVP code not defined)
+		// case 0: // AVP (AVP code not defined)
 		case 284: // Proxy-Info
-			val, err := models_base.DecodeGrouped(avpValue)
-			if err == nil {
-				m.ProxyInfo = append(m.ProxyInfo, val.(models_base.Grouped))
+			grouped := &ProxyInfo{}
+			if err := grouped.Unmarshal(avpValue); err == nil {
+				m.ProxyInfo = append(m.ProxyInfo, grouped)
 			}
 		case 282: // Route-Record
 			val, err := models_base.DecodeDiameterIdentity(avpValue)
@@ -2459,7 +4950,7 @@ func (m *InsertSubscriberDataRequest) Len() int {
 
 // String returns a string representation of InsertSubscriberDataRequest
 func (m *InsertSubscriberDataRequest) String() string {
-	return fmt.Sprintf("InsertSubscriberDataRequest{SessionId:%v, Drmp:%v, VendorSpecificApplicationId:%v, AuthSessionState:%v, OriginHost:%v, OriginRealm:%v, DestinationHost:%v, DestinationRealm:%v, UserName:%v, SupportedFeatures:%v, SubscriptionData:%v, IdrFlags:%v, ResetId:%v, ProxyInfo:%v, RouteRecord:%v}", m.SessionId, m.Drmp, m.VendorSpecificApplicationId, m.AuthSessionState, m.OriginHost, m.OriginRealm, m.DestinationHost, m.DestinationRealm, m.UserName, m.SupportedFeatures, m.SubscriptionData, m.IdrFlags, m.ResetId, m.ProxyInfo, m.RouteRecord)
+	return fmt.Sprintf("InsertSubscriberDataRequest{SessionId:%v, AuthSessionState:%v, OriginHost:%v, OriginRealm:%v, DestinationHost:%v, DestinationRealm:%v, UserName:%v, SubscriptionData:%v, Drmp:%v, VendorSpecificApplicationId:%v, SupportedFeatures:%v, IdrFlags:%v, ResetId:%v, Avp:%v, ProxyInfo:%v, RouteRecord:%v}", m.SessionId, m.AuthSessionState, m.OriginHost, m.OriginRealm, m.DestinationHost, m.DestinationRealm, m.UserName, m.SubscriptionData, m.Drmp, m.VendorSpecificApplicationId, m.SupportedFeatures, m.IdrFlags, m.ResetId, m.Avp, m.ProxyInfo, m.RouteRecord)
 }
 
 // InsertSubscriberDataAnswer represents the Insert-Subscriber-Data-Answer (ISDA) Diameter command
@@ -2467,25 +4958,29 @@ func (m *InsertSubscriberDataRequest) String() string {
 type InsertSubscriberDataAnswer struct {
 	Header DiameterHeader
 
-	SessionId                   models_base.UTF8String         // Required
-	Drmp                        *models_base.Enumerated        // Optional
-	VendorSpecificApplicationId *models_base.Grouped           // Optional
-	SupportedFeatures           []models_base.Grouped          // Optional
-	ResultCode                  *models_base.Unsigned32        // Optional
-	ExperimentalResult          *models_base.Grouped           // Optional
-	AuthSessionState            models_base.Enumerated         // Required
-	OriginHost                  models_base.DiameterIdentity   // Required
-	OriginRealm                 models_base.DiameterIdentity   // Required
-	ImsVoiceOverPsSupported     *models_base.Enumerated        // Optional
-	LastUeActivityTime          *models_base.Time              // Optional
-	RatType                     *models_base.Enumerated        // Optional
-	IdaFlags                    *models_base.Unsigned32        // Optional
-	EpsUserState                *models_base.Grouped           // Optional
-	EpsLocationInformation      *models_base.Grouped           // Optional
-	LocalTimeZone               *models_base.Grouped           // Optional
-	FailedAvp                   *models_base.Grouped           // Optional
-	ProxyInfo                   []models_base.Grouped          // Optional
-	RouteRecord                 []models_base.DiameterIdentity // Optional
+	SessionId                       models_base.UTF8String         // Required
+	AuthSessionState                models_base.Enumerated         // Required
+	OriginHost                      models_base.DiameterIdentity   // Required
+	OriginRealm                     models_base.DiameterIdentity   // Required
+	Drmp                            *models_base.OctetString       // Optional - WARNING: AVP code not defined, DO NOT USE
+	VendorSpecificApplicationId     *VendorSpecificApplicationId   // Optional
+	SupportedFeatures               []models_base.OctetString      // Optional - WARNING: AVP code not defined, DO NOT USE
+	ResultCode                      *models_base.Unsigned32        // Optional
+	ExperimentalResult              *ExperimentalResult            // Optional
+	ImsVoiceOverPsSessionsSupported *models_base.OctetString       // Optional - WARNING: AVP code not defined, DO NOT USE
+	LastUeActivityTime              *models_base.OctetString       // Optional - WARNING: AVP code not defined, DO NOT USE
+	RatType                         *models_base.Enumerated        // Optional
+	IdaFlags                        *models_base.Unsigned32        // Optional
+	EpsUserState                    *models_base.OctetString       // Optional - WARNING: AVP code not defined, DO NOT USE
+	EpsLocationInformation          *models_base.OctetString       // Optional - WARNING: AVP code not defined, DO NOT USE
+	LocalTimeZone                   *models_base.OctetString       // Optional - WARNING: AVP code not defined, DO NOT USE
+	SupportedServices               *models_base.OctetString       // Optional - WARNING: AVP code not defined, DO NOT USE
+	MonitoringEventReport           []models_base.OctetString      // Optional - WARNING: AVP code not defined, DO NOT USE
+	MonitoringEventConfigStatus     []models_base.OctetString      // Optional - WARNING: AVP code not defined, DO NOT USE
+	Avp                             []models_base.OctetString      // Optional - WARNING: AVP code not defined, DO NOT USE
+	FailedAvp                       *FailedAVP                     // Optional
+	ProxyInfo                       []*ProxyInfo                   // Optional
+	RouteRecord                     []models_base.DiameterIdentity // Optional
 }
 
 // NewInsertSubscriberDataAnswer creates a new ISDA message
@@ -2538,31 +5033,6 @@ func (m *InsertSubscriberDataAnswer) Marshal() ([]byte, error) {
 	// Marshal SessionId (required)
 	buf.Write(marshalAVP(263, m.SessionId, true, false))
 
-	// Marshal Drmp (optional)
-	if m.Drmp != nil {
-		buf.Write(marshalAVP(301, *m.Drmp, false, false))
-	}
-
-	// Marshal VendorSpecificApplicationId (optional)
-	if m.VendorSpecificApplicationId != nil {
-		buf.Write(marshalAVP(260, *m.VendorSpecificApplicationId, false, false))
-	}
-
-	// Marshal SupportedFeatures (repeated)
-	for _, v := range m.SupportedFeatures {
-		buf.Write(marshalAVP(628, v, false, false))
-	}
-
-	// Marshal ResultCode (optional)
-	if m.ResultCode != nil {
-		buf.Write(marshalAVP(268, *m.ResultCode, true, false))
-	}
-
-	// Marshal ExperimentalResult (optional)
-	if m.ExperimentalResult != nil {
-		buf.Write(marshalAVP(297, *m.ExperimentalResult, true, false))
-	}
-
 	// Marshal AuthSessionState (required)
 	buf.Write(marshalAVP(277, m.AuthSessionState, true, false))
 
@@ -2572,54 +5042,109 @@ func (m *InsertSubscriberDataAnswer) Marshal() ([]byte, error) {
 	// Marshal OriginRealm (required)
 	buf.Write(marshalAVP(296, m.OriginRealm, true, false))
 
-	// Marshal ImsVoiceOverPsSupported (optional)
-	if m.ImsVoiceOverPsSupported != nil {
-		buf.Write(marshalAVP(1492, *m.ImsVoiceOverPsSupported, true, false))
+	// Marshal Drmp (optional)
+	if m.Drmp != nil {
+		buf.Write(marshalAVP(0, *m.Drmp, false, false))
+	}
+
+	// Marshal VendorSpecificApplicationId (grouped)
+	if m.VendorSpecificApplicationId != nil {
+		if groupedData, err := m.VendorSpecificApplicationId.Marshal(); err == nil {
+			buf.Write(marshalAVP(260, models_base.Grouped(groupedData), true, false))
+		}
+	}
+
+	// Marshal SupportedFeatures (repeated)
+	for _, v := range m.SupportedFeatures {
+		buf.Write(marshalAVP(0, v, false, false))
+	}
+
+	// Marshal ResultCode (optional)
+	if m.ResultCode != nil {
+		buf.Write(marshalAVP(268, *m.ResultCode, true, false))
+	}
+
+	// Marshal ExperimentalResult (grouped)
+	if m.ExperimentalResult != nil {
+		if groupedData, err := m.ExperimentalResult.Marshal(); err == nil {
+			buf.Write(marshalAVP(297, models_base.Grouped(groupedData), true, false))
+		}
+	}
+
+	// Marshal ImsVoiceOverPsSessionsSupported (optional)
+	if m.ImsVoiceOverPsSessionsSupported != nil {
+		buf.Write(marshalAVP(0, *m.ImsVoiceOverPsSessionsSupported, false, false))
 	}
 
 	// Marshal LastUeActivityTime (optional)
 	if m.LastUeActivityTime != nil {
-		buf.Write(marshalAVP(1494, *m.LastUeActivityTime, true, false))
+		buf.Write(marshalAVP(0, *m.LastUeActivityTime, false, false))
 	}
 
 	// Marshal RatType (optional)
 	if m.RatType != nil {
-		buf.Write(marshalAVP(1032, *m.RatType, true, false))
+		buf.Write(marshalAVPWithVendor(1032, *m.RatType, true, false, 10415))
 	}
 
 	// Marshal IdaFlags (optional)
 	if m.IdaFlags != nil {
-		buf.Write(marshalAVP(1441, *m.IdaFlags, true, false))
+		buf.Write(marshalAVPWithVendor(1441, *m.IdaFlags, true, false, 10415))
 	}
 
 	// Marshal EpsUserState (optional)
 	if m.EpsUserState != nil {
-		buf.Write(marshalAVP(1495, *m.EpsUserState, true, false))
+		buf.Write(marshalAVP(0, *m.EpsUserState, false, false))
 	}
 
 	// Marshal EpsLocationInformation (optional)
 	if m.EpsLocationInformation != nil {
-		buf.Write(marshalAVP(1496, *m.EpsLocationInformation, true, false))
+		buf.Write(marshalAVP(0, *m.EpsLocationInformation, false, false))
 	}
 
 	// Marshal LocalTimeZone (optional)
 	if m.LocalTimeZone != nil {
-		buf.Write(marshalAVP(1649, *m.LocalTimeZone, false, false))
+		buf.Write(marshalAVP(0, *m.LocalTimeZone, false, false))
 	}
 
-	// Marshal FailedAvp (optional)
+	// Marshal SupportedServices (optional)
+	if m.SupportedServices != nil {
+		buf.Write(marshalAVP(0, *m.SupportedServices, false, false))
+	}
+
+	// Marshal MonitoringEventReport (repeated)
+	for _, v := range m.MonitoringEventReport {
+		buf.Write(marshalAVP(0, v, false, false))
+	}
+
+	// Marshal MonitoringEventConfigStatus (repeated)
+	for _, v := range m.MonitoringEventConfigStatus {
+		buf.Write(marshalAVP(0, v, false, false))
+	}
+
+	// Marshal Avp (repeated)
+	for _, v := range m.Avp {
+		buf.Write(marshalAVP(0, v, false, false))
+	}
+
+	// Marshal FailedAvp (grouped)
 	if m.FailedAvp != nil {
-		buf.Write(marshalAVP(279, *m.FailedAvp, false, false))
+		if groupedData, err := m.FailedAvp.Marshal(); err == nil {
+			buf.Write(marshalAVP(279, models_base.Grouped(groupedData), true, false))
+		}
 	}
 
-	// Marshal ProxyInfo (repeated)
+	// Marshal ProxyInfo (repeated, grouped)
 	for _, v := range m.ProxyInfo {
-		buf.Write(marshalAVP(284, v, false, false))
+		if v != nil {
+			if groupedData, err := v.Marshal(); err == nil {
+				buf.Write(marshalAVP(284, models_base.Grouped(groupedData), true, false))
+			}
+		}
 	}
 
 	// Marshal RouteRecord (repeated)
 	for _, v := range m.RouteRecord {
-		buf.Write(marshalAVP(282, v, false, false))
+		buf.Write(marshalAVP(282, v, true, false))
 	}
 
 	// Get the final message
@@ -2664,7 +5189,12 @@ func (m *InsertSubscriberDataAnswer) Unmarshal(data []byte) error {
 
 		// Extract AVP data
 		headerSize := 8
+		var vendorID uint32
 		if avpFlags&0x80 != 0 { // V-bit set
+			if len(avpData) < 12 {
+				return fmt.Errorf("AVP data too short for vendor ID")
+			}
+			vendorID = binary.BigEndian.Uint32(avpData[8:12])
 			headerSize = 12
 		}
 		avpDataLen := int(avpLength) - headerSize
@@ -2673,41 +5203,12 @@ func (m *InsertSubscriberDataAnswer) Unmarshal(data []byte) error {
 		}
 		avpValue := avpData[headerSize : headerSize+avpDataLen]
 
-		// Parse AVP based on code
+		// Parse AVP based on code and vendor ID
 		switch avpCode {
 		case 263: // Session-Id
 			val, err := models_base.DecodeUTF8String(avpValue)
 			if err == nil {
 				m.SessionId = val.(models_base.UTF8String)
-			}
-		case 301: // DRMP
-			val, err := models_base.DecodeEnumerated(avpValue)
-			if err == nil {
-				v := val.(models_base.Enumerated)
-				m.Drmp = &v
-			}
-		case 260: // Vendor-Specific-Application-Id
-			val, err := models_base.DecodeGrouped(avpValue)
-			if err == nil {
-				v := val.(models_base.Grouped)
-				m.VendorSpecificApplicationId = &v
-			}
-		case 628: // Supported-Features
-			val, err := models_base.DecodeGrouped(avpValue)
-			if err == nil {
-				m.SupportedFeatures = append(m.SupportedFeatures, val.(models_base.Grouped))
-			}
-		case 268: // Result-Code
-			val, err := models_base.DecodeUnsigned32(avpValue)
-			if err == nil {
-				v := val.(models_base.Unsigned32)
-				m.ResultCode = &v
-			}
-		case 297: // Experimental-Result
-			val, err := models_base.DecodeGrouped(avpValue)
-			if err == nil {
-				v := val.(models_base.Grouped)
-				m.ExperimentalResult = &v
 			}
 		case 277: // Auth-Session-State
 			val, err := models_base.DecodeEnumerated(avpValue)
@@ -2724,58 +5225,60 @@ func (m *InsertSubscriberDataAnswer) Unmarshal(data []byte) error {
 			if err == nil {
 				m.OriginRealm = val.(models_base.DiameterIdentity)
 			}
-		case 1492: // IMS-Voice-Over-PS-Sessions-Supported
-			val, err := models_base.DecodeEnumerated(avpValue)
-			if err == nil {
-				v := val.(models_base.Enumerated)
-				m.ImsVoiceOverPsSupported = &v
+		// case 0: // DRMP (AVP code not defined)
+		case 260: // Vendor-Specific-Application-Id
+			grouped := &VendorSpecificApplicationId{}
+			if err := grouped.Unmarshal(avpValue); err == nil {
+				m.VendorSpecificApplicationId = grouped
 			}
-		case 1494: // Last-UE-Activity-Time
-			val, err := models_base.DecodeTime(avpValue)
+		// case 0: // Supported-Features (AVP code not defined)
+		case 268: // Result-Code
+			val, err := models_base.DecodeUnsigned32(avpValue)
 			if err == nil {
-				v := val.(models_base.Time)
-				m.LastUeActivityTime = &v
+				v := val.(models_base.Unsigned32)
+				m.ResultCode = &v
 			}
+		case 297: // Experimental-Result
+			grouped := &ExperimentalResult{}
+			if err := grouped.Unmarshal(avpValue); err == nil {
+				m.ExperimentalResult = grouped
+			}
+		// case 0: // IMS-Voice-Over-PS-Sessions-Supported (AVP code not defined)
+		// case 0: // Last-UE-Activity-Time (AVP code not defined)
 		case 1032: // RAT-Type
+			if vendorID != 10415 {
+				break // Vendor ID mismatch
+			}
 			val, err := models_base.DecodeEnumerated(avpValue)
 			if err == nil {
 				v := val.(models_base.Enumerated)
 				m.RatType = &v
 			}
 		case 1441: // IDA-Flags
+			if vendorID != 10415 {
+				break // Vendor ID mismatch
+			}
 			val, err := models_base.DecodeUnsigned32(avpValue)
 			if err == nil {
 				v := val.(models_base.Unsigned32)
 				m.IdaFlags = &v
 			}
-		case 1495: // EPS-User-State
-			val, err := models_base.DecodeGrouped(avpValue)
-			if err == nil {
-				v := val.(models_base.Grouped)
-				m.EpsUserState = &v
-			}
-		case 1496: // EPS-Location-Information
-			val, err := models_base.DecodeGrouped(avpValue)
-			if err == nil {
-				v := val.(models_base.Grouped)
-				m.EpsLocationInformation = &v
-			}
-		case 1649: // Local-Time-Zone
-			val, err := models_base.DecodeGrouped(avpValue)
-			if err == nil {
-				v := val.(models_base.Grouped)
-				m.LocalTimeZone = &v
-			}
+		// case 0: // EPS-User-State (AVP code not defined)
+		// case 0: // EPS-Location-Information (AVP code not defined)
+		// case 0: // Local-Time-Zone (AVP code not defined)
+		// case 0: // Supported-Services (AVP code not defined)
+		// case 0: // Monitoring-Event-Report (AVP code not defined)
+		// case 0: // Monitoring-Event-Config-Status (AVP code not defined)
+		// case 0: // AVP (AVP code not defined)
 		case 279: // Failed-AVP
-			val, err := models_base.DecodeGrouped(avpValue)
-			if err == nil {
-				v := val.(models_base.Grouped)
-				m.FailedAvp = &v
+			grouped := &FailedAVP{}
+			if err := grouped.Unmarshal(avpValue); err == nil {
+				m.FailedAvp = grouped
 			}
 		case 284: // Proxy-Info
-			val, err := models_base.DecodeGrouped(avpValue)
-			if err == nil {
-				m.ProxyInfo = append(m.ProxyInfo, val.(models_base.Grouped))
+			grouped := &ProxyInfo{}
+			if err := grouped.Unmarshal(avpValue); err == nil {
+				m.ProxyInfo = append(m.ProxyInfo, grouped)
 			}
 		case 282: // Route-Record
 			val, err := models_base.DecodeDiameterIdentity(avpValue)
@@ -2806,7 +5309,7 @@ func (m *InsertSubscriberDataAnswer) Len() int {
 
 // String returns a string representation of InsertSubscriberDataAnswer
 func (m *InsertSubscriberDataAnswer) String() string {
-	return fmt.Sprintf("InsertSubscriberDataAnswer{SessionId:%v, Drmp:%v, VendorSpecificApplicationId:%v, SupportedFeatures:%v, ResultCode:%v, ExperimentalResult:%v, AuthSessionState:%v, OriginHost:%v, OriginRealm:%v, ImsVoiceOverPsSupported:%v, LastUeActivityTime:%v, RatType:%v, IdaFlags:%v, EpsUserState:%v, EpsLocationInformation:%v, LocalTimeZone:%v, FailedAvp:%v, ProxyInfo:%v, RouteRecord:%v}", m.SessionId, m.Drmp, m.VendorSpecificApplicationId, m.SupportedFeatures, m.ResultCode, m.ExperimentalResult, m.AuthSessionState, m.OriginHost, m.OriginRealm, m.ImsVoiceOverPsSupported, m.LastUeActivityTime, m.RatType, m.IdaFlags, m.EpsUserState, m.EpsLocationInformation, m.LocalTimeZone, m.FailedAvp, m.ProxyInfo, m.RouteRecord)
+	return fmt.Sprintf("InsertSubscriberDataAnswer{SessionId:%v, AuthSessionState:%v, OriginHost:%v, OriginRealm:%v, Drmp:%v, VendorSpecificApplicationId:%v, SupportedFeatures:%v, ResultCode:%v, ExperimentalResult:%v, ImsVoiceOverPsSessionsSupported:%v, LastUeActivityTime:%v, RatType:%v, IdaFlags:%v, EpsUserState:%v, EpsLocationInformation:%v, LocalTimeZone:%v, SupportedServices:%v, MonitoringEventReport:%v, MonitoringEventConfigStatus:%v, Avp:%v, FailedAvp:%v, ProxyInfo:%v, RouteRecord:%v}", m.SessionId, m.AuthSessionState, m.OriginHost, m.OriginRealm, m.Drmp, m.VendorSpecificApplicationId, m.SupportedFeatures, m.ResultCode, m.ExperimentalResult, m.ImsVoiceOverPsSessionsSupported, m.LastUeActivityTime, m.RatType, m.IdaFlags, m.EpsUserState, m.EpsLocationInformation, m.LocalTimeZone, m.SupportedServices, m.MonitoringEventReport, m.MonitoringEventConfigStatus, m.Avp, m.FailedAvp, m.ProxyInfo, m.RouteRecord)
 }
 
 // DeleteSubscriberDataRequest represents the Delete-Subscriber-Data-Request (DSDR) Diameter command
@@ -2815,21 +5318,25 @@ type DeleteSubscriberDataRequest struct {
 	Header DiameterHeader
 
 	SessionId                   models_base.UTF8String         // Required
-	Drmp                        *models_base.Enumerated        // Optional
-	VendorSpecificApplicationId *models_base.Grouped           // Optional
 	AuthSessionState            models_base.Enumerated         // Required
 	OriginHost                  models_base.DiameterIdentity   // Required
 	OriginRealm                 models_base.DiameterIdentity   // Required
 	DestinationHost             models_base.DiameterIdentity   // Required
 	DestinationRealm            models_base.DiameterIdentity   // Required
 	UserName                    models_base.UTF8String         // Required
-	SupportedFeatures           []models_base.Grouped          // Optional
 	DsrFlags                    models_base.Unsigned32         // Required
+	Drmp                        *models_base.OctetString       // Optional - WARNING: AVP code not defined, DO NOT USE
+	VendorSpecificApplicationId *VendorSpecificApplicationId   // Optional
+	SupportedFeatures           []models_base.OctetString      // Optional - WARNING: AVP code not defined, DO NOT USE
+	ScefId                      *models_base.OctetString       // Optional - WARNING: AVP code not defined, DO NOT USE
 	ContextIdentifier           []models_base.Unsigned32       // Optional
-	TraceReference              *models_base.OctetString       // Optional
-	TsCode                      []models_base.OctetString      // Optional
-	SsCode                      []models_base.OctetString      // Optional
-	ProxyInfo                   []models_base.Grouped          // Optional
+	TraceReference              *models_base.OctetString       // Optional - WARNING: AVP code not defined, DO NOT USE
+	TsCode                      []models_base.OctetString      // Optional - WARNING: AVP code not defined, DO NOT USE
+	SsCode                      []models_base.OctetString      // Optional - WARNING: AVP code not defined, DO NOT USE
+	EdrxRelatedRat              *models_base.OctetString       // Optional - WARNING: AVP code not defined, DO NOT USE
+	ExternalIdentifier          []models_base.OctetString      // Optional - WARNING: AVP code not defined, DO NOT USE
+	Avp                         []models_base.OctetString      // Optional - WARNING: AVP code not defined, DO NOT USE
+	ProxyInfo                   []*ProxyInfo                   // Optional
 	RouteRecord                 []models_base.DiameterIdentity // Optional
 }
 
@@ -2892,16 +5399,6 @@ func (m *DeleteSubscriberDataRequest) Marshal() ([]byte, error) {
 	// Marshal SessionId (required)
 	buf.Write(marshalAVP(263, m.SessionId, true, false))
 
-	// Marshal Drmp (optional)
-	if m.Drmp != nil {
-		buf.Write(marshalAVP(301, *m.Drmp, false, false))
-	}
-
-	// Marshal VendorSpecificApplicationId (optional)
-	if m.VendorSpecificApplicationId != nil {
-		buf.Write(marshalAVP(260, *m.VendorSpecificApplicationId, false, false))
-	}
-
 	// Marshal AuthSessionState (required)
 	buf.Write(marshalAVP(277, m.AuthSessionState, true, false))
 
@@ -2912,50 +5409,86 @@ func (m *DeleteSubscriberDataRequest) Marshal() ([]byte, error) {
 	buf.Write(marshalAVP(296, m.OriginRealm, true, false))
 
 	// Marshal DestinationHost (required)
-	buf.Write(marshalAVP(293, m.DestinationHost, false, false))
+	buf.Write(marshalAVP(293, m.DestinationHost, true, false))
 
 	// Marshal DestinationRealm (required)
 	buf.Write(marshalAVP(283, m.DestinationRealm, true, false))
 
 	// Marshal UserName (required)
-	buf.Write(marshalAVP(1, m.UserName, false, true))
+	buf.Write(marshalAVP(1, m.UserName, true, true))
+
+	// Marshal DsrFlags (required)
+	buf.Write(marshalAVPWithVendor(1421, m.DsrFlags, true, false, 10415))
+
+	// Marshal Drmp (optional)
+	if m.Drmp != nil {
+		buf.Write(marshalAVP(0, *m.Drmp, false, false))
+	}
+
+	// Marshal VendorSpecificApplicationId (grouped)
+	if m.VendorSpecificApplicationId != nil {
+		if groupedData, err := m.VendorSpecificApplicationId.Marshal(); err == nil {
+			buf.Write(marshalAVP(260, models_base.Grouped(groupedData), true, false))
+		}
+	}
 
 	// Marshal SupportedFeatures (repeated)
 	for _, v := range m.SupportedFeatures {
-		buf.Write(marshalAVP(628, v, false, false))
+		buf.Write(marshalAVP(0, v, false, false))
 	}
 
-	// Marshal DsrFlags (required)
-	buf.Write(marshalAVP(1421, m.DsrFlags, true, false))
+	// Marshal ScefId (optional)
+	if m.ScefId != nil {
+		buf.Write(marshalAVP(0, *m.ScefId, false, false))
+	}
 
 	// Marshal ContextIdentifier (repeated)
 	for _, v := range m.ContextIdentifier {
-		buf.Write(marshalAVP(1423, v, true, false))
+		buf.Write(marshalAVPWithVendor(1423, v, true, false, 10415))
 	}
 
 	// Marshal TraceReference (optional)
 	if m.TraceReference != nil {
-		buf.Write(marshalAVP(1459, *m.TraceReference, true, false))
+		buf.Write(marshalAVP(0, *m.TraceReference, false, false))
 	}
 
 	// Marshal TsCode (repeated)
 	for _, v := range m.TsCode {
-		buf.Write(marshalAVP(1487, v, true, false))
+		buf.Write(marshalAVP(0, v, false, false))
 	}
 
 	// Marshal SsCode (repeated)
 	for _, v := range m.SsCode {
-		buf.Write(marshalAVP(1476, v, true, false))
+		buf.Write(marshalAVP(0, v, false, false))
 	}
 
-	// Marshal ProxyInfo (repeated)
+	// Marshal EdrxRelatedRat (optional)
+	if m.EdrxRelatedRat != nil {
+		buf.Write(marshalAVP(0, *m.EdrxRelatedRat, false, false))
+	}
+
+	// Marshal ExternalIdentifier (repeated)
+	for _, v := range m.ExternalIdentifier {
+		buf.Write(marshalAVP(0, v, false, false))
+	}
+
+	// Marshal Avp (repeated)
+	for _, v := range m.Avp {
+		buf.Write(marshalAVP(0, v, false, false))
+	}
+
+	// Marshal ProxyInfo (repeated, grouped)
 	for _, v := range m.ProxyInfo {
-		buf.Write(marshalAVP(284, v, false, false))
+		if v != nil {
+			if groupedData, err := v.Marshal(); err == nil {
+				buf.Write(marshalAVP(284, models_base.Grouped(groupedData), true, false))
+			}
+		}
 	}
 
 	// Marshal RouteRecord (repeated)
 	for _, v := range m.RouteRecord {
-		buf.Write(marshalAVP(282, v, false, false))
+		buf.Write(marshalAVP(282, v, true, false))
 	}
 
 	// Get the final message
@@ -3000,7 +5533,12 @@ func (m *DeleteSubscriberDataRequest) Unmarshal(data []byte) error {
 
 		// Extract AVP data
 		headerSize := 8
+		var vendorID uint32
 		if avpFlags&0x80 != 0 { // V-bit set
+			if len(avpData) < 12 {
+				return fmt.Errorf("AVP data too short for vendor ID")
+			}
+			vendorID = binary.BigEndian.Uint32(avpData[8:12])
 			headerSize = 12
 		}
 		avpDataLen := int(avpLength) - headerSize
@@ -3009,24 +5547,12 @@ func (m *DeleteSubscriberDataRequest) Unmarshal(data []byte) error {
 		}
 		avpValue := avpData[headerSize : headerSize+avpDataLen]
 
-		// Parse AVP based on code
+		// Parse AVP based on code and vendor ID
 		switch avpCode {
 		case 263: // Session-Id
 			val, err := models_base.DecodeUTF8String(avpValue)
 			if err == nil {
 				m.SessionId = val.(models_base.UTF8String)
-			}
-		case 301: // DRMP
-			val, err := models_base.DecodeEnumerated(avpValue)
-			if err == nil {
-				v := val.(models_base.Enumerated)
-				m.Drmp = &v
-			}
-		case 260: // Vendor-Specific-Application-Id
-			val, err := models_base.DecodeGrouped(avpValue)
-			if err == nil {
-				v := val.(models_base.Grouped)
-				m.VendorSpecificApplicationId = &v
 			}
 		case 277: // Auth-Session-State
 			val, err := models_base.DecodeEnumerated(avpValue)
@@ -3058,41 +5584,40 @@ func (m *DeleteSubscriberDataRequest) Unmarshal(data []byte) error {
 			if err == nil {
 				m.UserName = val.(models_base.UTF8String)
 			}
-		case 628: // Supported-Features
-			val, err := models_base.DecodeGrouped(avpValue)
-			if err == nil {
-				m.SupportedFeatures = append(m.SupportedFeatures, val.(models_base.Grouped))
-			}
 		case 1421: // DSR-Flags
+			if vendorID != 10415 {
+				break // Vendor ID mismatch
+			}
 			val, err := models_base.DecodeUnsigned32(avpValue)
 			if err == nil {
 				m.DsrFlags = val.(models_base.Unsigned32)
 			}
+		// case 0: // DRMP (AVP code not defined)
+		case 260: // Vendor-Specific-Application-Id
+			grouped := &VendorSpecificApplicationId{}
+			if err := grouped.Unmarshal(avpValue); err == nil {
+				m.VendorSpecificApplicationId = grouped
+			}
+		// case 0: // Supported-Features (AVP code not defined)
+		// case 0: // SCEF-ID (AVP code not defined)
 		case 1423: // Context-Identifier
+			if vendorID != 10415 {
+				break // Vendor ID mismatch
+			}
 			val, err := models_base.DecodeUnsigned32(avpValue)
 			if err == nil {
 				m.ContextIdentifier = append(m.ContextIdentifier, val.(models_base.Unsigned32))
 			}
-		case 1459: // Trace-Reference
-			val, err := models_base.DecodeOctetString(avpValue)
-			if err == nil {
-				v := val.(models_base.OctetString)
-				m.TraceReference = &v
-			}
-		case 1487: // TS-Code
-			val, err := models_base.DecodeOctetString(avpValue)
-			if err == nil {
-				m.TsCode = append(m.TsCode, val.(models_base.OctetString))
-			}
-		case 1476: // SS-Code
-			val, err := models_base.DecodeOctetString(avpValue)
-			if err == nil {
-				m.SsCode = append(m.SsCode, val.(models_base.OctetString))
-			}
+		// case 0: // Trace-Reference (AVP code not defined)
+		// case 0: // TS-Code (AVP code not defined)
+		// case 0: // SS-Code (AVP code not defined)
+		// case 0: // eDRX-Related-RAT (AVP code not defined)
+		// case 0: // External-Identifier (AVP code not defined)
+		// case 0: // AVP (AVP code not defined)
 		case 284: // Proxy-Info
-			val, err := models_base.DecodeGrouped(avpValue)
-			if err == nil {
-				m.ProxyInfo = append(m.ProxyInfo, val.(models_base.Grouped))
+			grouped := &ProxyInfo{}
+			if err := grouped.Unmarshal(avpValue); err == nil {
+				m.ProxyInfo = append(m.ProxyInfo, grouped)
 			}
 		case 282: // Route-Record
 			val, err := models_base.DecodeDiameterIdentity(avpValue)
@@ -3123,7 +5648,7 @@ func (m *DeleteSubscriberDataRequest) Len() int {
 
 // String returns a string representation of DeleteSubscriberDataRequest
 func (m *DeleteSubscriberDataRequest) String() string {
-	return fmt.Sprintf("DeleteSubscriberDataRequest{SessionId:%v, Drmp:%v, VendorSpecificApplicationId:%v, AuthSessionState:%v, OriginHost:%v, OriginRealm:%v, DestinationHost:%v, DestinationRealm:%v, UserName:%v, SupportedFeatures:%v, DsrFlags:%v, ContextIdentifier:%v, TraceReference:%v, TsCode:%v, SsCode:%v, ProxyInfo:%v, RouteRecord:%v}", m.SessionId, m.Drmp, m.VendorSpecificApplicationId, m.AuthSessionState, m.OriginHost, m.OriginRealm, m.DestinationHost, m.DestinationRealm, m.UserName, m.SupportedFeatures, m.DsrFlags, m.ContextIdentifier, m.TraceReference, m.TsCode, m.SsCode, m.ProxyInfo, m.RouteRecord)
+	return fmt.Sprintf("DeleteSubscriberDataRequest{SessionId:%v, AuthSessionState:%v, OriginHost:%v, OriginRealm:%v, DestinationHost:%v, DestinationRealm:%v, UserName:%v, DsrFlags:%v, Drmp:%v, VendorSpecificApplicationId:%v, SupportedFeatures:%v, ScefId:%v, ContextIdentifier:%v, TraceReference:%v, TsCode:%v, SsCode:%v, EdrxRelatedRat:%v, ExternalIdentifier:%v, Avp:%v, ProxyInfo:%v, RouteRecord:%v}", m.SessionId, m.AuthSessionState, m.OriginHost, m.OriginRealm, m.DestinationHost, m.DestinationRealm, m.UserName, m.DsrFlags, m.Drmp, m.VendorSpecificApplicationId, m.SupportedFeatures, m.ScefId, m.ContextIdentifier, m.TraceReference, m.TsCode, m.SsCode, m.EdrxRelatedRat, m.ExternalIdentifier, m.Avp, m.ProxyInfo, m.RouteRecord)
 }
 
 // DeleteSubscriberDataAnswer represents the Delete-Subscriber-Data-Answer (DSDA) Diameter command
@@ -3132,17 +5657,18 @@ type DeleteSubscriberDataAnswer struct {
 	Header DiameterHeader
 
 	SessionId                   models_base.UTF8String         // Required
-	Drmp                        *models_base.Enumerated        // Optional
-	VendorSpecificApplicationId *models_base.Grouped           // Optional
-	SupportedFeatures           []models_base.Grouped          // Optional
-	ResultCode                  *models_base.Unsigned32        // Optional
-	ExperimentalResult          *models_base.Grouped           // Optional
 	AuthSessionState            models_base.Enumerated         // Required
 	OriginHost                  models_base.DiameterIdentity   // Required
 	OriginRealm                 models_base.DiameterIdentity   // Required
+	Drmp                        *models_base.OctetString       // Optional - WARNING: AVP code not defined, DO NOT USE
+	VendorSpecificApplicationId *VendorSpecificApplicationId   // Optional
+	SupportedFeatures           []models_base.OctetString      // Optional - WARNING: AVP code not defined, DO NOT USE
+	ResultCode                  *models_base.Unsigned32        // Optional
+	ExperimentalResult          *ExperimentalResult            // Optional
 	DsaFlags                    *models_base.Unsigned32        // Optional
-	FailedAvp                   *models_base.Grouped           // Optional
-	ProxyInfo                   []models_base.Grouped          // Optional
+	Avp                         []models_base.OctetString      // Optional - WARNING: AVP code not defined, DO NOT USE
+	FailedAvp                   *FailedAVP                     // Optional
+	ProxyInfo                   []*ProxyInfo                   // Optional
 	RouteRecord                 []models_base.DiameterIdentity // Optional
 }
 
@@ -3196,31 +5722,6 @@ func (m *DeleteSubscriberDataAnswer) Marshal() ([]byte, error) {
 	// Marshal SessionId (required)
 	buf.Write(marshalAVP(263, m.SessionId, true, false))
 
-	// Marshal Drmp (optional)
-	if m.Drmp != nil {
-		buf.Write(marshalAVP(301, *m.Drmp, false, false))
-	}
-
-	// Marshal VendorSpecificApplicationId (optional)
-	if m.VendorSpecificApplicationId != nil {
-		buf.Write(marshalAVP(260, *m.VendorSpecificApplicationId, false, false))
-	}
-
-	// Marshal SupportedFeatures (repeated)
-	for _, v := range m.SupportedFeatures {
-		buf.Write(marshalAVP(628, v, false, false))
-	}
-
-	// Marshal ResultCode (optional)
-	if m.ResultCode != nil {
-		buf.Write(marshalAVP(268, *m.ResultCode, true, false))
-	}
-
-	// Marshal ExperimentalResult (optional)
-	if m.ExperimentalResult != nil {
-		buf.Write(marshalAVP(297, *m.ExperimentalResult, true, false))
-	}
-
 	// Marshal AuthSessionState (required)
 	buf.Write(marshalAVP(277, m.AuthSessionState, true, false))
 
@@ -3230,24 +5731,64 @@ func (m *DeleteSubscriberDataAnswer) Marshal() ([]byte, error) {
 	// Marshal OriginRealm (required)
 	buf.Write(marshalAVP(296, m.OriginRealm, true, false))
 
+	// Marshal Drmp (optional)
+	if m.Drmp != nil {
+		buf.Write(marshalAVP(0, *m.Drmp, false, false))
+	}
+
+	// Marshal VendorSpecificApplicationId (grouped)
+	if m.VendorSpecificApplicationId != nil {
+		if groupedData, err := m.VendorSpecificApplicationId.Marshal(); err == nil {
+			buf.Write(marshalAVP(260, models_base.Grouped(groupedData), true, false))
+		}
+	}
+
+	// Marshal SupportedFeatures (repeated)
+	for _, v := range m.SupportedFeatures {
+		buf.Write(marshalAVP(0, v, false, false))
+	}
+
+	// Marshal ResultCode (optional)
+	if m.ResultCode != nil {
+		buf.Write(marshalAVP(268, *m.ResultCode, true, false))
+	}
+
+	// Marshal ExperimentalResult (grouped)
+	if m.ExperimentalResult != nil {
+		if groupedData, err := m.ExperimentalResult.Marshal(); err == nil {
+			buf.Write(marshalAVP(297, models_base.Grouped(groupedData), true, false))
+		}
+	}
+
 	// Marshal DsaFlags (optional)
 	if m.DsaFlags != nil {
-		buf.Write(marshalAVP(1422, *m.DsaFlags, true, false))
+		buf.Write(marshalAVPWithVendor(1422, *m.DsaFlags, true, false, 10415))
 	}
 
-	// Marshal FailedAvp (optional)
+	// Marshal Avp (repeated)
+	for _, v := range m.Avp {
+		buf.Write(marshalAVP(0, v, false, false))
+	}
+
+	// Marshal FailedAvp (grouped)
 	if m.FailedAvp != nil {
-		buf.Write(marshalAVP(279, *m.FailedAvp, false, false))
+		if groupedData, err := m.FailedAvp.Marshal(); err == nil {
+			buf.Write(marshalAVP(279, models_base.Grouped(groupedData), true, false))
+		}
 	}
 
-	// Marshal ProxyInfo (repeated)
+	// Marshal ProxyInfo (repeated, grouped)
 	for _, v := range m.ProxyInfo {
-		buf.Write(marshalAVP(284, v, false, false))
+		if v != nil {
+			if groupedData, err := v.Marshal(); err == nil {
+				buf.Write(marshalAVP(284, models_base.Grouped(groupedData), true, false))
+			}
+		}
 	}
 
 	// Marshal RouteRecord (repeated)
 	for _, v := range m.RouteRecord {
-		buf.Write(marshalAVP(282, v, false, false))
+		buf.Write(marshalAVP(282, v, true, false))
 	}
 
 	// Get the final message
@@ -3292,7 +5833,12 @@ func (m *DeleteSubscriberDataAnswer) Unmarshal(data []byte) error {
 
 		// Extract AVP data
 		headerSize := 8
+		var vendorID uint32
 		if avpFlags&0x80 != 0 { // V-bit set
+			if len(avpData) < 12 {
+				return fmt.Errorf("AVP data too short for vendor ID")
+			}
+			vendorID = binary.BigEndian.Uint32(avpData[8:12])
 			headerSize = 12
 		}
 		avpDataLen := int(avpLength) - headerSize
@@ -3301,41 +5847,12 @@ func (m *DeleteSubscriberDataAnswer) Unmarshal(data []byte) error {
 		}
 		avpValue := avpData[headerSize : headerSize+avpDataLen]
 
-		// Parse AVP based on code
+		// Parse AVP based on code and vendor ID
 		switch avpCode {
 		case 263: // Session-Id
 			val, err := models_base.DecodeUTF8String(avpValue)
 			if err == nil {
 				m.SessionId = val.(models_base.UTF8String)
-			}
-		case 301: // DRMP
-			val, err := models_base.DecodeEnumerated(avpValue)
-			if err == nil {
-				v := val.(models_base.Enumerated)
-				m.Drmp = &v
-			}
-		case 260: // Vendor-Specific-Application-Id
-			val, err := models_base.DecodeGrouped(avpValue)
-			if err == nil {
-				v := val.(models_base.Grouped)
-				m.VendorSpecificApplicationId = &v
-			}
-		case 628: // Supported-Features
-			val, err := models_base.DecodeGrouped(avpValue)
-			if err == nil {
-				m.SupportedFeatures = append(m.SupportedFeatures, val.(models_base.Grouped))
-			}
-		case 268: // Result-Code
-			val, err := models_base.DecodeUnsigned32(avpValue)
-			if err == nil {
-				v := val.(models_base.Unsigned32)
-				m.ResultCode = &v
-			}
-		case 297: // Experimental-Result
-			val, err := models_base.DecodeGrouped(avpValue)
-			if err == nil {
-				v := val.(models_base.Grouped)
-				m.ExperimentalResult = &v
 			}
 		case 277: // Auth-Session-State
 			val, err := models_base.DecodeEnumerated(avpValue)
@@ -3352,22 +5869,43 @@ func (m *DeleteSubscriberDataAnswer) Unmarshal(data []byte) error {
 			if err == nil {
 				m.OriginRealm = val.(models_base.DiameterIdentity)
 			}
+		// case 0: // DRMP (AVP code not defined)
+		case 260: // Vendor-Specific-Application-Id
+			grouped := &VendorSpecificApplicationId{}
+			if err := grouped.Unmarshal(avpValue); err == nil {
+				m.VendorSpecificApplicationId = grouped
+			}
+		// case 0: // Supported-Features (AVP code not defined)
+		case 268: // Result-Code
+			val, err := models_base.DecodeUnsigned32(avpValue)
+			if err == nil {
+				v := val.(models_base.Unsigned32)
+				m.ResultCode = &v
+			}
+		case 297: // Experimental-Result
+			grouped := &ExperimentalResult{}
+			if err := grouped.Unmarshal(avpValue); err == nil {
+				m.ExperimentalResult = grouped
+			}
 		case 1422: // DSA-Flags
+			if vendorID != 10415 {
+				break // Vendor ID mismatch
+			}
 			val, err := models_base.DecodeUnsigned32(avpValue)
 			if err == nil {
 				v := val.(models_base.Unsigned32)
 				m.DsaFlags = &v
 			}
+		// case 0: // AVP (AVP code not defined)
 		case 279: // Failed-AVP
-			val, err := models_base.DecodeGrouped(avpValue)
-			if err == nil {
-				v := val.(models_base.Grouped)
-				m.FailedAvp = &v
+			grouped := &FailedAVP{}
+			if err := grouped.Unmarshal(avpValue); err == nil {
+				m.FailedAvp = grouped
 			}
 		case 284: // Proxy-Info
-			val, err := models_base.DecodeGrouped(avpValue)
-			if err == nil {
-				m.ProxyInfo = append(m.ProxyInfo, val.(models_base.Grouped))
+			grouped := &ProxyInfo{}
+			if err := grouped.Unmarshal(avpValue); err == nil {
+				m.ProxyInfo = append(m.ProxyInfo, grouped)
 			}
 		case 282: // Route-Record
 			val, err := models_base.DecodeDiameterIdentity(avpValue)
@@ -3398,7 +5936,7 @@ func (m *DeleteSubscriberDataAnswer) Len() int {
 
 // String returns a string representation of DeleteSubscriberDataAnswer
 func (m *DeleteSubscriberDataAnswer) String() string {
-	return fmt.Sprintf("DeleteSubscriberDataAnswer{SessionId:%v, Drmp:%v, VendorSpecificApplicationId:%v, SupportedFeatures:%v, ResultCode:%v, ExperimentalResult:%v, AuthSessionState:%v, OriginHost:%v, OriginRealm:%v, DsaFlags:%v, FailedAvp:%v, ProxyInfo:%v, RouteRecord:%v}", m.SessionId, m.Drmp, m.VendorSpecificApplicationId, m.SupportedFeatures, m.ResultCode, m.ExperimentalResult, m.AuthSessionState, m.OriginHost, m.OriginRealm, m.DsaFlags, m.FailedAvp, m.ProxyInfo, m.RouteRecord)
+	return fmt.Sprintf("DeleteSubscriberDataAnswer{SessionId:%v, AuthSessionState:%v, OriginHost:%v, OriginRealm:%v, Drmp:%v, VendorSpecificApplicationId:%v, SupportedFeatures:%v, ResultCode:%v, ExperimentalResult:%v, DsaFlags:%v, Avp:%v, FailedAvp:%v, ProxyInfo:%v, RouteRecord:%v}", m.SessionId, m.AuthSessionState, m.OriginHost, m.OriginRealm, m.Drmp, m.VendorSpecificApplicationId, m.SupportedFeatures, m.ResultCode, m.ExperimentalResult, m.DsaFlags, m.Avp, m.FailedAvp, m.ProxyInfo, m.RouteRecord)
 }
 
 // PurgeUERequest represents the Purge-UE-Request (PUR) Diameter command
@@ -3407,19 +5945,20 @@ type PurgeUERequest struct {
 	Header DiameterHeader
 
 	SessionId                   models_base.UTF8String         // Required
-	Drmp                        *models_base.Enumerated        // Optional
-	VendorSpecificApplicationId *models_base.Grouped           // Optional
 	AuthSessionState            models_base.Enumerated         // Required
 	OriginHost                  models_base.DiameterIdentity   // Required
 	OriginRealm                 models_base.DiameterIdentity   // Required
-	DestinationHost             *models_base.DiameterIdentity  // Optional
 	DestinationRealm            models_base.DiameterIdentity   // Required
 	UserName                    models_base.UTF8String         // Required
-	OcSupportedFeatures         *models_base.Grouped           // Optional
+	Drmp                        *models_base.OctetString       // Optional - WARNING: AVP code not defined, DO NOT USE
+	VendorSpecificApplicationId *VendorSpecificApplicationId   // Optional
+	DestinationHost             *models_base.DiameterIdentity  // Optional
+	OcSupportedFeatures         *models_base.OctetString       // Optional - WARNING: AVP code not defined, DO NOT USE
 	PurFlags                    *models_base.Unsigned32        // Optional
-	SupportedFeatures           []models_base.Grouped          // Optional
-	EpsLocationInformation      *models_base.Grouped           // Optional
-	ProxyInfo                   []models_base.Grouped          // Optional
+	SupportedFeatures           []models_base.OctetString      // Optional - WARNING: AVP code not defined, DO NOT USE
+	EpsLocationInformation      *models_base.OctetString       // Optional - WARNING: AVP code not defined, DO NOT USE
+	Avp                         []models_base.OctetString      // Optional - WARNING: AVP code not defined, DO NOT USE
+	ProxyInfo                   []*ProxyInfo                   // Optional
 	RouteRecord                 []models_base.DiameterIdentity // Optional
 }
 
@@ -3479,16 +6018,6 @@ func (m *PurgeUERequest) Marshal() ([]byte, error) {
 	// Marshal SessionId (required)
 	buf.Write(marshalAVP(263, m.SessionId, true, false))
 
-	// Marshal Drmp (optional)
-	if m.Drmp != nil {
-		buf.Write(marshalAVP(301, *m.Drmp, false, false))
-	}
-
-	// Marshal VendorSpecificApplicationId (optional)
-	if m.VendorSpecificApplicationId != nil {
-		buf.Write(marshalAVP(260, *m.VendorSpecificApplicationId, false, false))
-	}
-
 	// Marshal AuthSessionState (required)
 	buf.Write(marshalAVP(277, m.AuthSessionState, true, false))
 
@@ -3498,45 +6027,66 @@ func (m *PurgeUERequest) Marshal() ([]byte, error) {
 	// Marshal OriginRealm (required)
 	buf.Write(marshalAVP(296, m.OriginRealm, true, false))
 
-	// Marshal DestinationHost (optional)
-	if m.DestinationHost != nil {
-		buf.Write(marshalAVP(293, *m.DestinationHost, false, false))
-	}
-
 	// Marshal DestinationRealm (required)
 	buf.Write(marshalAVP(283, m.DestinationRealm, true, false))
 
 	// Marshal UserName (required)
-	buf.Write(marshalAVP(1, m.UserName, false, true))
+	buf.Write(marshalAVP(1, m.UserName, true, true))
+
+	// Marshal Drmp (optional)
+	if m.Drmp != nil {
+		buf.Write(marshalAVP(0, *m.Drmp, false, false))
+	}
+
+	// Marshal VendorSpecificApplicationId (grouped)
+	if m.VendorSpecificApplicationId != nil {
+		if groupedData, err := m.VendorSpecificApplicationId.Marshal(); err == nil {
+			buf.Write(marshalAVP(260, models_base.Grouped(groupedData), true, false))
+		}
+	}
+
+	// Marshal DestinationHost (optional)
+	if m.DestinationHost != nil {
+		buf.Write(marshalAVP(293, *m.DestinationHost, true, false))
+	}
 
 	// Marshal OcSupportedFeatures (optional)
 	if m.OcSupportedFeatures != nil {
-		buf.Write(marshalAVP(621, *m.OcSupportedFeatures, false, false))
+		buf.Write(marshalAVP(0, *m.OcSupportedFeatures, false, false))
 	}
 
 	// Marshal PurFlags (optional)
 	if m.PurFlags != nil {
-		buf.Write(marshalAVP(1635, *m.PurFlags, false, false))
+		buf.Write(marshalAVPWithVendor(1635, *m.PurFlags, true, false, 10415))
 	}
 
 	// Marshal SupportedFeatures (repeated)
 	for _, v := range m.SupportedFeatures {
-		buf.Write(marshalAVP(628, v, false, false))
+		buf.Write(marshalAVP(0, v, false, false))
 	}
 
 	// Marshal EpsLocationInformation (optional)
 	if m.EpsLocationInformation != nil {
-		buf.Write(marshalAVP(1496, *m.EpsLocationInformation, true, false))
+		buf.Write(marshalAVP(0, *m.EpsLocationInformation, false, false))
 	}
 
-	// Marshal ProxyInfo (repeated)
+	// Marshal Avp (repeated)
+	for _, v := range m.Avp {
+		buf.Write(marshalAVP(0, v, false, false))
+	}
+
+	// Marshal ProxyInfo (repeated, grouped)
 	for _, v := range m.ProxyInfo {
-		buf.Write(marshalAVP(284, v, false, false))
+		if v != nil {
+			if groupedData, err := v.Marshal(); err == nil {
+				buf.Write(marshalAVP(284, models_base.Grouped(groupedData), true, false))
+			}
+		}
 	}
 
 	// Marshal RouteRecord (repeated)
 	for _, v := range m.RouteRecord {
-		buf.Write(marshalAVP(282, v, false, false))
+		buf.Write(marshalAVP(282, v, true, false))
 	}
 
 	// Get the final message
@@ -3581,7 +6131,12 @@ func (m *PurgeUERequest) Unmarshal(data []byte) error {
 
 		// Extract AVP data
 		headerSize := 8
+		var vendorID uint32
 		if avpFlags&0x80 != 0 { // V-bit set
+			if len(avpData) < 12 {
+				return fmt.Errorf("AVP data too short for vendor ID")
+			}
+			vendorID = binary.BigEndian.Uint32(avpData[8:12])
 			headerSize = 12
 		}
 		avpDataLen := int(avpLength) - headerSize
@@ -3590,24 +6145,12 @@ func (m *PurgeUERequest) Unmarshal(data []byte) error {
 		}
 		avpValue := avpData[headerSize : headerSize+avpDataLen]
 
-		// Parse AVP based on code
+		// Parse AVP based on code and vendor ID
 		switch avpCode {
 		case 263: // Session-Id
 			val, err := models_base.DecodeUTF8String(avpValue)
 			if err == nil {
 				m.SessionId = val.(models_base.UTF8String)
-			}
-		case 301: // DRMP
-			val, err := models_base.DecodeEnumerated(avpValue)
-			if err == nil {
-				v := val.(models_base.Enumerated)
-				m.Drmp = &v
-			}
-		case 260: // Vendor-Specific-Application-Id
-			val, err := models_base.DecodeGrouped(avpValue)
-			if err == nil {
-				v := val.(models_base.Grouped)
-				m.VendorSpecificApplicationId = &v
 			}
 		case 277: // Auth-Session-State
 			val, err := models_base.DecodeEnumerated(avpValue)
@@ -3624,12 +6167,6 @@ func (m *PurgeUERequest) Unmarshal(data []byte) error {
 			if err == nil {
 				m.OriginRealm = val.(models_base.DiameterIdentity)
 			}
-		case 293: // Destination-Host
-			val, err := models_base.DecodeDiameterIdentity(avpValue)
-			if err == nil {
-				v := val.(models_base.DiameterIdentity)
-				m.DestinationHost = &v
-			}
 		case 283: // Destination-Realm
 			val, err := models_base.DecodeDiameterIdentity(avpValue)
 			if err == nil {
@@ -3640,33 +6177,35 @@ func (m *PurgeUERequest) Unmarshal(data []byte) error {
 			if err == nil {
 				m.UserName = val.(models_base.UTF8String)
 			}
-		case 621: // OC-Supported-Features
-			val, err := models_base.DecodeGrouped(avpValue)
-			if err == nil {
-				v := val.(models_base.Grouped)
-				m.OcSupportedFeatures = &v
+		// case 0: // DRMP (AVP code not defined)
+		case 260: // Vendor-Specific-Application-Id
+			grouped := &VendorSpecificApplicationId{}
+			if err := grouped.Unmarshal(avpValue); err == nil {
+				m.VendorSpecificApplicationId = grouped
 			}
+		case 293: // Destination-Host
+			val, err := models_base.DecodeDiameterIdentity(avpValue)
+			if err == nil {
+				v := val.(models_base.DiameterIdentity)
+				m.DestinationHost = &v
+			}
+		// case 0: // OC-Supported-Features (AVP code not defined)
 		case 1635: // PUR-Flags
+			if vendorID != 10415 {
+				break // Vendor ID mismatch
+			}
 			val, err := models_base.DecodeUnsigned32(avpValue)
 			if err == nil {
 				v := val.(models_base.Unsigned32)
 				m.PurFlags = &v
 			}
-		case 628: // Supported-Features
-			val, err := models_base.DecodeGrouped(avpValue)
-			if err == nil {
-				m.SupportedFeatures = append(m.SupportedFeatures, val.(models_base.Grouped))
-			}
-		case 1496: // EPS-Location-Information
-			val, err := models_base.DecodeGrouped(avpValue)
-			if err == nil {
-				v := val.(models_base.Grouped)
-				m.EpsLocationInformation = &v
-			}
+		// case 0: // Supported-Features (AVP code not defined)
+		// case 0: // EPS-Location-Information (AVP code not defined)
+		// case 0: // AVP (AVP code not defined)
 		case 284: // Proxy-Info
-			val, err := models_base.DecodeGrouped(avpValue)
-			if err == nil {
-				m.ProxyInfo = append(m.ProxyInfo, val.(models_base.Grouped))
+			grouped := &ProxyInfo{}
+			if err := grouped.Unmarshal(avpValue); err == nil {
+				m.ProxyInfo = append(m.ProxyInfo, grouped)
 			}
 		case 282: // Route-Record
 			val, err := models_base.DecodeDiameterIdentity(avpValue)
@@ -3697,7 +6236,7 @@ func (m *PurgeUERequest) Len() int {
 
 // String returns a string representation of PurgeUERequest
 func (m *PurgeUERequest) String() string {
-	return fmt.Sprintf("PurgeUERequest{SessionId:%v, Drmp:%v, VendorSpecificApplicationId:%v, AuthSessionState:%v, OriginHost:%v, OriginRealm:%v, DestinationHost:%v, DestinationRealm:%v, UserName:%v, OcSupportedFeatures:%v, PurFlags:%v, SupportedFeatures:%v, EpsLocationInformation:%v, ProxyInfo:%v, RouteRecord:%v}", m.SessionId, m.Drmp, m.VendorSpecificApplicationId, m.AuthSessionState, m.OriginHost, m.OriginRealm, m.DestinationHost, m.DestinationRealm, m.UserName, m.OcSupportedFeatures, m.PurFlags, m.SupportedFeatures, m.EpsLocationInformation, m.ProxyInfo, m.RouteRecord)
+	return fmt.Sprintf("PurgeUERequest{SessionId:%v, AuthSessionState:%v, OriginHost:%v, OriginRealm:%v, DestinationRealm:%v, UserName:%v, Drmp:%v, VendorSpecificApplicationId:%v, DestinationHost:%v, OcSupportedFeatures:%v, PurFlags:%v, SupportedFeatures:%v, EpsLocationInformation:%v, Avp:%v, ProxyInfo:%v, RouteRecord:%v}", m.SessionId, m.AuthSessionState, m.OriginHost, m.OriginRealm, m.DestinationRealm, m.UserName, m.Drmp, m.VendorSpecificApplicationId, m.DestinationHost, m.OcSupportedFeatures, m.PurFlags, m.SupportedFeatures, m.EpsLocationInformation, m.Avp, m.ProxyInfo, m.RouteRecord)
 }
 
 // PurgeUEAnswer represents the Purge-UE-Answer (PUA) Diameter command
@@ -3706,20 +6245,21 @@ type PurgeUEAnswer struct {
 	Header DiameterHeader
 
 	SessionId                   models_base.UTF8String         // Required
-	Drmp                        *models_base.Enumerated        // Optional
-	VendorSpecificApplicationId *models_base.Grouped           // Optional
-	SupportedFeatures           []models_base.Grouped          // Optional
-	ResultCode                  *models_base.Unsigned32        // Optional
-	ExperimentalResult          *models_base.Grouped           // Optional
 	AuthSessionState            models_base.Enumerated         // Required
 	OriginHost                  models_base.DiameterIdentity   // Required
 	OriginRealm                 models_base.DiameterIdentity   // Required
-	OcSupportedFeatures         *models_base.Grouped           // Optional
-	OcOlr                       *models_base.Grouped           // Optional
-	Load                        []models_base.Grouped          // Optional
+	Drmp                        *models_base.OctetString       // Optional - WARNING: AVP code not defined, DO NOT USE
+	VendorSpecificApplicationId *VendorSpecificApplicationId   // Optional
+	SupportedFeatures           []models_base.OctetString      // Optional - WARNING: AVP code not defined, DO NOT USE
+	ResultCode                  *models_base.Unsigned32        // Optional
+	ExperimentalResult          *ExperimentalResult            // Optional
+	OcSupportedFeatures         *models_base.OctetString       // Optional - WARNING: AVP code not defined, DO NOT USE
+	OcOlr                       *models_base.OctetString       // Optional - WARNING: AVP code not defined, DO NOT USE
+	Load                        []models_base.OctetString      // Optional - WARNING: AVP code not defined, DO NOT USE
 	PuaFlags                    *models_base.Unsigned32        // Optional
-	FailedAvp                   *models_base.Grouped           // Optional
-	ProxyInfo                   []models_base.Grouped          // Optional
+	Avp                         []models_base.OctetString      // Optional - WARNING: AVP code not defined, DO NOT USE
+	FailedAvp                   *FailedAVP                     // Optional
+	ProxyInfo                   []*ProxyInfo                   // Optional
 	RouteRecord                 []models_base.DiameterIdentity // Optional
 }
 
@@ -3773,31 +6313,6 @@ func (m *PurgeUEAnswer) Marshal() ([]byte, error) {
 	// Marshal SessionId (required)
 	buf.Write(marshalAVP(263, m.SessionId, true, false))
 
-	// Marshal Drmp (optional)
-	if m.Drmp != nil {
-		buf.Write(marshalAVP(301, *m.Drmp, false, false))
-	}
-
-	// Marshal VendorSpecificApplicationId (optional)
-	if m.VendorSpecificApplicationId != nil {
-		buf.Write(marshalAVP(260, *m.VendorSpecificApplicationId, false, false))
-	}
-
-	// Marshal SupportedFeatures (repeated)
-	for _, v := range m.SupportedFeatures {
-		buf.Write(marshalAVP(628, v, false, false))
-	}
-
-	// Marshal ResultCode (optional)
-	if m.ResultCode != nil {
-		buf.Write(marshalAVP(268, *m.ResultCode, true, false))
-	}
-
-	// Marshal ExperimentalResult (optional)
-	if m.ExperimentalResult != nil {
-		buf.Write(marshalAVP(297, *m.ExperimentalResult, true, false))
-	}
-
 	// Marshal AuthSessionState (required)
 	buf.Write(marshalAVP(277, m.AuthSessionState, true, false))
 
@@ -3807,39 +6322,79 @@ func (m *PurgeUEAnswer) Marshal() ([]byte, error) {
 	// Marshal OriginRealm (required)
 	buf.Write(marshalAVP(296, m.OriginRealm, true, false))
 
+	// Marshal Drmp (optional)
+	if m.Drmp != nil {
+		buf.Write(marshalAVP(0, *m.Drmp, false, false))
+	}
+
+	// Marshal VendorSpecificApplicationId (grouped)
+	if m.VendorSpecificApplicationId != nil {
+		if groupedData, err := m.VendorSpecificApplicationId.Marshal(); err == nil {
+			buf.Write(marshalAVP(260, models_base.Grouped(groupedData), true, false))
+		}
+	}
+
+	// Marshal SupportedFeatures (repeated)
+	for _, v := range m.SupportedFeatures {
+		buf.Write(marshalAVP(0, v, false, false))
+	}
+
+	// Marshal ResultCode (optional)
+	if m.ResultCode != nil {
+		buf.Write(marshalAVP(268, *m.ResultCode, true, false))
+	}
+
+	// Marshal ExperimentalResult (grouped)
+	if m.ExperimentalResult != nil {
+		if groupedData, err := m.ExperimentalResult.Marshal(); err == nil {
+			buf.Write(marshalAVP(297, models_base.Grouped(groupedData), true, false))
+		}
+	}
+
 	// Marshal OcSupportedFeatures (optional)
 	if m.OcSupportedFeatures != nil {
-		buf.Write(marshalAVP(621, *m.OcSupportedFeatures, false, false))
+		buf.Write(marshalAVP(0, *m.OcSupportedFeatures, false, false))
 	}
 
 	// Marshal OcOlr (optional)
 	if m.OcOlr != nil {
-		buf.Write(marshalAVP(623, *m.OcOlr, false, false))
+		buf.Write(marshalAVP(0, *m.OcOlr, false, false))
 	}
 
 	// Marshal Load (repeated)
 	for _, v := range m.Load {
-		buf.Write(marshalAVP(650, v, false, false))
+		buf.Write(marshalAVP(0, v, false, false))
 	}
 
 	// Marshal PuaFlags (optional)
 	if m.PuaFlags != nil {
-		buf.Write(marshalAVP(1442, *m.PuaFlags, true, false))
+		buf.Write(marshalAVPWithVendor(1442, *m.PuaFlags, true, false, 10415))
 	}
 
-	// Marshal FailedAvp (optional)
+	// Marshal Avp (repeated)
+	for _, v := range m.Avp {
+		buf.Write(marshalAVP(0, v, false, false))
+	}
+
+	// Marshal FailedAvp (grouped)
 	if m.FailedAvp != nil {
-		buf.Write(marshalAVP(279, *m.FailedAvp, false, false))
+		if groupedData, err := m.FailedAvp.Marshal(); err == nil {
+			buf.Write(marshalAVP(279, models_base.Grouped(groupedData), true, false))
+		}
 	}
 
-	// Marshal ProxyInfo (repeated)
+	// Marshal ProxyInfo (repeated, grouped)
 	for _, v := range m.ProxyInfo {
-		buf.Write(marshalAVP(284, v, false, false))
+		if v != nil {
+			if groupedData, err := v.Marshal(); err == nil {
+				buf.Write(marshalAVP(284, models_base.Grouped(groupedData), true, false))
+			}
+		}
 	}
 
 	// Marshal RouteRecord (repeated)
 	for _, v := range m.RouteRecord {
-		buf.Write(marshalAVP(282, v, false, false))
+		buf.Write(marshalAVP(282, v, true, false))
 	}
 
 	// Get the final message
@@ -3884,7 +6439,12 @@ func (m *PurgeUEAnswer) Unmarshal(data []byte) error {
 
 		// Extract AVP data
 		headerSize := 8
+		var vendorID uint32
 		if avpFlags&0x80 != 0 { // V-bit set
+			if len(avpData) < 12 {
+				return fmt.Errorf("AVP data too short for vendor ID")
+			}
+			vendorID = binary.BigEndian.Uint32(avpData[8:12])
 			headerSize = 12
 		}
 		avpDataLen := int(avpLength) - headerSize
@@ -3893,41 +6453,12 @@ func (m *PurgeUEAnswer) Unmarshal(data []byte) error {
 		}
 		avpValue := avpData[headerSize : headerSize+avpDataLen]
 
-		// Parse AVP based on code
+		// Parse AVP based on code and vendor ID
 		switch avpCode {
 		case 263: // Session-Id
 			val, err := models_base.DecodeUTF8String(avpValue)
 			if err == nil {
 				m.SessionId = val.(models_base.UTF8String)
-			}
-		case 301: // DRMP
-			val, err := models_base.DecodeEnumerated(avpValue)
-			if err == nil {
-				v := val.(models_base.Enumerated)
-				m.Drmp = &v
-			}
-		case 260: // Vendor-Specific-Application-Id
-			val, err := models_base.DecodeGrouped(avpValue)
-			if err == nil {
-				v := val.(models_base.Grouped)
-				m.VendorSpecificApplicationId = &v
-			}
-		case 628: // Supported-Features
-			val, err := models_base.DecodeGrouped(avpValue)
-			if err == nil {
-				m.SupportedFeatures = append(m.SupportedFeatures, val.(models_base.Grouped))
-			}
-		case 268: // Result-Code
-			val, err := models_base.DecodeUnsigned32(avpValue)
-			if err == nil {
-				v := val.(models_base.Unsigned32)
-				m.ResultCode = &v
-			}
-		case 297: // Experimental-Result
-			val, err := models_base.DecodeGrouped(avpValue)
-			if err == nil {
-				v := val.(models_base.Grouped)
-				m.ExperimentalResult = &v
 			}
 		case 277: // Auth-Session-State
 			val, err := models_base.DecodeEnumerated(avpValue)
@@ -3944,39 +6475,46 @@ func (m *PurgeUEAnswer) Unmarshal(data []byte) error {
 			if err == nil {
 				m.OriginRealm = val.(models_base.DiameterIdentity)
 			}
-		case 621: // OC-Supported-Features
-			val, err := models_base.DecodeGrouped(avpValue)
-			if err == nil {
-				v := val.(models_base.Grouped)
-				m.OcSupportedFeatures = &v
+		// case 0: // DRMP (AVP code not defined)
+		case 260: // Vendor-Specific-Application-Id
+			grouped := &VendorSpecificApplicationId{}
+			if err := grouped.Unmarshal(avpValue); err == nil {
+				m.VendorSpecificApplicationId = grouped
 			}
-		case 623: // OC-OLR
-			val, err := models_base.DecodeGrouped(avpValue)
+		// case 0: // Supported-Features (AVP code not defined)
+		case 268: // Result-Code
+			val, err := models_base.DecodeUnsigned32(avpValue)
 			if err == nil {
-				v := val.(models_base.Grouped)
-				m.OcOlr = &v
+				v := val.(models_base.Unsigned32)
+				m.ResultCode = &v
 			}
-		case 650: // Load
-			val, err := models_base.DecodeGrouped(avpValue)
-			if err == nil {
-				m.Load = append(m.Load, val.(models_base.Grouped))
+		case 297: // Experimental-Result
+			grouped := &ExperimentalResult{}
+			if err := grouped.Unmarshal(avpValue); err == nil {
+				m.ExperimentalResult = grouped
 			}
+		// case 0: // OC-Supported-Features (AVP code not defined)
+		// case 0: // OC-OLR (AVP code not defined)
+		// case 0: // Load (AVP code not defined)
 		case 1442: // PUA-Flags
+			if vendorID != 10415 {
+				break // Vendor ID mismatch
+			}
 			val, err := models_base.DecodeUnsigned32(avpValue)
 			if err == nil {
 				v := val.(models_base.Unsigned32)
 				m.PuaFlags = &v
 			}
+		// case 0: // AVP (AVP code not defined)
 		case 279: // Failed-AVP
-			val, err := models_base.DecodeGrouped(avpValue)
-			if err == nil {
-				v := val.(models_base.Grouped)
-				m.FailedAvp = &v
+			grouped := &FailedAVP{}
+			if err := grouped.Unmarshal(avpValue); err == nil {
+				m.FailedAvp = grouped
 			}
 		case 284: // Proxy-Info
-			val, err := models_base.DecodeGrouped(avpValue)
-			if err == nil {
-				m.ProxyInfo = append(m.ProxyInfo, val.(models_base.Grouped))
+			grouped := &ProxyInfo{}
+			if err := grouped.Unmarshal(avpValue); err == nil {
+				m.ProxyInfo = append(m.ProxyInfo, grouped)
 			}
 		case 282: // Route-Record
 			val, err := models_base.DecodeDiameterIdentity(avpValue)
@@ -4007,7 +6545,7 @@ func (m *PurgeUEAnswer) Len() int {
 
 // String returns a string representation of PurgeUEAnswer
 func (m *PurgeUEAnswer) String() string {
-	return fmt.Sprintf("PurgeUEAnswer{SessionId:%v, Drmp:%v, VendorSpecificApplicationId:%v, SupportedFeatures:%v, ResultCode:%v, ExperimentalResult:%v, AuthSessionState:%v, OriginHost:%v, OriginRealm:%v, OcSupportedFeatures:%v, OcOlr:%v, Load:%v, PuaFlags:%v, FailedAvp:%v, ProxyInfo:%v, RouteRecord:%v}", m.SessionId, m.Drmp, m.VendorSpecificApplicationId, m.SupportedFeatures, m.ResultCode, m.ExperimentalResult, m.AuthSessionState, m.OriginHost, m.OriginRealm, m.OcSupportedFeatures, m.OcOlr, m.Load, m.PuaFlags, m.FailedAvp, m.ProxyInfo, m.RouteRecord)
+	return fmt.Sprintf("PurgeUEAnswer{SessionId:%v, AuthSessionState:%v, OriginHost:%v, OriginRealm:%v, Drmp:%v, VendorSpecificApplicationId:%v, SupportedFeatures:%v, ResultCode:%v, ExperimentalResult:%v, OcSupportedFeatures:%v, OcOlr:%v, Load:%v, PuaFlags:%v, Avp:%v, FailedAvp:%v, ProxyInfo:%v, RouteRecord:%v}", m.SessionId, m.AuthSessionState, m.OriginHost, m.OriginRealm, m.Drmp, m.VendorSpecificApplicationId, m.SupportedFeatures, m.ResultCode, m.ExperimentalResult, m.OcSupportedFeatures, m.OcOlr, m.Load, m.PuaFlags, m.Avp, m.FailedAvp, m.ProxyInfo, m.RouteRecord)
 }
 
 // ResetRequest represents the Reset-Request (RR) Diameter command
@@ -4016,18 +6554,20 @@ type ResetRequest struct {
 	Header DiameterHeader
 
 	SessionId                   models_base.UTF8String         // Required
-	Drmp                        *models_base.Enumerated        // Optional
-	VendorSpecificApplicationId *models_base.Grouped           // Optional
 	AuthSessionState            models_base.Enumerated         // Required
 	OriginHost                  models_base.DiameterIdentity   // Required
 	OriginRealm                 models_base.DiameterIdentity   // Required
 	DestinationHost             models_base.DiameterIdentity   // Required
 	DestinationRealm            models_base.DiameterIdentity   // Required
-	SupportedFeatures           []models_base.Grouped          // Optional
-	UserId                      []models_base.UTF8String       // Optional
-	ResetId                     []models_base.OctetString      // Optional
-	SubscriptionData            *models_base.Grouped           // Optional
-	ProxyInfo                   []models_base.Grouped          // Optional
+	Drmp                        *models_base.OctetString       // Optional - WARNING: AVP code not defined, DO NOT USE
+	VendorSpecificApplicationId *VendorSpecificApplicationId   // Optional
+	SupportedFeatures           []models_base.OctetString      // Optional - WARNING: AVP code not defined, DO NOT USE
+	UserId                      []models_base.OctetString      // Optional - WARNING: AVP code not defined, DO NOT USE
+	ResetId                     []models_base.OctetString      // Optional - WARNING: AVP code not defined, DO NOT USE
+	SubscriptionData            *SubscriptionData              // Optional
+	SubscriptionDataDeletion    *models_base.OctetString       // Optional - WARNING: AVP code not defined, DO NOT USE
+	Avp                         []models_base.OctetString      // Optional - WARNING: AVP code not defined, DO NOT USE
+	ProxyInfo                   []*ProxyInfo                   // Optional
 	RouteRecord                 []models_base.DiameterIdentity // Optional
 }
 
@@ -4087,16 +6627,6 @@ func (m *ResetRequest) Marshal() ([]byte, error) {
 	// Marshal SessionId (required)
 	buf.Write(marshalAVP(263, m.SessionId, true, false))
 
-	// Marshal Drmp (optional)
-	if m.Drmp != nil {
-		buf.Write(marshalAVP(301, *m.Drmp, false, false))
-	}
-
-	// Marshal VendorSpecificApplicationId (optional)
-	if m.VendorSpecificApplicationId != nil {
-		buf.Write(marshalAVP(260, *m.VendorSpecificApplicationId, false, false))
-	}
-
 	// Marshal AuthSessionState (required)
 	buf.Write(marshalAVP(277, m.AuthSessionState, true, false))
 
@@ -4107,39 +6637,67 @@ func (m *ResetRequest) Marshal() ([]byte, error) {
 	buf.Write(marshalAVP(296, m.OriginRealm, true, false))
 
 	// Marshal DestinationHost (required)
-	buf.Write(marshalAVP(293, m.DestinationHost, false, false))
+	buf.Write(marshalAVP(293, m.DestinationHost, true, false))
 
 	// Marshal DestinationRealm (required)
 	buf.Write(marshalAVP(283, m.DestinationRealm, true, false))
 
+	// Marshal Drmp (optional)
+	if m.Drmp != nil {
+		buf.Write(marshalAVP(0, *m.Drmp, false, false))
+	}
+
+	// Marshal VendorSpecificApplicationId (grouped)
+	if m.VendorSpecificApplicationId != nil {
+		if groupedData, err := m.VendorSpecificApplicationId.Marshal(); err == nil {
+			buf.Write(marshalAVP(260, models_base.Grouped(groupedData), true, false))
+		}
+	}
+
 	// Marshal SupportedFeatures (repeated)
 	for _, v := range m.SupportedFeatures {
-		buf.Write(marshalAVP(628, v, false, false))
+		buf.Write(marshalAVP(0, v, false, false))
 	}
 
 	// Marshal UserId (repeated)
 	for _, v := range m.UserId {
-		buf.Write(marshalAVP(1444, v, false, false))
+		buf.Write(marshalAVP(0, v, false, false))
 	}
 
 	// Marshal ResetId (repeated)
 	for _, v := range m.ResetId {
-		buf.Write(marshalAVP(1670, v, false, false))
+		buf.Write(marshalAVP(0, v, false, false))
 	}
 
-	// Marshal SubscriptionData (optional)
+	// Marshal SubscriptionData (grouped)
 	if m.SubscriptionData != nil {
-		buf.Write(marshalAVP(1400, *m.SubscriptionData, true, false))
+		if groupedData, err := m.SubscriptionData.Marshal(); err == nil {
+			buf.Write(marshalAVPWithVendor(1400, models_base.Grouped(groupedData), true, false, 10415))
+		}
 	}
 
-	// Marshal ProxyInfo (repeated)
+	// Marshal SubscriptionDataDeletion (optional)
+	if m.SubscriptionDataDeletion != nil {
+		buf.Write(marshalAVP(0, *m.SubscriptionDataDeletion, false, false))
+	}
+
+	// Marshal Avp (repeated)
+	for _, v := range m.Avp {
+		buf.Write(marshalAVP(0, v, false, false))
+	}
+
+	// Marshal ProxyInfo (repeated, grouped)
 	for _, v := range m.ProxyInfo {
-		buf.Write(marshalAVP(284, v, false, false))
+		if v != nil {
+			if groupedData, err := v.Marshal(); err == nil {
+				buf.Write(marshalAVP(284, models_base.Grouped(groupedData), true, false))
+			}
+		}
 	}
 
 	// Marshal RouteRecord (repeated)
 	for _, v := range m.RouteRecord {
-		buf.Write(marshalAVP(282, v, false, false))
+		buf.Write(marshalAVP(282, v, true, false))
 	}
 
 	// Get the final message
@@ -4184,7 +6742,12 @@ func (m *ResetRequest) Unmarshal(data []byte) error {
 
 		// Extract AVP data
 		headerSize := 8
+		var vendorID uint32
 		if avpFlags&0x80 != 0 { // V-bit set
+			if len(avpData) < 12 {
+				return fmt.Errorf("AVP data too short for vendor ID")
+			}
+			vendorID = binary.BigEndian.Uint32(avpData[8:12])
 			headerSize = 12
 		}
 		avpDataLen := int(avpLength) - headerSize
@@ -4193,24 +6756,12 @@ func (m *ResetRequest) Unmarshal(data []byte) error {
 		}
 		avpValue := avpData[headerSize : headerSize+avpDataLen]
 
-		// Parse AVP based on code
+		// Parse AVP based on code and vendor ID
 		switch avpCode {
 		case 263: // Session-Id
 			val, err := models_base.DecodeUTF8String(avpValue)
 			if err == nil {
 				m.SessionId = val.(models_base.UTF8String)
-			}
-		case 301: // DRMP
-			val, err := models_base.DecodeEnumerated(avpValue)
-			if err == nil {
-				v := val.(models_base.Enumerated)
-				m.Drmp = &v
-			}
-		case 260: // Vendor-Specific-Application-Id
-			val, err := models_base.DecodeGrouped(avpValue)
-			if err == nil {
-				v := val.(models_base.Grouped)
-				m.VendorSpecificApplicationId = &v
 			}
 		case 277: // Auth-Session-State
 			val, err := models_base.DecodeEnumerated(avpValue)
@@ -4237,31 +6788,29 @@ func (m *ResetRequest) Unmarshal(data []byte) error {
 			if err == nil {
 				m.DestinationRealm = val.(models_base.DiameterIdentity)
 			}
-		case 628: // Supported-Features
-			val, err := models_base.DecodeGrouped(avpValue)
-			if err == nil {
-				m.SupportedFeatures = append(m.SupportedFeatures, val.(models_base.Grouped))
+		// case 0: // DRMP (AVP code not defined)
+		case 260: // Vendor-Specific-Application-Id
+			grouped := &VendorSpecificApplicationId{}
+			if err := grouped.Unmarshal(avpValue); err == nil {
+				m.VendorSpecificApplicationId = grouped
 			}
-		case 1444: // User-Id
-			val, err := models_base.DecodeUTF8String(avpValue)
-			if err == nil {
-				m.UserId = append(m.UserId, val.(models_base.UTF8String))
-			}
-		case 1670: // Reset-ID
-			val, err := models_base.DecodeOctetString(avpValue)
-			if err == nil {
-				m.ResetId = append(m.ResetId, val.(models_base.OctetString))
-			}
+		// case 0: // Supported-Features (AVP code not defined)
+		// case 0: // User-Id (AVP code not defined)
+		// case 0: // Reset-ID (AVP code not defined)
 		case 1400: // Subscription-Data
-			val, err := models_base.DecodeGrouped(avpValue)
-			if err == nil {
-				v := val.(models_base.Grouped)
-				m.SubscriptionData = &v
+			if vendorID != 10415 {
+				break // Vendor ID mismatch
 			}
+			grouped := &SubscriptionData{}
+			if err := grouped.Unmarshal(avpValue); err == nil {
+				m.SubscriptionData = grouped
+			}
+		// case 0: // Subscription-Data-Deletion (AVP code not defined)
+		// case 0: // AVP (AVP code not defined)
 		case 284: // Proxy-Info
-			val, err := models_base.DecodeGrouped(avpValue)
-			if err == nil {
-				m.ProxyInfo = append(m.ProxyInfo, val.(models_base.Grouped))
+			grouped := &ProxyInfo{}
+			if err := grouped.Unmarshal(avpValue); err == nil {
+				m.ProxyInfo = append(m.ProxyInfo, grouped)
 			}
 		case 282: // Route-Record
 			val, err := models_base.DecodeDiameterIdentity(avpValue)
@@ -4292,7 +6841,7 @@ func (m *ResetRequest) Len() int {
 
 // String returns a string representation of ResetRequest
 func (m *ResetRequest) String() string {
-	return fmt.Sprintf("ResetRequest{SessionId:%v, Drmp:%v, VendorSpecificApplicationId:%v, AuthSessionState:%v, OriginHost:%v, OriginRealm:%v, DestinationHost:%v, DestinationRealm:%v, SupportedFeatures:%v, UserId:%v, ResetId:%v, SubscriptionData:%v, ProxyInfo:%v, RouteRecord:%v}", m.SessionId, m.Drmp, m.VendorSpecificApplicationId, m.AuthSessionState, m.OriginHost, m.OriginRealm, m.DestinationHost, m.DestinationRealm, m.SupportedFeatures, m.UserId, m.ResetId, m.SubscriptionData, m.ProxyInfo, m.RouteRecord)
+	return fmt.Sprintf("ResetRequest{SessionId:%v, AuthSessionState:%v, OriginHost:%v, OriginRealm:%v, DestinationHost:%v, DestinationRealm:%v, Drmp:%v, VendorSpecificApplicationId:%v, SupportedFeatures:%v, UserId:%v, ResetId:%v, SubscriptionData:%v, SubscriptionDataDeletion:%v, Avp:%v, ProxyInfo:%v, RouteRecord:%v}", m.SessionId, m.AuthSessionState, m.OriginHost, m.OriginRealm, m.DestinationHost, m.DestinationRealm, m.Drmp, m.VendorSpecificApplicationId, m.SupportedFeatures, m.UserId, m.ResetId, m.SubscriptionData, m.SubscriptionDataDeletion, m.Avp, m.ProxyInfo, m.RouteRecord)
 }
 
 // ResetAnswer represents the Reset-Answer (RA) Diameter command
@@ -4301,16 +6850,17 @@ type ResetAnswer struct {
 	Header DiameterHeader
 
 	SessionId                   models_base.UTF8String         // Required
-	Drmp                        *models_base.Enumerated        // Optional
-	VendorSpecificApplicationId *models_base.Grouped           // Optional
-	SupportedFeatures           []models_base.Grouped          // Optional
-	ResultCode                  *models_base.Unsigned32        // Optional
-	ExperimentalResult          *models_base.Grouped           // Optional
 	AuthSessionState            models_base.Enumerated         // Required
 	OriginHost                  models_base.DiameterIdentity   // Required
 	OriginRealm                 models_base.DiameterIdentity   // Required
-	FailedAvp                   *models_base.Grouped           // Optional
-	ProxyInfo                   []models_base.Grouped          // Optional
+	Drmp                        *models_base.OctetString       // Optional - WARNING: AVP code not defined, DO NOT USE
+	VendorSpecificApplicationId *VendorSpecificApplicationId   // Optional
+	SupportedFeatures           []models_base.OctetString      // Optional - WARNING: AVP code not defined, DO NOT USE
+	ResultCode                  *models_base.Unsigned32        // Optional
+	ExperimentalResult          *ExperimentalResult            // Optional
+	Avp                         []models_base.OctetString      // Optional - WARNING: AVP code not defined, DO NOT USE
+	FailedAvp                   *FailedAVP                     // Optional
+	ProxyInfo                   []*ProxyInfo                   // Optional
 	RouteRecord                 []models_base.DiameterIdentity // Optional
 }
 
@@ -4364,31 +6914,6 @@ func (m *ResetAnswer) Marshal() ([]byte, error) {
 	// Marshal SessionId (required)
 	buf.Write(marshalAVP(263, m.SessionId, true, false))
 
-	// Marshal Drmp (optional)
-	if m.Drmp != nil {
-		buf.Write(marshalAVP(301, *m.Drmp, false, false))
-	}
-
-	// Marshal VendorSpecificApplicationId (optional)
-	if m.VendorSpecificApplicationId != nil {
-		buf.Write(marshalAVP(260, *m.VendorSpecificApplicationId, false, false))
-	}
-
-	// Marshal SupportedFeatures (repeated)
-	for _, v := range m.SupportedFeatures {
-		buf.Write(marshalAVP(628, v, false, false))
-	}
-
-	// Marshal ResultCode (optional)
-	if m.ResultCode != nil {
-		buf.Write(marshalAVP(268, *m.ResultCode, true, false))
-	}
-
-	// Marshal ExperimentalResult (optional)
-	if m.ExperimentalResult != nil {
-		buf.Write(marshalAVP(297, *m.ExperimentalResult, true, false))
-	}
-
 	// Marshal AuthSessionState (required)
 	buf.Write(marshalAVP(277, m.AuthSessionState, true, false))
 
@@ -4398,19 +6923,59 @@ func (m *ResetAnswer) Marshal() ([]byte, error) {
 	// Marshal OriginRealm (required)
 	buf.Write(marshalAVP(296, m.OriginRealm, true, false))
 
-	// Marshal FailedAvp (optional)
-	if m.FailedAvp != nil {
-		buf.Write(marshalAVP(279, *m.FailedAvp, false, false))
+	// Marshal Drmp (optional)
+	if m.Drmp != nil {
+		buf.Write(marshalAVP(0, *m.Drmp, false, false))
 	}
 
-	// Marshal ProxyInfo (repeated)
+	// Marshal VendorSpecificApplicationId (grouped)
+	if m.VendorSpecificApplicationId != nil {
+		if groupedData, err := m.VendorSpecificApplicationId.Marshal(); err == nil {
+			buf.Write(marshalAVP(260, models_base.Grouped(groupedData), true, false))
+		}
+	}
+
+	// Marshal SupportedFeatures (repeated)
+	for _, v := range m.SupportedFeatures {
+		buf.Write(marshalAVP(0, v, false, false))
+	}
+
+	// Marshal ResultCode (optional)
+	if m.ResultCode != nil {
+		buf.Write(marshalAVP(268, *m.ResultCode, true, false))
+	}
+
+	// Marshal ExperimentalResult (grouped)
+	if m.ExperimentalResult != nil {
+		if groupedData, err := m.ExperimentalResult.Marshal(); err == nil {
+			buf.Write(marshalAVP(297, models_base.Grouped(groupedData), true, false))
+		}
+	}
+
+	// Marshal Avp (repeated)
+	for _, v := range m.Avp {
+		buf.Write(marshalAVP(0, v, false, false))
+	}
+
+	// Marshal FailedAvp (grouped)
+	if m.FailedAvp != nil {
+		if groupedData, err := m.FailedAvp.Marshal(); err == nil {
+			buf.Write(marshalAVP(279, models_base.Grouped(groupedData), true, false))
+		}
+	}
+
+	// Marshal ProxyInfo (repeated, grouped)
 	for _, v := range m.ProxyInfo {
-		buf.Write(marshalAVP(284, v, false, false))
+		if v != nil {
+			if groupedData, err := v.Marshal(); err == nil {
+				buf.Write(marshalAVP(284, models_base.Grouped(groupedData), true, false))
+			}
+		}
 	}
 
 	// Marshal RouteRecord (repeated)
 	for _, v := range m.RouteRecord {
-		buf.Write(marshalAVP(282, v, false, false))
+		buf.Write(marshalAVP(282, v, true, false))
 	}
 
 	// Get the final message
@@ -4456,6 +7021,10 @@ func (m *ResetAnswer) Unmarshal(data []byte) error {
 		// Extract AVP data
 		headerSize := 8
 		if avpFlags&0x80 != 0 { // V-bit set
+			if len(avpData) < 12 {
+				return fmt.Errorf("AVP data too short for vendor ID")
+			}
+			_ = binary.BigEndian.Uint32(avpData[8:12]) // vendorID not used
 			headerSize = 12
 		}
 		avpDataLen := int(avpLength) - headerSize
@@ -4464,41 +7033,12 @@ func (m *ResetAnswer) Unmarshal(data []byte) error {
 		}
 		avpValue := avpData[headerSize : headerSize+avpDataLen]
 
-		// Parse AVP based on code
+		// Parse AVP based on code and vendor ID
 		switch avpCode {
 		case 263: // Session-Id
 			val, err := models_base.DecodeUTF8String(avpValue)
 			if err == nil {
 				m.SessionId = val.(models_base.UTF8String)
-			}
-		case 301: // DRMP
-			val, err := models_base.DecodeEnumerated(avpValue)
-			if err == nil {
-				v := val.(models_base.Enumerated)
-				m.Drmp = &v
-			}
-		case 260: // Vendor-Specific-Application-Id
-			val, err := models_base.DecodeGrouped(avpValue)
-			if err == nil {
-				v := val.(models_base.Grouped)
-				m.VendorSpecificApplicationId = &v
-			}
-		case 628: // Supported-Features
-			val, err := models_base.DecodeGrouped(avpValue)
-			if err == nil {
-				m.SupportedFeatures = append(m.SupportedFeatures, val.(models_base.Grouped))
-			}
-		case 268: // Result-Code
-			val, err := models_base.DecodeUnsigned32(avpValue)
-			if err == nil {
-				v := val.(models_base.Unsigned32)
-				m.ResultCode = &v
-			}
-		case 297: // Experimental-Result
-			val, err := models_base.DecodeGrouped(avpValue)
-			if err == nil {
-				v := val.(models_base.Grouped)
-				m.ExperimentalResult = &v
 			}
 		case 277: // Auth-Session-State
 			val, err := models_base.DecodeEnumerated(avpValue)
@@ -4515,16 +7055,34 @@ func (m *ResetAnswer) Unmarshal(data []byte) error {
 			if err == nil {
 				m.OriginRealm = val.(models_base.DiameterIdentity)
 			}
-		case 279: // Failed-AVP
-			val, err := models_base.DecodeGrouped(avpValue)
+		// case 0: // DRMP (AVP code not defined)
+		case 260: // Vendor-Specific-Application-Id
+			grouped := &VendorSpecificApplicationId{}
+			if err := grouped.Unmarshal(avpValue); err == nil {
+				m.VendorSpecificApplicationId = grouped
+			}
+		// case 0: // Supported-Features (AVP code not defined)
+		case 268: // Result-Code
+			val, err := models_base.DecodeUnsigned32(avpValue)
 			if err == nil {
-				v := val.(models_base.Grouped)
-				m.FailedAvp = &v
+				v := val.(models_base.Unsigned32)
+				m.ResultCode = &v
+			}
+		case 297: // Experimental-Result
+			grouped := &ExperimentalResult{}
+			if err := grouped.Unmarshal(avpValue); err == nil {
+				m.ExperimentalResult = grouped
+			}
+		// case 0: // AVP (AVP code not defined)
+		case 279: // Failed-AVP
+			grouped := &FailedAVP{}
+			if err := grouped.Unmarshal(avpValue); err == nil {
+				m.FailedAvp = grouped
 			}
 		case 284: // Proxy-Info
-			val, err := models_base.DecodeGrouped(avpValue)
-			if err == nil {
-				m.ProxyInfo = append(m.ProxyInfo, val.(models_base.Grouped))
+			grouped := &ProxyInfo{}
+			if err := grouped.Unmarshal(avpValue); err == nil {
+				m.ProxyInfo = append(m.ProxyInfo, grouped)
 			}
 		case 282: // Route-Record
 			val, err := models_base.DecodeDiameterIdentity(avpValue)
@@ -4555,7 +7113,7 @@ func (m *ResetAnswer) Len() int {
 
 // String returns a string representation of ResetAnswer
 func (m *ResetAnswer) String() string {
-	return fmt.Sprintf("ResetAnswer{SessionId:%v, Drmp:%v, VendorSpecificApplicationId:%v, SupportedFeatures:%v, ResultCode:%v, ExperimentalResult:%v, AuthSessionState:%v, OriginHost:%v, OriginRealm:%v, FailedAvp:%v, ProxyInfo:%v, RouteRecord:%v}", m.SessionId, m.Drmp, m.VendorSpecificApplicationId, m.SupportedFeatures, m.ResultCode, m.ExperimentalResult, m.AuthSessionState, m.OriginHost, m.OriginRealm, m.FailedAvp, m.ProxyInfo, m.RouteRecord)
+	return fmt.Sprintf("ResetAnswer{SessionId:%v, AuthSessionState:%v, OriginHost:%v, OriginRealm:%v, Drmp:%v, VendorSpecificApplicationId:%v, SupportedFeatures:%v, ResultCode:%v, ExperimentalResult:%v, Avp:%v, FailedAvp:%v, ProxyInfo:%v, RouteRecord:%v}", m.SessionId, m.AuthSessionState, m.OriginHost, m.OriginRealm, m.Drmp, m.VendorSpecificApplicationId, m.SupportedFeatures, m.ResultCode, m.ExperimentalResult, m.Avp, m.FailedAvp, m.ProxyInfo, m.RouteRecord)
 }
 
 // NotifyRequest represents the Notify-Request (NR) Diameter command
@@ -4564,26 +7122,30 @@ type NotifyRequest struct {
 	Header DiameterHeader
 
 	SessionId                   models_base.UTF8String         // Required
-	VendorSpecificApplicationId *models_base.Grouped           // Optional
-	Drmp                        *models_base.Enumerated        // Optional
 	AuthSessionState            models_base.Enumerated         // Required
 	OriginHost                  models_base.DiameterIdentity   // Required
 	OriginRealm                 models_base.DiameterIdentity   // Required
-	DestinationHost             *models_base.DiameterIdentity  // Optional
 	DestinationRealm            models_base.DiameterIdentity   // Required
 	UserName                    models_base.UTF8String         // Required
-	OcSupportedFeatures         *models_base.Grouped           // Optional
-	SupportedFeatures           []models_base.Grouped          // Optional
-	TerminalInformation         *models_base.Grouped           // Optional
-	Mip6AgentInfo               *models_base.Grouped           // Optional
-	VisitedNetworkIdentifier    *models_base.OctetString       // Optional
+	Drmp                        *models_base.OctetString       // Optional - WARNING: AVP code not defined, DO NOT USE
+	VendorSpecificApplicationId *VendorSpecificApplicationId   // Optional
+	DestinationHost             *models_base.DiameterIdentity  // Optional
+	OcSupportedFeatures         *models_base.OctetString       // Optional - WARNING: AVP code not defined, DO NOT USE
+	SupportedFeatures           []models_base.OctetString      // Optional - WARNING: AVP code not defined, DO NOT USE
+	TerminalInformation         *TerminalInformation           // Optional
+	Mip6AgentInfo               *MIP6AgentInfo                 // Optional
+	VisitedNetworkIdentifier    *models_base.OctetString       // Optional - WARNING: AVP code not defined, DO NOT USE
 	ContextIdentifier           *models_base.Unsigned32        // Optional
 	ServiceSelection            *models_base.UTF8String        // Optional
 	AlertReason                 *models_base.Enumerated        // Optional
 	UeSrvccCapability           *models_base.Enumerated        // Optional
 	NorFlags                    *models_base.Unsigned32        // Optional
-	HomogeneousSupportImsVoice  *models_base.Enumerated        // Optional
-	ProxyInfo                   []models_base.Grouped          // Optional
+	HomogeneousSupportImsVoice  *models_base.OctetString       // Optional - WARNING: AVP code not defined, DO NOT USE
+	MaximumUeAvailabilityTime   *models_base.OctetString       // Optional - WARNING: AVP code not defined, DO NOT USE
+	MonitoringEventConfigStatus []models_base.OctetString      // Optional - WARNING: AVP code not defined, DO NOT USE
+	EmergencyServices           *models_base.OctetString       // Optional - WARNING: AVP code not defined, DO NOT USE
+	Avp                         []models_base.OctetString      // Optional - WARNING: AVP code not defined, DO NOT USE
+	ProxyInfo                   []*ProxyInfo                   // Optional
 	RouteRecord                 []models_base.DiameterIdentity // Optional
 }
 
@@ -4643,16 +7205,6 @@ func (m *NotifyRequest) Marshal() ([]byte, error) {
 	// Marshal SessionId (required)
 	buf.Write(marshalAVP(263, m.SessionId, true, false))
 
-	// Marshal VendorSpecificApplicationId (optional)
-	if m.VendorSpecificApplicationId != nil {
-		buf.Write(marshalAVP(260, *m.VendorSpecificApplicationId, false, false))
-	}
-
-	// Marshal Drmp (optional)
-	if m.Drmp != nil {
-		buf.Write(marshalAVP(301, *m.Drmp, false, false))
-	}
-
 	// Marshal AuthSessionState (required)
 	buf.Write(marshalAVP(277, m.AuthSessionState, true, false))
 
@@ -4662,45 +7214,61 @@ func (m *NotifyRequest) Marshal() ([]byte, error) {
 	// Marshal OriginRealm (required)
 	buf.Write(marshalAVP(296, m.OriginRealm, true, false))
 
-	// Marshal DestinationHost (optional)
-	if m.DestinationHost != nil {
-		buf.Write(marshalAVP(293, *m.DestinationHost, false, false))
-	}
-
 	// Marshal DestinationRealm (required)
 	buf.Write(marshalAVP(283, m.DestinationRealm, true, false))
 
 	// Marshal UserName (required)
-	buf.Write(marshalAVP(1, m.UserName, false, true))
+	buf.Write(marshalAVP(1, m.UserName, true, true))
+
+	// Marshal Drmp (optional)
+	if m.Drmp != nil {
+		buf.Write(marshalAVP(0, *m.Drmp, false, false))
+	}
+
+	// Marshal VendorSpecificApplicationId (grouped)
+	if m.VendorSpecificApplicationId != nil {
+		if groupedData, err := m.VendorSpecificApplicationId.Marshal(); err == nil {
+			buf.Write(marshalAVP(260, models_base.Grouped(groupedData), true, false))
+		}
+	}
+
+	// Marshal DestinationHost (optional)
+	if m.DestinationHost != nil {
+		buf.Write(marshalAVP(293, *m.DestinationHost, true, false))
+	}
 
 	// Marshal OcSupportedFeatures (optional)
 	if m.OcSupportedFeatures != nil {
-		buf.Write(marshalAVP(621, *m.OcSupportedFeatures, false, false))
+		buf.Write(marshalAVP(0, *m.OcSupportedFeatures, false, false))
 	}
 
 	// Marshal SupportedFeatures (repeated)
 	for _, v := range m.SupportedFeatures {
-		buf.Write(marshalAVP(628, v, false, false))
+		buf.Write(marshalAVP(0, v, false, false))
 	}
 
-	// Marshal TerminalInformation (optional)
+	// Marshal TerminalInformation (grouped)
 	if m.TerminalInformation != nil {
-		buf.Write(marshalAVP(1401, *m.TerminalInformation, true, false))
+		if groupedData, err := m.TerminalInformation.Marshal(); err == nil {
+			buf.Write(marshalAVPWithVendor(1401, models_base.Grouped(groupedData), true, false, 10415))
+		}
 	}
 
-	// Marshal Mip6AgentInfo (optional)
+	// Marshal Mip6AgentInfo (grouped)
 	if m.Mip6AgentInfo != nil {
-		buf.Write(marshalAVP(486, *m.Mip6AgentInfo, true, false))
+		if groupedData, err := m.Mip6AgentInfo.Marshal(); err == nil {
+			buf.Write(marshalAVP(486, models_base.Grouped(groupedData), true, false))
+		}
 	}
 
 	// Marshal VisitedNetworkIdentifier (optional)
 	if m.VisitedNetworkIdentifier != nil {
-		buf.Write(marshalAVP(600, *m.VisitedNetworkIdentifier, true, false))
+		buf.Write(marshalAVP(0, *m.VisitedNetworkIdentifier, false, false))
 	}
 
 	// Marshal ContextIdentifier (optional)
 	if m.ContextIdentifier != nil {
-		buf.Write(marshalAVP(1423, *m.ContextIdentifier, true, false))
+		buf.Write(marshalAVPWithVendor(1423, *m.ContextIdentifier, true, false, 10415))
 	}
 
 	// Marshal ServiceSelection (optional)
@@ -4710,32 +7278,56 @@ func (m *NotifyRequest) Marshal() ([]byte, error) {
 
 	// Marshal AlertReason (optional)
 	if m.AlertReason != nil {
-		buf.Write(marshalAVP(1434, *m.AlertReason, true, false))
+		buf.Write(marshalAVPWithVendor(1434, *m.AlertReason, true, false, 10415))
 	}
 
 	// Marshal UeSrvccCapability (optional)
 	if m.UeSrvccCapability != nil {
-		buf.Write(marshalAVP(1615, *m.UeSrvccCapability, true, false))
+		buf.Write(marshalAVPWithVendor(1615, *m.UeSrvccCapability, true, false, 10415))
 	}
 
 	// Marshal NorFlags (optional)
 	if m.NorFlags != nil {
-		buf.Write(marshalAVP(1443, *m.NorFlags, true, false))
+		buf.Write(marshalAVPWithVendor(1443, *m.NorFlags, true, false, 10415))
 	}
 
 	// Marshal HomogeneousSupportImsVoice (optional)
 	if m.HomogeneousSupportImsVoice != nil {
-		buf.Write(marshalAVP(1493, *m.HomogeneousSupportImsVoice, true, false))
+		buf.Write(marshalAVP(0, *m.HomogeneousSupportImsVoice, false, false))
 	}
 
-	// Marshal ProxyInfo (repeated)
+	// Marshal MaximumUeAvailabilityTime (optional)
+	if m.MaximumUeAvailabilityTime != nil {
+		buf.Write(marshalAVP(0, *m.MaximumUeAvailabilityTime, false, false))
+	}
+
+	// Marshal MonitoringEventConfigStatus (repeated)
+	for _, v := range m.MonitoringEventConfigStatus {
+		buf.Write(marshalAVP(0, v, false, false))
+	}
+
+	// Marshal EmergencyServices (optional)
+	if m.EmergencyServices != nil {
+		buf.Write(marshalAVP(0, *m.EmergencyServices, false, false))
+	}
+
+	// Marshal Avp (repeated)
+	for _, v := range m.Avp {
+		buf.Write(marshalAVP(0, v, false, false))
+	}
+
+	// Marshal ProxyInfo (repeated, grouped)
 	for _, v := range m.ProxyInfo {
-		buf.Write(marshalAVP(284, v, false, false))
+		if v != nil {
+			if groupedData, err := v.Marshal(); err == nil {
+				buf.Write(marshalAVP(284, models_base.Grouped(groupedData), true, false))
+			}
+		}
 	}
 
 	// Marshal RouteRecord (repeated)
 	for _, v := range m.RouteRecord {
-		buf.Write(marshalAVP(282, v, false, false))
+		buf.Write(marshalAVP(282, v, true, false))
 	}
 
 	// Get the final message
@@ -4780,7 +7372,12 @@ func (m *NotifyRequest) Unmarshal(data []byte) error {
 
 		// Extract AVP data
 		headerSize := 8
+		var vendorID uint32
 		if avpFlags&0x80 != 0 { // V-bit set
+			if len(avpData) < 12 {
+				return fmt.Errorf("AVP data too short for vendor ID")
+			}
+			vendorID = binary.BigEndian.Uint32(avpData[8:12])
 			headerSize = 12
 		}
 		avpDataLen := int(avpLength) - headerSize
@@ -4789,24 +7386,12 @@ func (m *NotifyRequest) Unmarshal(data []byte) error {
 		}
 		avpValue := avpData[headerSize : headerSize+avpDataLen]
 
-		// Parse AVP based on code
+		// Parse AVP based on code and vendor ID
 		switch avpCode {
 		case 263: // Session-Id
 			val, err := models_base.DecodeUTF8String(avpValue)
 			if err == nil {
 				m.SessionId = val.(models_base.UTF8String)
-			}
-		case 260: // Vendor-Specific-Application-Id
-			val, err := models_base.DecodeGrouped(avpValue)
-			if err == nil {
-				v := val.(models_base.Grouped)
-				m.VendorSpecificApplicationId = &v
-			}
-		case 301: // DRMP
-			val, err := models_base.DecodeEnumerated(avpValue)
-			if err == nil {
-				v := val.(models_base.Enumerated)
-				m.Drmp = &v
 			}
 		case 277: // Auth-Session-State
 			val, err := models_base.DecodeEnumerated(avpValue)
@@ -4823,12 +7408,6 @@ func (m *NotifyRequest) Unmarshal(data []byte) error {
 			if err == nil {
 				m.OriginRealm = val.(models_base.DiameterIdentity)
 			}
-		case 293: // Destination-Host
-			val, err := models_base.DecodeDiameterIdentity(avpValue)
-			if err == nil {
-				v := val.(models_base.DiameterIdentity)
-				m.DestinationHost = &v
-			}
 		case 283: // Destination-Realm
 			val, err := models_base.DecodeDiameterIdentity(avpValue)
 			if err == nil {
@@ -4839,36 +7418,38 @@ func (m *NotifyRequest) Unmarshal(data []byte) error {
 			if err == nil {
 				m.UserName = val.(models_base.UTF8String)
 			}
-		case 621: // OC-Supported-Features
-			val, err := models_base.DecodeGrouped(avpValue)
-			if err == nil {
-				v := val.(models_base.Grouped)
-				m.OcSupportedFeatures = &v
+		// case 0: // DRMP (AVP code not defined)
+		case 260: // Vendor-Specific-Application-Id
+			grouped := &VendorSpecificApplicationId{}
+			if err := grouped.Unmarshal(avpValue); err == nil {
+				m.VendorSpecificApplicationId = grouped
 			}
-		case 628: // Supported-Features
-			val, err := models_base.DecodeGrouped(avpValue)
+		case 293: // Destination-Host
+			val, err := models_base.DecodeDiameterIdentity(avpValue)
 			if err == nil {
-				m.SupportedFeatures = append(m.SupportedFeatures, val.(models_base.Grouped))
+				v := val.(models_base.DiameterIdentity)
+				m.DestinationHost = &v
 			}
+		// case 0: // OC-Supported-Features (AVP code not defined)
+		// case 0: // Supported-Features (AVP code not defined)
 		case 1401: // Terminal-Information
-			val, err := models_base.DecodeGrouped(avpValue)
-			if err == nil {
-				v := val.(models_base.Grouped)
-				m.TerminalInformation = &v
+			if vendorID != 10415 {
+				break // Vendor ID mismatch
+			}
+			grouped := &TerminalInformation{}
+			if err := grouped.Unmarshal(avpValue); err == nil {
+				m.TerminalInformation = grouped
 			}
 		case 486: // MIP6-Agent-Info
-			val, err := models_base.DecodeGrouped(avpValue)
-			if err == nil {
-				v := val.(models_base.Grouped)
-				m.Mip6AgentInfo = &v
+			grouped := &MIP6AgentInfo{}
+			if err := grouped.Unmarshal(avpValue); err == nil {
+				m.Mip6AgentInfo = grouped
 			}
-		case 600: // Visited-Network-Identifier
-			val, err := models_base.DecodeOctetString(avpValue)
-			if err == nil {
-				v := val.(models_base.OctetString)
-				m.VisitedNetworkIdentifier = &v
-			}
+		// case 0: // Visited-Network-Identifier (AVP code not defined)
 		case 1423: // Context-Identifier
+			if vendorID != 10415 {
+				break // Vendor ID mismatch
+			}
 			val, err := models_base.DecodeUnsigned32(avpValue)
 			if err == nil {
 				v := val.(models_base.Unsigned32)
@@ -4881,33 +7462,41 @@ func (m *NotifyRequest) Unmarshal(data []byte) error {
 				m.ServiceSelection = &v
 			}
 		case 1434: // Alert-Reason
+			if vendorID != 10415 {
+				break // Vendor ID mismatch
+			}
 			val, err := models_base.DecodeEnumerated(avpValue)
 			if err == nil {
 				v := val.(models_base.Enumerated)
 				m.AlertReason = &v
 			}
 		case 1615: // UE-SRVCC-Capability
+			if vendorID != 10415 {
+				break // Vendor ID mismatch
+			}
 			val, err := models_base.DecodeEnumerated(avpValue)
 			if err == nil {
 				v := val.(models_base.Enumerated)
 				m.UeSrvccCapability = &v
 			}
 		case 1443: // NOR-Flags
+			if vendorID != 10415 {
+				break // Vendor ID mismatch
+			}
 			val, err := models_base.DecodeUnsigned32(avpValue)
 			if err == nil {
 				v := val.(models_base.Unsigned32)
 				m.NorFlags = &v
 			}
-		case 1493: // Homogeneous-Support-of-IMS-Voice-Over-PS-Sessions
-			val, err := models_base.DecodeEnumerated(avpValue)
-			if err == nil {
-				v := val.(models_base.Enumerated)
-				m.HomogeneousSupportImsVoice = &v
-			}
+		// case 0: // Homogeneous-Support-of-IMS-Voice-Over-PS-Sessions (AVP code not defined)
+		// case 0: // Maximum-UE-Availability-Time (AVP code not defined)
+		// case 0: // Monitoring-Event-Config-Status (AVP code not defined)
+		// case 0: // Emergency-Services (AVP code not defined)
+		// case 0: // AVP (AVP code not defined)
 		case 284: // Proxy-Info
-			val, err := models_base.DecodeGrouped(avpValue)
-			if err == nil {
-				m.ProxyInfo = append(m.ProxyInfo, val.(models_base.Grouped))
+			grouped := &ProxyInfo{}
+			if err := grouped.Unmarshal(avpValue); err == nil {
+				m.ProxyInfo = append(m.ProxyInfo, grouped)
 			}
 		case 282: // Route-Record
 			val, err := models_base.DecodeDiameterIdentity(avpValue)
@@ -4938,7 +7527,7 @@ func (m *NotifyRequest) Len() int {
 
 // String returns a string representation of NotifyRequest
 func (m *NotifyRequest) String() string {
-	return fmt.Sprintf("NotifyRequest{SessionId:%v, VendorSpecificApplicationId:%v, Drmp:%v, AuthSessionState:%v, OriginHost:%v, OriginRealm:%v, DestinationHost:%v, DestinationRealm:%v, UserName:%v, OcSupportedFeatures:%v, SupportedFeatures:%v, TerminalInformation:%v, Mip6AgentInfo:%v, VisitedNetworkIdentifier:%v, ContextIdentifier:%v, ServiceSelection:%v, AlertReason:%v, UeSrvccCapability:%v, NorFlags:%v, HomogeneousSupportImsVoice:%v, ProxyInfo:%v, RouteRecord:%v}", m.SessionId, m.VendorSpecificApplicationId, m.Drmp, m.AuthSessionState, m.OriginHost, m.OriginRealm, m.DestinationHost, m.DestinationRealm, m.UserName, m.OcSupportedFeatures, m.SupportedFeatures, m.TerminalInformation, m.Mip6AgentInfo, m.VisitedNetworkIdentifier, m.ContextIdentifier, m.ServiceSelection, m.AlertReason, m.UeSrvccCapability, m.NorFlags, m.HomogeneousSupportImsVoice, m.ProxyInfo, m.RouteRecord)
+	return fmt.Sprintf("NotifyRequest{SessionId:%v, AuthSessionState:%v, OriginHost:%v, OriginRealm:%v, DestinationRealm:%v, UserName:%v, Drmp:%v, VendorSpecificApplicationId:%v, DestinationHost:%v, OcSupportedFeatures:%v, SupportedFeatures:%v, TerminalInformation:%v, Mip6AgentInfo:%v, VisitedNetworkIdentifier:%v, ContextIdentifier:%v, ServiceSelection:%v, AlertReason:%v, UeSrvccCapability:%v, NorFlags:%v, HomogeneousSupportImsVoice:%v, MaximumUeAvailabilityTime:%v, MonitoringEventConfigStatus:%v, EmergencyServices:%v, Avp:%v, ProxyInfo:%v, RouteRecord:%v}", m.SessionId, m.AuthSessionState, m.OriginHost, m.OriginRealm, m.DestinationRealm, m.UserName, m.Drmp, m.VendorSpecificApplicationId, m.DestinationHost, m.OcSupportedFeatures, m.SupportedFeatures, m.TerminalInformation, m.Mip6AgentInfo, m.VisitedNetworkIdentifier, m.ContextIdentifier, m.ServiceSelection, m.AlertReason, m.UeSrvccCapability, m.NorFlags, m.HomogeneousSupportImsVoice, m.MaximumUeAvailabilityTime, m.MonitoringEventConfigStatus, m.EmergencyServices, m.Avp, m.ProxyInfo, m.RouteRecord)
 }
 
 // NotifyAnswer represents the Notify-Answer (NA) Diameter command
@@ -4947,19 +7536,20 @@ type NotifyAnswer struct {
 	Header DiameterHeader
 
 	SessionId                   models_base.UTF8String         // Required
-	Drmp                        *models_base.Enumerated        // Optional
-	VendorSpecificApplicationId *models_base.Grouped           // Optional
-	ResultCode                  *models_base.Unsigned32        // Optional
-	ExperimentalResult          *models_base.Grouped           // Optional
 	AuthSessionState            models_base.Enumerated         // Required
 	OriginHost                  models_base.DiameterIdentity   // Required
 	OriginRealm                 models_base.DiameterIdentity   // Required
-	OcSupportedFeatures         *models_base.Grouped           // Optional
-	OcOlr                       *models_base.Grouped           // Optional
-	Load                        []models_base.Grouped          // Optional
-	SupportedFeatures           []models_base.Grouped          // Optional
-	FailedAvp                   *models_base.Grouped           // Optional
-	ProxyInfo                   []models_base.Grouped          // Optional
+	Drmp                        *models_base.OctetString       // Optional - WARNING: AVP code not defined, DO NOT USE
+	VendorSpecificApplicationId *VendorSpecificApplicationId   // Optional
+	ResultCode                  *models_base.Unsigned32        // Optional
+	ExperimentalResult          *ExperimentalResult            // Optional
+	OcSupportedFeatures         *models_base.OctetString       // Optional - WARNING: AVP code not defined, DO NOT USE
+	OcOlr                       *models_base.OctetString       // Optional - WARNING: AVP code not defined, DO NOT USE
+	Load                        []models_base.OctetString      // Optional - WARNING: AVP code not defined, DO NOT USE
+	SupportedFeatures           []models_base.OctetString      // Optional - WARNING: AVP code not defined, DO NOT USE
+	Avp                         []models_base.OctetString      // Optional - WARNING: AVP code not defined, DO NOT USE
+	FailedAvp                   *FailedAVP                     // Optional
+	ProxyInfo                   []*ProxyInfo                   // Optional
 	RouteRecord                 []models_base.DiameterIdentity // Optional
 }
 
@@ -5013,26 +7603,6 @@ func (m *NotifyAnswer) Marshal() ([]byte, error) {
 	// Marshal SessionId (required)
 	buf.Write(marshalAVP(263, m.SessionId, true, false))
 
-	// Marshal Drmp (optional)
-	if m.Drmp != nil {
-		buf.Write(marshalAVP(301, *m.Drmp, false, false))
-	}
-
-	// Marshal VendorSpecificApplicationId (optional)
-	if m.VendorSpecificApplicationId != nil {
-		buf.Write(marshalAVP(260, *m.VendorSpecificApplicationId, false, false))
-	}
-
-	// Marshal ResultCode (optional)
-	if m.ResultCode != nil {
-		buf.Write(marshalAVP(268, *m.ResultCode, true, false))
-	}
-
-	// Marshal ExperimentalResult (optional)
-	if m.ExperimentalResult != nil {
-		buf.Write(marshalAVP(297, *m.ExperimentalResult, true, false))
-	}
-
 	// Marshal AuthSessionState (required)
 	buf.Write(marshalAVP(277, m.AuthSessionState, true, false))
 
@@ -5042,39 +7612,74 @@ func (m *NotifyAnswer) Marshal() ([]byte, error) {
 	// Marshal OriginRealm (required)
 	buf.Write(marshalAVP(296, m.OriginRealm, true, false))
 
+	// Marshal Drmp (optional)
+	if m.Drmp != nil {
+		buf.Write(marshalAVP(0, *m.Drmp, false, false))
+	}
+
+	// Marshal VendorSpecificApplicationId (grouped)
+	if m.VendorSpecificApplicationId != nil {
+		if groupedData, err := m.VendorSpecificApplicationId.Marshal(); err == nil {
+			buf.Write(marshalAVP(260, models_base.Grouped(groupedData), true, false))
+		}
+	}
+
+	// Marshal ResultCode (optional)
+	if m.ResultCode != nil {
+		buf.Write(marshalAVP(268, *m.ResultCode, true, false))
+	}
+
+	// Marshal ExperimentalResult (grouped)
+	if m.ExperimentalResult != nil {
+		if groupedData, err := m.ExperimentalResult.Marshal(); err == nil {
+			buf.Write(marshalAVP(297, models_base.Grouped(groupedData), true, false))
+		}
+	}
+
 	// Marshal OcSupportedFeatures (optional)
 	if m.OcSupportedFeatures != nil {
-		buf.Write(marshalAVP(621, *m.OcSupportedFeatures, false, false))
+		buf.Write(marshalAVP(0, *m.OcSupportedFeatures, false, false))
 	}
 
 	// Marshal OcOlr (optional)
 	if m.OcOlr != nil {
-		buf.Write(marshalAVP(623, *m.OcOlr, false, false))
+		buf.Write(marshalAVP(0, *m.OcOlr, false, false))
 	}
 
 	// Marshal Load (repeated)
 	for _, v := range m.Load {
-		buf.Write(marshalAVP(650, v, false, false))
+		buf.Write(marshalAVP(0, v, false, false))
 	}
 
 	// Marshal SupportedFeatures (repeated)
 	for _, v := range m.SupportedFeatures {
-		buf.Write(marshalAVP(628, v, false, false))
+		buf.Write(marshalAVP(0, v, false, false))
 	}
 
-	// Marshal FailedAvp (optional)
+	// Marshal Avp (repeated)
+	for _, v := range m.Avp {
+		buf.Write(marshalAVP(0, v, false, false))
+	}
+
+	// Marshal FailedAvp (grouped)
 	if m.FailedAvp != nil {
-		buf.Write(marshalAVP(279, *m.FailedAvp, false, false))
+		if groupedData, err := m.FailedAvp.Marshal(); err == nil {
+			buf.Write(marshalAVP(279, models_base.Grouped(groupedData), true, false))
+		}
 	}
 
-	// Marshal ProxyInfo (repeated)
+	// Marshal ProxyInfo (repeated, grouped)
 	for _, v := range m.ProxyInfo {
-		buf.Write(marshalAVP(284, v, false, false))
+		if v != nil {
+			if groupedData, err := v.Marshal(); err == nil {
+				buf.Write(marshalAVP(284, models_base.Grouped(groupedData), true, false))
+			}
+		}
 	}
 
 	// Marshal RouteRecord (repeated)
 	for _, v := range m.RouteRecord {
-		buf.Write(marshalAVP(282, v, false, false))
+		buf.Write(marshalAVP(282, v, true, false))
 	}
 
 	// Get the final message
@@ -5120,6 +7725,10 @@ func (m *NotifyAnswer) Unmarshal(data []byte) error {
 		// Extract AVP data
 		headerSize := 8
 		if avpFlags&0x80 != 0 { // V-bit set
+			if len(avpData) < 12 {
+				return fmt.Errorf("AVP data too short for vendor ID")
+			}
+			_ = binary.BigEndian.Uint32(avpData[8:12]) // vendorID not used
 			headerSize = 12
 		}
 		avpDataLen := int(avpLength) - headerSize
@@ -5128,36 +7737,12 @@ func (m *NotifyAnswer) Unmarshal(data []byte) error {
 		}
 		avpValue := avpData[headerSize : headerSize+avpDataLen]
 
-		// Parse AVP based on code
+		// Parse AVP based on code and vendor ID
 		switch avpCode {
 		case 263: // Session-Id
 			val, err := models_base.DecodeUTF8String(avpValue)
 			if err == nil {
 				m.SessionId = val.(models_base.UTF8String)
-			}
-		case 301: // DRMP
-			val, err := models_base.DecodeEnumerated(avpValue)
-			if err == nil {
-				v := val.(models_base.Enumerated)
-				m.Drmp = &v
-			}
-		case 260: // Vendor-Specific-Application-Id
-			val, err := models_base.DecodeGrouped(avpValue)
-			if err == nil {
-				v := val.(models_base.Grouped)
-				m.VendorSpecificApplicationId = &v
-			}
-		case 268: // Result-Code
-			val, err := models_base.DecodeUnsigned32(avpValue)
-			if err == nil {
-				v := val.(models_base.Unsigned32)
-				m.ResultCode = &v
-			}
-		case 297: // Experimental-Result
-			val, err := models_base.DecodeGrouped(avpValue)
-			if err == nil {
-				v := val.(models_base.Grouped)
-				m.ExperimentalResult = &v
 			}
 		case 277: // Auth-Session-State
 			val, err := models_base.DecodeEnumerated(avpValue)
@@ -5174,38 +7759,37 @@ func (m *NotifyAnswer) Unmarshal(data []byte) error {
 			if err == nil {
 				m.OriginRealm = val.(models_base.DiameterIdentity)
 			}
-		case 621: // OC-Supported-Features
-			val, err := models_base.DecodeGrouped(avpValue)
-			if err == nil {
-				v := val.(models_base.Grouped)
-				m.OcSupportedFeatures = &v
+		// case 0: // DRMP (AVP code not defined)
+		case 260: // Vendor-Specific-Application-Id
+			grouped := &VendorSpecificApplicationId{}
+			if err := grouped.Unmarshal(avpValue); err == nil {
+				m.VendorSpecificApplicationId = grouped
 			}
-		case 623: // OC-OLR
-			val, err := models_base.DecodeGrouped(avpValue)
+		case 268: // Result-Code
+			val, err := models_base.DecodeUnsigned32(avpValue)
 			if err == nil {
-				v := val.(models_base.Grouped)
-				m.OcOlr = &v
+				v := val.(models_base.Unsigned32)
+				m.ResultCode = &v
 			}
-		case 650: // Load
-			val, err := models_base.DecodeGrouped(avpValue)
-			if err == nil {
-				m.Load = append(m.Load, val.(models_base.Grouped))
+		case 297: // Experimental-Result
+			grouped := &ExperimentalResult{}
+			if err := grouped.Unmarshal(avpValue); err == nil {
+				m.ExperimentalResult = grouped
 			}
-		case 628: // Supported-Features
-			val, err := models_base.DecodeGrouped(avpValue)
-			if err == nil {
-				m.SupportedFeatures = append(m.SupportedFeatures, val.(models_base.Grouped))
-			}
+		// case 0: // OC-Supported-Features (AVP code not defined)
+		// case 0: // OC-OLR (AVP code not defined)
+		// case 0: // Load (AVP code not defined)
+		// case 0: // Supported-Features (AVP code not defined)
+		// case 0: // AVP (AVP code not defined)
 		case 279: // Failed-AVP
-			val, err := models_base.DecodeGrouped(avpValue)
-			if err == nil {
-				v := val.(models_base.Grouped)
-				m.FailedAvp = &v
+			grouped := &FailedAVP{}
+			if err := grouped.Unmarshal(avpValue); err == nil {
+				m.FailedAvp = grouped
 			}
 		case 284: // Proxy-Info
-			val, err := models_base.DecodeGrouped(avpValue)
-			if err == nil {
-				m.ProxyInfo = append(m.ProxyInfo, val.(models_base.Grouped))
+			grouped := &ProxyInfo{}
+			if err := grouped.Unmarshal(avpValue); err == nil {
+				m.ProxyInfo = append(m.ProxyInfo, grouped)
 			}
 		case 282: // Route-Record
 			val, err := models_base.DecodeDiameterIdentity(avpValue)
@@ -5236,7 +7820,7 @@ func (m *NotifyAnswer) Len() int {
 
 // String returns a string representation of NotifyAnswer
 func (m *NotifyAnswer) String() string {
-	return fmt.Sprintf("NotifyAnswer{SessionId:%v, Drmp:%v, VendorSpecificApplicationId:%v, ResultCode:%v, ExperimentalResult:%v, AuthSessionState:%v, OriginHost:%v, OriginRealm:%v, OcSupportedFeatures:%v, OcOlr:%v, Load:%v, SupportedFeatures:%v, FailedAvp:%v, ProxyInfo:%v, RouteRecord:%v}", m.SessionId, m.Drmp, m.VendorSpecificApplicationId, m.ResultCode, m.ExperimentalResult, m.AuthSessionState, m.OriginHost, m.OriginRealm, m.OcSupportedFeatures, m.OcOlr, m.Load, m.SupportedFeatures, m.FailedAvp, m.ProxyInfo, m.RouteRecord)
+	return fmt.Sprintf("NotifyAnswer{SessionId:%v, AuthSessionState:%v, OriginHost:%v, OriginRealm:%v, Drmp:%v, VendorSpecificApplicationId:%v, ResultCode:%v, ExperimentalResult:%v, OcSupportedFeatures:%v, OcOlr:%v, Load:%v, SupportedFeatures:%v, Avp:%v, FailedAvp:%v, ProxyInfo:%v, RouteRecord:%v}", m.SessionId, m.AuthSessionState, m.OriginHost, m.OriginRealm, m.Drmp, m.VendorSpecificApplicationId, m.ResultCode, m.ExperimentalResult, m.OcSupportedFeatures, m.OcOlr, m.Load, m.SupportedFeatures, m.Avp, m.FailedAvp, m.ProxyInfo, m.RouteRecord)
 }
 
 // Helper functions
@@ -5358,4 +7942,106 @@ func marshalAVP(code uint32, data models_base.Type, mandatory, protected bool) [
 	}
 
 	return buf
+}
+
+// marshalAVPWithVendor serializes an AVP with optional vendor ID
+func marshalAVPWithVendor(code uint32, data models_base.Type, mandatory, protected bool, vendorID uint32) []byte {
+	// Serialize data
+	serialized := data.Serialize()
+
+	// Determine if we need vendor ID in header
+	hasVendor := vendorID != 0
+
+	// Calculate header size
+	headerSize := 8
+	if hasVendor {
+		headerSize = 12 // With vendor ID
+	}
+
+	// Calculate total length
+	totalLen := headerSize + len(serialized)
+
+	// Create buffer
+	buf := make([]byte, headerSize)
+
+	// AVP Code
+	binary.BigEndian.PutUint32(buf[0:4], code)
+
+	// AVP Flags
+	var flags byte
+	if hasVendor {
+		flags |= 0x80 // V-bit
+	}
+	if mandatory {
+		flags |= 0x40 // M-bit
+	}
+	if protected {
+		flags |= 0x20 // P-bit
+	}
+	buf[4] = flags
+
+	// AVP Length (3 bytes)
+	binary.BigEndian.PutUint32(buf[4:8], uint32(totalLen))
+	buf[4] = flags // Restore flags
+
+	// Vendor ID (if needed)
+	if hasVendor {
+		binary.BigEndian.PutUint32(buf[8:12], vendorID)
+	}
+
+	// Append data
+	buf = append(buf, serialized...)
+
+	// Add padding to 32-bit boundary
+	padding := (4 - (len(buf) % 4)) % 4
+	for i := 0; i < padding; i++ {
+		buf = append(buf, 0)
+	}
+
+	return buf
+}
+
+// Pointer helper functions for grouped AVP field assignments in tests
+func ptrUTF8String(s string) *models_base.UTF8String {
+	v := models_base.UTF8String(s)
+	return &v
+}
+
+func ptrOctetString(b []byte) *models_base.OctetString {
+	v := models_base.OctetString(b)
+	return &v
+}
+
+func ptrUnsigned32(u uint32) *models_base.Unsigned32 {
+	v := models_base.Unsigned32(u)
+	return &v
+}
+
+func ptrUnsigned64(u uint64) *models_base.Unsigned64 {
+	v := models_base.Unsigned64(u)
+	return &v
+}
+
+func ptrEnumerated(e uint32) *models_base.Enumerated {
+	v := models_base.Enumerated(e)
+	return &v
+}
+
+func ptrDiameterIdentity(d string) *models_base.DiameterIdentity {
+	v := models_base.DiameterIdentity(d)
+	return &v
+}
+
+func ptrAddress(a models_base.Address) *models_base.Address {
+	return &a
+}
+
+func ptrFloat32(f float32) *models_base.Float32 {
+	v := models_base.Float32(f)
+	return &v
+}
+
+func ptrFloat64(f float64) *models_base.Float64 {
+	v := models_base.Float64(f)
+	return &v
 }

@@ -121,11 +121,73 @@ func processProtoDirectory(protoDir, outputDir string, genTests bool) error {
 
 	fmt.Printf("Found %d proto files in %s\n", len(protoFiles), protoDir)
 
-	// Process each proto file
+	// First pass: Parse ALL proto files into a complete AVP registry
+	completeAVPs := make(map[string]*codegen.AVPDefinition)
+
+	for _, protoFile := range protoFiles {
+		parser := codegen.NewProtoParser()
+		if err := parser.ParseFile(protoFile); err != nil {
+			return fmt.Errorf("parsing %s: %w", filepath.Base(protoFile), err)
+		}
+		// Merge all AVPs into the complete registry
+		for name, avp := range parser.AVPs {
+			completeAVPs[name] = avp
+		}
+	}
+
+	// Create a temporary parser to resolve grouped field references within completeAVPs
+	resolverParser := codegen.NewProtoParser()
+	resolverParser.AVPs = completeAVPs
+	resolverParser.ResolveAVPReferences()
+
+	// Second pass: Generate code for each proto file using the complete AVP registry
 	for _, protoFile := range protoFiles {
 		fmt.Printf("\nProcessing %s...\n", filepath.Base(protoFile))
-		if err := processProtoFile(protoFile, "", "", outputDir, genTests); err != nil {
-			return fmt.Errorf("processing %s: %w", protoFile, err)
+
+		// Parse this specific proto file
+		fileParser := codegen.NewProtoParser()
+		if err := fileParser.ParseFile(protoFile); err != nil {
+			return fmt.Errorf("parsing %s: %w", filepath.Base(protoFile), err)
+		}
+
+		// Replace AVPs with complete registry so all referenced types are available
+		fileParser.AVPs = completeAVPs
+
+		// Resolve all field references using the complete AVP registry
+		fileParser.ResolveAVPReferences()
+
+		packageName := fileParser.PackageName
+		if packageName == "" {
+			packageName = "base"
+		}
+
+		// Create package directory
+		packageDir := filepath.Join(outputDir, packageName)
+		if err := os.MkdirAll(packageDir, 0755); err != nil {
+			return fmt.Errorf("creating package directory: %w", err)
+		}
+
+		// Generate output file name
+		base := filepath.Base(protoFile)
+		ext := filepath.Ext(base)
+		name := base[:len(base)-len(ext)]
+		finalOutputFile := filepath.Join(packageDir, name+".pb.go")
+
+		// Generate code
+		generator := codegen.NewGenerator(fileParser, packageName)
+		if err := generator.GenerateToFile(finalOutputFile); err != nil {
+			return fmt.Errorf("generating code for %s: %w", filepath.Base(protoFile), err)
+		}
+
+		fmt.Printf("Generated code written to %s\n", finalOutputFile)
+
+		// Generate test file if requested
+		if genTests {
+			testFile := strings.TrimSuffix(finalOutputFile, ".pb.go") + "_pcap_test.go"
+			if err := generator.GenerateTestFile(testFile); err != nil {
+				return fmt.Errorf("generating test file: %w", err)
+			}
+			fmt.Printf("Generated test file written to %s\n", testFile)
 		}
 	}
 

@@ -127,6 +127,50 @@ func (g *Generator) Generate() (string, error) {
 	// Generate type definitions
 	g.generateTypeDefinitions(&buf)
 
+	// Generate Grouped AVP structs
+	buf.WriteString("// Grouped AVP structures\n\n")
+	for name, avp := range g.Parser.AVPs {
+		if avp.TypeName == "Grouped" {
+			structName := toCamelCase(strings.ReplaceAll(name, "-", "_"))
+			buf.WriteString(fmt.Sprintf("// %s represents the %s grouped AVP (AVP Code %d)\n", structName, name, avp.Code))
+			buf.WriteString(fmt.Sprintf("type %s struct {\n", structName))
+
+			// Generate fields from grouped definition
+			if len(avp.GroupedFields) > 0 {
+				for _, field := range avp.GroupedFields {
+					goType := g.getGoType(field)
+					comment := ""
+					if field.AVP.Code == 0 {
+						// AVP not defined - add warning
+						if field.Required {
+							comment = " // Required - WARNING: AVP code not defined, DO NOT USE"
+						} else {
+							comment = " // Optional - WARNING: AVP code not defined, DO NOT USE"
+						}
+					} else {
+						if field.Required {
+							comment = " // Required"
+						} else {
+							comment = " // Optional"
+						}
+					}
+					buf.WriteString(fmt.Sprintf("\t%s %s%s\n", field.FieldName, goType, comment))
+				}
+			} else {
+				buf.WriteString("\t// No fields defined - using raw data\n")
+				buf.WriteString("\tData []byte\n")
+			}
+
+			buf.WriteString("}\n\n")
+
+			// Generate Marshal method
+			g.generateGroupedMarshal(&buf, structName, avp)
+
+			// Generate Unmarshal method
+			g.generateGroupedUnmarshal(&buf, structName, avp)
+		}
+	}
+
 	// Generate AVP constants
 	buf.WriteString("// AVP Codes\n")
 	buf.WriteString("const (\n")
@@ -174,10 +218,19 @@ func (g *Generator) generateCommandStruct(buf *bytes.Buffer, cmd *CommandDefinit
 	for _, field := range cmd.Fields {
 		goType := g.getGoType(field)
 		comment := ""
-		if field.Required {
-			comment = " // Required"
+		if field.AVP.Code == 0 {
+			// AVP not defined - add warning
+			if field.Required {
+				comment = " // Required - WARNING: AVP code not defined, DO NOT USE"
+			} else {
+				comment = " // Optional - WARNING: AVP code not defined, DO NOT USE"
+			}
 		} else {
-			comment = " // Optional"
+			if field.Required {
+				comment = " // Required"
+			} else {
+				comment = " // Optional"
+			}
 		}
 		buf.WriteString(fmt.Sprintf("\t%s %s%s\n", field.FieldName, goType, comment))
 	}
@@ -207,13 +260,22 @@ func (g *Generator) generateCommandStruct(buf *bytes.Buffer, cmd *CommandDefinit
 
 // getGoType returns the Go type for a field
 func (g *Generator) getGoType(field *AVPField) string {
-	baseType := g.getBaseGoType(field.AVP.TypeName)
+	baseType := g.getBaseGoTypeForField(field)
 
 	if field.Repeated {
+		// Only use pointer for Grouped types in repeated fields
+		if field.AVP.TypeName == "Grouped" {
+			return "[]*" + baseType
+		}
 		return "[]" + baseType
 	}
 
 	if !field.Required {
+		return "*" + baseType
+	}
+
+	// For Grouped types, always use pointer even if required
+	if field.AVP.TypeName == "Grouped" {
 		return "*" + baseType
 	}
 
@@ -258,6 +320,15 @@ func (g *Generator) getBaseGoType(typeName string) string {
 	default:
 		return "models_base.OctetString" // fallback
 	}
+}
+
+// getBaseGoTypeForField returns the base Go type for an AVP field, considering Grouped types
+func (g *Generator) getBaseGoTypeForField(field *AVPField) string {
+	if field.AVP.TypeName == "Grouped" {
+		// For Grouped types, use the AVP name to create a struct name
+		return toCamelCase(strings.ReplaceAll(field.AVP.Name, "-", "_"))
+	}
+	return g.getBaseGoType(field.AVP.TypeName)
 }
 
 // generateConstructor generates a constructor function
@@ -310,6 +381,11 @@ func (g *Generator) generateValidate(buf *bytes.Buffer, cmd *CommandDefinition, 
 			case "UTF8String", "DiameterIdentity", "DiameterURI", "OctetString":
 				buf.WriteString(fmt.Sprintf("\tif m.%s == \"\" {\n", fieldName))
 				buf.WriteString(fmt.Sprintf("\t\treturn fmt.Errorf(\"required field %s is empty\")\n", avpName))
+				buf.WriteString("\t}\n")
+			case "Grouped":
+				// Grouped types are always pointers
+				buf.WriteString(fmt.Sprintf("\tif m.%s == nil {\n", fieldName))
+				buf.WriteString(fmt.Sprintf("\t\treturn fmt.Errorf(\"required field %s is nil\")\n", avpName))
 				buf.WriteString("\t}\n")
 			case "Unsigned32", "Unsigned64", "Integer32", "Integer64", "Enumerated":
 				// For numeric types, we can't really validate zero vs unset for required non-pointer fields
@@ -368,24 +444,82 @@ func (g *Generator) generateMarshal(buf *bytes.Buffer, cmd *CommandDefinition, s
 
 // generateFieldMarshalToBuffer generates marshaling code that writes directly to buffer
 func (g *Generator) generateFieldMarshalToBuffer(buf *bytes.Buffer, field *AVPField) {
+	g.generateFieldMarshalToBufferWithReceiver(buf, field, "m")
+}
+
+// generateFieldMarshalToBufferWithReceiver generates marshaling code with custom receiver name
+func (g *Generator) generateFieldMarshalToBufferWithReceiver(buf *bytes.Buffer, field *AVPField, receiver string) {
 	fieldName := field.FieldName
 
-	if field.Repeated {
-		buf.WriteString(fmt.Sprintf("\t// Marshal %s (repeated)\n", fieldName))
-		buf.WriteString(fmt.Sprintf("\tfor _, v := range m.%s {\n", fieldName))
-		buf.WriteString(fmt.Sprintf("\t\tbuf.Write(marshalAVP(%d, v, %v, %v))\n",
-			field.AVP.Code, field.AVP.Must, field.AVP.MayEncrypt))
-		buf.WriteString("\t}\n\n")
-	} else if !field.Required {
-		buf.WriteString(fmt.Sprintf("\t// Marshal %s (optional)\n", fieldName))
-		buf.WriteString(fmt.Sprintf("\tif m.%s != nil {\n", fieldName))
-		buf.WriteString(fmt.Sprintf("\t\tbuf.Write(marshalAVP(%d, *m.%s, %v, %v))\n",
-			field.AVP.Code, fieldName, field.AVP.Must, field.AVP.MayEncrypt))
-		buf.WriteString("\t}\n\n")
+	// Handle Grouped types differently
+	if field.AVP.TypeName == "Grouped" {
+		if field.Repeated {
+			buf.WriteString(fmt.Sprintf("\t// Marshal %s (repeated, grouped)\n", fieldName))
+			buf.WriteString(fmt.Sprintf("\tfor _, v := range %s.%s {\n", receiver, fieldName))
+			buf.WriteString("\t\tif v != nil {\n")
+			buf.WriteString("\t\t\tif groupedData, err := v.Marshal(); err == nil {\n")
+			// Check if this grouped AVP has a vendor ID
+			if field.AVP.VendorID != 0 {
+				buf.WriteString(fmt.Sprintf("\t\t\t\tbuf.Write(marshalAVPWithVendor(%d, models_base.Grouped(groupedData), %v, %v, %d))\n",
+					field.AVP.Code, field.AVP.Must, field.AVP.MayEncrypt, field.AVP.VendorID))
+			} else {
+				buf.WriteString(fmt.Sprintf("\t\t\t\tbuf.Write(marshalAVP(%d, models_base.Grouped(groupedData), %v, %v))\n",
+					field.AVP.Code, field.AVP.Must, field.AVP.MayEncrypt))
+			}
+			buf.WriteString("\t\t\t}\n")
+			buf.WriteString("\t\t}\n")
+			buf.WriteString("\t}\n\n")
+		} else {
+			buf.WriteString(fmt.Sprintf("\t// Marshal %s (grouped)\n", fieldName))
+			buf.WriteString(fmt.Sprintf("\tif %s.%s != nil {\n", receiver, fieldName))
+			buf.WriteString(fmt.Sprintf("\t\tif groupedData, err := %s.%s.Marshal(); err == nil {\n", receiver, fieldName))
+			// Check if this grouped AVP has a vendor ID
+			if field.AVP.VendorID != 0 {
+				buf.WriteString(fmt.Sprintf("\t\t\tbuf.Write(marshalAVPWithVendor(%d, models_base.Grouped(groupedData), %v, %v, %d))\n",
+					field.AVP.Code, field.AVP.Must, field.AVP.MayEncrypt, field.AVP.VendorID))
+			} else {
+				buf.WriteString(fmt.Sprintf("\t\t\tbuf.Write(marshalAVP(%d, models_base.Grouped(groupedData), %v, %v))\n",
+					field.AVP.Code, field.AVP.Must, field.AVP.MayEncrypt))
+			}
+			buf.WriteString("\t\t}\n")
+			buf.WriteString("\t}\n\n")
+		}
 	} else {
-		buf.WriteString(fmt.Sprintf("\t// Marshal %s (required)\n", fieldName))
-		buf.WriteString(fmt.Sprintf("\tbuf.Write(marshalAVP(%d, m.%s, %v, %v))\n\n",
-			field.AVP.Code, fieldName, field.AVP.Must, field.AVP.MayEncrypt))
+		if field.Repeated {
+			buf.WriteString(fmt.Sprintf("\t// Marshal %s (repeated)\n", fieldName))
+			buf.WriteString(fmt.Sprintf("\tfor _, v := range %s.%s {\n", receiver, fieldName))
+			// Check if this field has a vendor ID
+			if field.AVP.VendorID != 0 {
+				buf.WriteString(fmt.Sprintf("\t\tbuf.Write(marshalAVPWithVendor(%d, v, %v, %v, %d))\n",
+					field.AVP.Code, field.AVP.Must, field.AVP.MayEncrypt, field.AVP.VendorID))
+			} else {
+				buf.WriteString(fmt.Sprintf("\t\tbuf.Write(marshalAVP(%d, v, %v, %v))\n",
+					field.AVP.Code, field.AVP.Must, field.AVP.MayEncrypt))
+			}
+			buf.WriteString("\t}\n\n")
+		} else if !field.Required {
+			buf.WriteString(fmt.Sprintf("\t// Marshal %s (optional)\n", fieldName))
+			buf.WriteString(fmt.Sprintf("\tif %s.%s != nil {\n", receiver, fieldName))
+			// Check if this field has a vendor ID
+			if field.AVP.VendorID != 0 {
+				buf.WriteString(fmt.Sprintf("\t\tbuf.Write(marshalAVPWithVendor(%d, *%s.%s, %v, %v, %d))\n",
+					field.AVP.Code, receiver, fieldName, field.AVP.Must, field.AVP.MayEncrypt, field.AVP.VendorID))
+			} else {
+				buf.WriteString(fmt.Sprintf("\t\tbuf.Write(marshalAVP(%d, *%s.%s, %v, %v))\n",
+					field.AVP.Code, receiver, fieldName, field.AVP.Must, field.AVP.MayEncrypt))
+			}
+			buf.WriteString("\t}\n\n")
+		} else {
+			buf.WriteString(fmt.Sprintf("\t// Marshal %s (required)\n", fieldName))
+			// Check if this field has a vendor ID
+			if field.AVP.VendorID != 0 {
+				buf.WriteString(fmt.Sprintf("\tbuf.Write(marshalAVPWithVendor(%d, %s.%s, %v, %v, %d))\n\n",
+					field.AVP.Code, receiver, fieldName, field.AVP.Must, field.AVP.MayEncrypt, field.AVP.VendorID))
+			} else {
+				buf.WriteString(fmt.Sprintf("\tbuf.Write(marshalAVP(%d, %s.%s, %v, %v))\n\n",
+					field.AVP.Code, receiver, fieldName, field.AVP.Must, field.AVP.MayEncrypt))
+			}
+		}
 	}
 }
 
@@ -396,19 +530,37 @@ func (g *Generator) generateFieldMarshal(buf *bytes.Buffer, field *AVPField) {
 	if field.Repeated {
 		buf.WriteString(fmt.Sprintf("\t// Marshal %s (repeated)\n", fieldName))
 		buf.WriteString(fmt.Sprintf("\tfor _, v := range m.%s {\n", fieldName))
-		buf.WriteString(fmt.Sprintf("\t\tavps = append(avps, marshalAVP(%d, v, %v, %v))\n",
-			field.AVP.Code, field.AVP.Must, field.AVP.MayEncrypt))
+		// Check if this field has a vendor ID
+		if field.AVP.VendorID != 0 {
+			buf.WriteString(fmt.Sprintf("\t\tavps = append(avps, marshalAVPWithVendor(%d, v, %v, %v, %d))\n",
+				field.AVP.Code, field.AVP.Must, field.AVP.MayEncrypt, field.AVP.VendorID))
+		} else {
+			buf.WriteString(fmt.Sprintf("\t\tavps = append(avps, marshalAVP(%d, v, %v, %v))\n",
+				field.AVP.Code, field.AVP.Must, field.AVP.MayEncrypt))
+		}
 		buf.WriteString("\t}\n\n")
 	} else if !field.Required {
 		buf.WriteString(fmt.Sprintf("\t// Marshal %s (optional)\n", fieldName))
 		buf.WriteString(fmt.Sprintf("\tif m.%s != nil {\n", fieldName))
-		buf.WriteString(fmt.Sprintf("\t\tavps = append(avps, marshalAVP(%d, *m.%s, %v, %v))\n",
-			field.AVP.Code, fieldName, field.AVP.Must, field.AVP.MayEncrypt))
+		// Check if this field has a vendor ID
+		if field.AVP.VendorID != 0 {
+			buf.WriteString(fmt.Sprintf("\t\tavps = append(avps, marshalAVPWithVendor(%d, *m.%s, %v, %v, %d))\n",
+				field.AVP.Code, fieldName, field.AVP.Must, field.AVP.MayEncrypt, field.AVP.VendorID))
+		} else {
+			buf.WriteString(fmt.Sprintf("\t\tavps = append(avps, marshalAVP(%d, *m.%s, %v, %v))\n",
+				field.AVP.Code, fieldName, field.AVP.Must, field.AVP.MayEncrypt))
+		}
 		buf.WriteString("\t}\n\n")
 	} else {
 		buf.WriteString(fmt.Sprintf("\t// Marshal %s (required)\n", fieldName))
-		buf.WriteString(fmt.Sprintf("\tavps = append(avps, marshalAVP(%d, m.%s, %v, %v))\n\n",
-			field.AVP.Code, fieldName, field.AVP.Must, field.AVP.MayEncrypt))
+		// Check if this field has a vendor ID
+		if field.AVP.VendorID != 0 {
+			buf.WriteString(fmt.Sprintf("\tavps = append(avps, marshalAVPWithVendor(%d, m.%s, %v, %v, %d))\n\n",
+				field.AVP.Code, fieldName, field.AVP.Must, field.AVP.MayEncrypt, field.AVP.VendorID))
+		} else {
+			buf.WriteString(fmt.Sprintf("\tavps = append(avps, marshalAVP(%d, m.%s, %v, %v))\n\n",
+				field.AVP.Code, fieldName, field.AVP.Must, field.AVP.MayEncrypt))
+		}
 	}
 }
 
@@ -445,39 +597,102 @@ func (g *Generator) generateUnmarshal(buf *bytes.Buffer, cmd *CommandDefinition,
 
 	buf.WriteString("\t\t// Extract AVP data\n")
 	buf.WriteString("\t\theaderSize := 8\n")
+
+	// Check if any field has a vendor ID that needs to be matched
+	hasVendorSpecificFields := false
+	for _, field := range cmd.Fields {
+		if field.AVP.VendorID != 0 {
+			hasVendorSpecificFields = true
+			break
+		}
+	}
+
+	if hasVendorSpecificFields {
+		buf.WriteString("\t\tvar vendorID uint32\n")
+	}
 	buf.WriteString("\t\tif avpFlags&0x80 != 0 { // V-bit set\n")
+	buf.WriteString("\t\t\tif len(avpData) < 12 {\n")
+	buf.WriteString("\t\t\t\treturn fmt.Errorf(\"AVP data too short for vendor ID\")\n")
+	buf.WriteString("\t\t\t}\n")
+	if hasVendorSpecificFields {
+		buf.WriteString("\t\t\tvendorID = binary.BigEndian.Uint32(avpData[8:12])\n")
+	} else {
+		buf.WriteString("\t\t\t_ = binary.BigEndian.Uint32(avpData[8:12]) // vendorID not used\n")
+	}
 	buf.WriteString("\t\t\theaderSize = 12\n")
 	buf.WriteString("\t\t}\n")
 	buf.WriteString("\t\tavpDataLen := int(avpLength) - headerSize\n")
 	buf.WriteString("\t\tif avpDataLen < 0 {\n")
 	buf.WriteString("\t\t\treturn fmt.Errorf(\"invalid AVP data length\")\n")
 	buf.WriteString("\t\t}\n")
-	buf.WriteString("\t\tavpValue := avpData[headerSize : headerSize+avpDataLen]\n\n")
 
-	buf.WriteString("\t\t// Parse AVP based on code\n")
+	// Check if there are any valid AVP fields to parse
+	hasValidFields := false
+	for _, field := range cmd.Fields {
+		if field.AVP.Code != 0 {
+			hasValidFields = true
+			break
+		}
+	}
+
+	if hasValidFields {
+		buf.WriteString("\t\tavpValue := avpData[headerSize : headerSize+avpDataLen]\n\n")
+	} else {
+		buf.WriteString("\t\t_ = avpDataLen // avpValue not needed when no fields are defined\n\n")
+	}
+
+	buf.WriteString("\t\t// Parse AVP based on code and vendor ID\n")
 	buf.WriteString("\t\tswitch avpCode {\n")
 
 	for _, field := range cmd.Fields {
+		// Skip fields with code 0 (undefined AVPs)
+		if field.AVP.Code == 0 {
+			buf.WriteString(fmt.Sprintf("\t\t// case 0: // %s (AVP code not defined)\n", field.AVP.Name))
+			continue
+		}
+
 		buf.WriteString(fmt.Sprintf("\t\tcase %d: // %s\n", field.AVP.Code, field.AVP.Name))
-		decoder := g.getDecoder(field.AVP.TypeName)
-		if field.Repeated {
-			buf.WriteString(fmt.Sprintf("\t\t\tval, err := %s(avpValue)\n", decoder))
-			buf.WriteString("\t\t\tif err == nil {\n")
-			buf.WriteString(fmt.Sprintf("\t\t\t\tm.%s = append(m.%s, val.(%s))\n",
-				field.FieldName, field.FieldName, g.getBaseGoType(field.AVP.TypeName)))
+
+		// Check vendor ID if it's a vendor-specific AVP
+		if field.AVP.VendorID != 0 {
+			buf.WriteString(fmt.Sprintf("\t\t\tif vendorID != %d {\n", field.AVP.VendorID))
+			buf.WriteString("\t\t\t\tbreak // Vendor ID mismatch\n")
 			buf.WriteString("\t\t\t}\n")
-		} else if !field.Required {
-			buf.WriteString(fmt.Sprintf("\t\t\tval, err := %s(avpValue)\n", decoder))
-			buf.WriteString("\t\t\tif err == nil {\n")
-			buf.WriteString(fmt.Sprintf("\t\t\t\tv := val.(%s)\n", g.getBaseGoType(field.AVP.TypeName)))
-			buf.WriteString(fmt.Sprintf("\t\t\t\tm.%s = &v\n", field.FieldName))
-			buf.WriteString("\t\t\t}\n")
+		}
+		if field.AVP.TypeName == "Grouped" {
+			structType := g.getBaseGoTypeForField(field)
+			if field.Repeated {
+				buf.WriteString(fmt.Sprintf("\t\t\tgrouped := &%s{}\n", structType))
+				buf.WriteString("\t\t\tif err := grouped.Unmarshal(avpValue); err == nil {\n")
+				buf.WriteString(fmt.Sprintf("\t\t\t\tm.%s = append(m.%s, grouped)\n", field.FieldName, field.FieldName))
+				buf.WriteString("\t\t\t}\n")
+			} else {
+				buf.WriteString(fmt.Sprintf("\t\t\tgrouped := &%s{}\n", structType))
+				buf.WriteString("\t\t\tif err := grouped.Unmarshal(avpValue); err == nil {\n")
+				buf.WriteString(fmt.Sprintf("\t\t\t\tm.%s = grouped\n", field.FieldName))
+				buf.WriteString("\t\t\t}\n")
+			}
 		} else {
-			buf.WriteString(fmt.Sprintf("\t\t\tval, err := %s(avpValue)\n", decoder))
-			buf.WriteString("\t\t\tif err == nil {\n")
-			buf.WriteString(fmt.Sprintf("\t\t\t\tm.%s = val.(%s)\n",
-				field.FieldName, g.getBaseGoType(field.AVP.TypeName)))
-			buf.WriteString("\t\t\t}\n")
+			decoder := g.getDecoder(field.AVP.TypeName)
+			if field.Repeated {
+				buf.WriteString(fmt.Sprintf("\t\t\tval, err := %s(avpValue)\n", decoder))
+				buf.WriteString("\t\t\tif err == nil {\n")
+				buf.WriteString(fmt.Sprintf("\t\t\t\tm.%s = append(m.%s, val.(%s))\n",
+					field.FieldName, field.FieldName, g.getBaseGoType(field.AVP.TypeName)))
+				buf.WriteString("\t\t\t}\n")
+			} else if !field.Required {
+				buf.WriteString(fmt.Sprintf("\t\t\tval, err := %s(avpValue)\n", decoder))
+				buf.WriteString("\t\t\tif err == nil {\n")
+				buf.WriteString(fmt.Sprintf("\t\t\t\tv := val.(%s)\n", g.getBaseGoType(field.AVP.TypeName)))
+				buf.WriteString(fmt.Sprintf("\t\t\t\tm.%s = &v\n", field.FieldName))
+				buf.WriteString("\t\t\t}\n")
+			} else {
+				buf.WriteString(fmt.Sprintf("\t\t\tval, err := %s(avpValue)\n", decoder))
+				buf.WriteString("\t\t\tif err == nil {\n")
+				buf.WriteString(fmt.Sprintf("\t\t\t\tm.%s = val.(%s)\n",
+					field.FieldName, g.getBaseGoType(field.AVP.TypeName)))
+				buf.WriteString("\t\t\t}\n")
+			}
 		}
 	}
 
@@ -720,6 +935,108 @@ func marshalAVP(code uint32, data models_base.Type, mandatory, protected bool) [
 	}
 
 	return buf
+}
+
+// marshalAVPWithVendor serializes an AVP with optional vendor ID
+func marshalAVPWithVendor(code uint32, data models_base.Type, mandatory, protected bool, vendorID uint32) []byte {
+	// Serialize data
+	serialized := data.Serialize()
+
+	// Determine if we need vendor ID in header
+	hasVendor := vendorID != 0
+
+	// Calculate header size
+	headerSize := 8
+	if hasVendor {
+		headerSize = 12 // With vendor ID
+	}
+
+	// Calculate total length
+	totalLen := headerSize + len(serialized)
+
+	// Create buffer
+	buf := make([]byte, headerSize)
+
+	// AVP Code
+	binary.BigEndian.PutUint32(buf[0:4], code)
+
+	// AVP Flags
+	var flags byte
+	if hasVendor {
+		flags |= 0x80 // V-bit
+	}
+	if mandatory {
+		flags |= 0x40 // M-bit
+	}
+	if protected {
+		flags |= 0x20 // P-bit
+	}
+	buf[4] = flags
+
+	// AVP Length (3 bytes)
+	binary.BigEndian.PutUint32(buf[4:8], uint32(totalLen))
+	buf[4] = flags // Restore flags
+
+	// Vendor ID (if needed)
+	if hasVendor {
+		binary.BigEndian.PutUint32(buf[8:12], vendorID)
+	}
+
+	// Append data
+	buf = append(buf, serialized...)
+
+	// Add padding to 32-bit boundary
+	padding := (4 - (len(buf) % 4)) % 4
+	for i := 0; i < padding; i++ {
+		buf = append(buf, 0)
+	}
+
+	return buf
+}
+
+// Pointer helper functions for grouped AVP field assignments in tests
+func ptrUTF8String(s string) *models_base.UTF8String {
+	v := models_base.UTF8String(s)
+	return &v
+}
+
+func ptrOctetString(b []byte) *models_base.OctetString {
+	v := models_base.OctetString(b)
+	return &v
+}
+
+func ptrUnsigned32(u uint32) *models_base.Unsigned32 {
+	v := models_base.Unsigned32(u)
+	return &v
+}
+
+func ptrUnsigned64(u uint64) *models_base.Unsigned64 {
+	v := models_base.Unsigned64(u)
+	return &v
+}
+
+func ptrEnumerated(e uint32) *models_base.Enumerated {
+	v := models_base.Enumerated(e)
+	return &v
+}
+
+func ptrDiameterIdentity(d string) *models_base.DiameterIdentity {
+	v := models_base.DiameterIdentity(d)
+	return &v
+}
+
+func ptrAddress(a models_base.Address) *models_base.Address {
+	return &a
+}
+
+func ptrFloat32(f float32) *models_base.Float32 {
+	v := models_base.Float32(f)
+	return &v
+}
+
+func ptrFloat64(f float64) *models_base.Float64 {
+	v := models_base.Float64(f)
+	return &v
 }
 `
 	buf.WriteString(helperTemplate)
@@ -1073,11 +1390,11 @@ func (g *Generator) generateCommandTest(buf *bytes.Buffer, cmd *CommandDefinitio
 
 // generateTestFieldAssignment generates code to assign test values to a field (uses "msg" variable)
 func (g *Generator) generateTestFieldAssignment(buf *bytes.Buffer, field *AVPField, cmdName *string) {
-	g.generateTestFieldAssignmentWithVar(buf, field, cmdName, "msg")
+	g.generateTestFieldAssignmentWithVar(buf, field, cmdName, "msg", "\t\t")
 }
 
-// generateTestFieldAssignmentWithVar generates code to assign test values to a field with custom variable name
-func (g *Generator) generateTestFieldAssignmentWithVar(buf *bytes.Buffer, field *AVPField, cmdName *string, varName string) {
+// generateTestFieldAssignmentWithVar generates code to assign test values to a field with custom variable name and indentation
+func (g *Generator) generateTestFieldAssignmentWithVar(buf *bytes.Buffer, field *AVPField, cmdName *string, varName string, indent string) {
 	fieldName := field.FieldName
 	isRepeated := field.Repeated
 
@@ -1154,10 +1471,62 @@ func (g *Generator) generateTestFieldAssignmentWithVar(buf *bytes.Buffer, field 
 			buf.WriteString(fmt.Sprintf("\t%s.%s = models_base.Enumerated(%s)\n", varName, fieldName, value))
 		}
 	case "Grouped":
-		if isRepeated {
-			buf.WriteString(fmt.Sprintf("\t// %s.%s (Grouped) needs to be set manually\n", varName, fieldName))
+		// Generate test code for grouped AVP with nested fields
+		if field.AVP.GroupedFields != nil && len(field.AVP.GroupedFields) > 0 {
+			groupTypeName := toCamelCase(strings.ReplaceAll(field.AVP.Name, "-", "_"))
+			if isRepeated {
+				buf.WriteString(fmt.Sprintf("\t%s.%s = []*%s{\n", varName, fieldName, groupTypeName))
+				buf.WriteString(fmt.Sprintf("\t\t&%s{\n", groupTypeName))
+			} else {
+				buf.WriteString(fmt.Sprintf("\t%s.%s = &%s{\n", varName, fieldName, groupTypeName))
+			}
+
+			// Generate field assignments for nested fields
+			for i, nestedField := range field.AVP.GroupedFields {
+				// Use the FieldName which is already properly converted from snake_case to CamelCase
+				nestedFieldName := nestedField.FieldName
+				switch nestedField.AVP.TypeName {
+				case "UTF8String":
+					if nestedField.AVP.Name == "IMEI" {
+						buf.WriteString(fmt.Sprintf("%s\t\t%s: ptrUTF8String(\"123456789012345\"),\n", indent, nestedFieldName))
+					} else if nestedField.AVP.Name == "Software-Version" {
+						buf.WriteString(fmt.Sprintf("%s\t\t%s: ptrUTF8String(\"01\"),\n", indent, nestedFieldName))
+					} else {
+						buf.WriteString(fmt.Sprintf("%s\t\t%s: ptrUTF8String(\"test\"),\n", indent, nestedFieldName))
+					}
+				case "OctetString":
+					buf.WriteString(fmt.Sprintf("%s\t\t%s: ptrOctetString([]byte{0x01, 0x02, 0x03}),\n", indent, nestedFieldName))
+				case "Unsigned32":
+					buf.WriteString(fmt.Sprintf("%s\t\t%s: ptrUnsigned32(1),\n", indent, nestedFieldName))
+				case "Unsigned64":
+					buf.WriteString(fmt.Sprintf("%s\t\t%s: ptrUnsigned64(1),\n", indent, nestedFieldName))
+				case "Enumerated":
+					buf.WriteString(fmt.Sprintf("%s\t\t%s: ptrEnumerated(1),\n", indent, nestedFieldName))
+				default:
+					// For unknown types, add a comment
+					buf.WriteString(fmt.Sprintf("%s\t\t// %s (type: %s) needs to be set\n", indent, nestedFieldName, nestedField.AVP.TypeName))
+				}
+
+				// Only show first few fields in test to keep it readable
+				if i >= 2 && len(field.AVP.GroupedFields) > 3 {
+					buf.WriteString(fmt.Sprintf("%s\t\t// ... and %d more fields\n", indent, len(field.AVP.GroupedFields)-i-1))
+					break
+				}
+			}
+
+			if isRepeated {
+				buf.WriteString(fmt.Sprintf("%s\t},\n", indent))
+				buf.WriteString(fmt.Sprintf("%s}\n", indent))
+			} else {
+				buf.WriteString(fmt.Sprintf("%s}\n", indent))
+			}
 		} else {
-			buf.WriteString(fmt.Sprintf("\t// %s.%s (Grouped) needs to be set manually\n", varName, fieldName))
+			// Fallback for grouped AVPs without nested field definitions
+			if isRepeated {
+				buf.WriteString(fmt.Sprintf("\t// %s.%s (Grouped) needs to be set manually\n", varName, fieldName))
+			} else {
+				buf.WriteString(fmt.Sprintf("\t// %s.%s (Grouped) needs to be set manually\n", varName, fieldName))
+			}
 		}
 	default:
 		// For other types, add a comment
@@ -1355,7 +1724,7 @@ func (g *Generator) generateCommandPairPcapTest(buf *bytes.Buffer, requestCmd, a
 	cmdName := requestCmd.Name
 	for _, field := range requestCmd.Fields {
 		if field.Required {
-			g.generateTestFieldAssignmentWithVar(buf, field, &cmdName, "request")
+			g.generateTestFieldAssignmentWithVar(buf, field, &cmdName, "request", "\t")
 		}
 	}
 
@@ -1370,7 +1739,7 @@ func (g *Generator) generateCommandPairPcapTest(buf *bytes.Buffer, requestCmd, a
 	cmdName = answerCmd.Name
 	for _, field := range answerCmd.Fields {
 		if field.Required {
-			g.generateTestFieldAssignmentWithVar(buf, field, &cmdName, "answer")
+			g.generateTestFieldAssignmentWithVar(buf, field, &cmdName, "answer", "\t")
 		}
 	}
 
@@ -1452,7 +1821,7 @@ func (g *Generator) generateCommandRoundtripTest(buf *bytes.Buffer, cmd *Command
 	cmdName := cmd.Name
 	for _, field := range cmd.Fields {
 		if field.Required {
-			g.generateTestFieldAssignmentWithVar(buf, field, &cmdName, "original")
+			g.generateTestFieldAssignmentWithVar(buf, field, &cmdName, "original", "\t")
 		}
 	}
 
@@ -1754,4 +2123,250 @@ func (g *Generator) GenerateBenchmarkTests() (string, error) {
 	}
 
 	return buf.String(), nil
+}
+
+// generateGroupedMarshal generates the Marshal method for a Grouped AVP
+func (g *Generator) generateGroupedMarshal(buf *bytes.Buffer, structName string, avp *AVPDefinition) {
+	buf.WriteString(fmt.Sprintf("// Marshal serializes %s to bytes\n", structName))
+	buf.WriteString(fmt.Sprintf("func (g *%s) Marshal() ([]byte, error) {\n", structName))
+
+	if len(avp.GroupedFields) == 0 {
+		// No fields, return raw data
+		buf.WriteString("\treturn g.Data, nil\n")
+		buf.WriteString("}\n\n")
+		return
+	}
+
+	buf.WriteString("\tvar buf bytes.Buffer\n\n")
+
+	// Marshal each field
+	for _, field := range avp.GroupedFields {
+		// Handle Grouped types differently
+		if field.AVP.TypeName == "Grouped" {
+			if field.Repeated {
+				buf.WriteString(fmt.Sprintf("\t// Marshal %s (repeated, grouped)\n", field.FieldName))
+				buf.WriteString(fmt.Sprintf("\tfor _, v := range g.%s {\n", field.FieldName))
+				buf.WriteString("\t\tif v != nil {\n")
+				buf.WriteString("\t\t\tif groupedData, err := v.Marshal(); err == nil {\n")
+				// Check if this nested grouped AVP has a vendor ID
+				if field.AVP.VendorID != 0 {
+					buf.WriteString(fmt.Sprintf("\t\t\t\tbuf.Write(marshalAVPWithVendor(%d, models_base.Grouped(groupedData), %v, %v, %d))\n",
+						field.AVP.Code, field.AVP.Must, field.AVP.MayEncrypt, field.AVP.VendorID))
+				} else {
+					buf.WriteString(fmt.Sprintf("\t\t\t\tbuf.Write(marshalAVP(%d, models_base.Grouped(groupedData), %v, %v))\n",
+						field.AVP.Code, field.AVP.Must, field.AVP.MayEncrypt))
+				}
+				buf.WriteString("\t\t\t}\n")
+				buf.WriteString("\t\t}\n")
+				buf.WriteString("\t}\n\n")
+			} else {
+				buf.WriteString(fmt.Sprintf("\t// Marshal %s (grouped)\n", field.FieldName))
+				buf.WriteString(fmt.Sprintf("\tif g.%s != nil {\n", field.FieldName))
+				buf.WriteString(fmt.Sprintf("\t\tif groupedData, err := g.%s.Marshal(); err == nil {\n", field.FieldName))
+				// Check if this nested grouped AVP has a vendor ID
+				if field.AVP.VendorID != 0 {
+					buf.WriteString(fmt.Sprintf("\t\t\tbuf.Write(marshalAVPWithVendor(%d, models_base.Grouped(groupedData), %v, %v, %d))\n",
+						field.AVP.Code, field.AVP.Must, field.AVP.MayEncrypt, field.AVP.VendorID))
+				} else {
+					buf.WriteString(fmt.Sprintf("\t\t\tbuf.Write(marshalAVP(%d, models_base.Grouped(groupedData), %v, %v))\n",
+						field.AVP.Code, field.AVP.Must, field.AVP.MayEncrypt))
+				}
+				buf.WriteString("\t\t}\n")
+				buf.WriteString("\t}\n\n")
+			}
+		} else {
+			// Non-grouped fields
+			if field.Repeated {
+				buf.WriteString(fmt.Sprintf("\t// Marshal %s (repeated)\n", field.FieldName))
+				buf.WriteString(fmt.Sprintf("\tfor _, v := range g.%s {\n", field.FieldName))
+				// Check if this field has a vendor ID
+				if field.AVP.VendorID != 0 {
+					buf.WriteString(fmt.Sprintf("\t\tbuf.Write(marshalAVPWithVendor(%d, v, %v, %v, %d))\n",
+						field.AVP.Code, field.AVP.Must, field.AVP.MayEncrypt, field.AVP.VendorID))
+				} else {
+					buf.WriteString(fmt.Sprintf("\t\tbuf.Write(marshalAVP(%d, v, %v, %v))\n",
+						field.AVP.Code, field.AVP.Must, field.AVP.MayEncrypt))
+				}
+				buf.WriteString("\t}\n\n")
+			} else if !field.Required {
+				buf.WriteString(fmt.Sprintf("\t// Marshal %s (optional)\n", field.FieldName))
+				buf.WriteString(fmt.Sprintf("\tif g.%s != nil {\n", field.FieldName))
+				// Check if this field has a vendor ID
+				if field.AVP.VendorID != 0 {
+					buf.WriteString(fmt.Sprintf("\t\tbuf.Write(marshalAVPWithVendor(%d, *g.%s, %v, %v, %d))\n",
+						field.AVP.Code, field.FieldName, field.AVP.Must, field.AVP.MayEncrypt, field.AVP.VendorID))
+				} else {
+					buf.WriteString(fmt.Sprintf("\t\tbuf.Write(marshalAVP(%d, *g.%s, %v, %v))\n",
+						field.AVP.Code, field.FieldName, field.AVP.Must, field.AVP.MayEncrypt))
+				}
+				buf.WriteString("\t}\n\n")
+			} else {
+				buf.WriteString(fmt.Sprintf("\t// Marshal %s (required)\n", field.FieldName))
+				// Check if this field has a vendor ID
+				if field.AVP.VendorID != 0 {
+					buf.WriteString(fmt.Sprintf("\tbuf.Write(marshalAVPWithVendor(%d, g.%s, %v, %v, %d))\n\n",
+						field.AVP.Code, field.FieldName, field.AVP.Must, field.AVP.MayEncrypt, field.AVP.VendorID))
+				} else {
+					buf.WriteString(fmt.Sprintf("\tbuf.Write(marshalAVP(%d, g.%s, %v, %v))\n\n",
+						field.AVP.Code, field.FieldName, field.AVP.Must, field.AVP.MayEncrypt))
+				}
+			}
+		}
+	}
+
+	buf.WriteString("\n\treturn buf.Bytes(), nil\n")
+	buf.WriteString("}\n\n")
+}
+
+// generateGroupedUnmarshal generates the Unmarshal method for a Grouped AVP
+func (g *Generator) generateGroupedUnmarshal(buf *bytes.Buffer, structName string, avp *AVPDefinition) {
+	buf.WriteString(fmt.Sprintf("// Unmarshal deserializes bytes into %s\n", structName))
+	buf.WriteString(fmt.Sprintf("func (g *%s) Unmarshal(data []byte) error {\n", structName))
+
+	if len(avp.GroupedFields) == 0 {
+		// No fields, store raw data
+		buf.WriteString("\tg.Data = make([]byte, len(data))\n")
+		buf.WriteString("\tcopy(g.Data, data)\n")
+		buf.WriteString("\treturn nil\n")
+		buf.WriteString("}\n\n")
+		return
+	}
+
+	buf.WriteString("\t// Parse AVPs in the grouped data\n")
+	buf.WriteString("\tavpData := data\n")
+	buf.WriteString("\tfor len(avpData) > 0 {\n")
+	buf.WriteString("\t\tif len(avpData) < 8 {\n")
+	buf.WriteString("\t\t\tbreak // Not enough data for AVP header\n")
+	buf.WriteString("\t\t}\n\n")
+
+	// Count how many fields have valid codes
+	hasValidCodes := false
+	for _, field := range avp.GroupedFields {
+		if field.AVP.Code != 0 {
+			hasValidCodes = true
+			break
+		}
+	}
+
+	buf.WriteString("\t\t// Parse AVP header\n")
+	if hasValidCodes {
+		buf.WriteString("\t\tavpCode := binary.BigEndian.Uint32(avpData[0:4])\n")
+	} else {
+		buf.WriteString("\t\t_ = binary.BigEndian.Uint32(avpData[0:4]) // avpCode\n")
+	}
+	buf.WriteString("\t\tavpFlags := avpData[4]\n")
+	buf.WriteString("\t\tavpLength := binary.BigEndian.Uint32([]byte{0, avpData[5], avpData[6], avpData[7]})\n\n")
+
+	buf.WriteString("\t\tif int(avpLength) > len(avpData) {\n")
+	buf.WriteString("\t\t\treturn fmt.Errorf(\"AVP length exceeds remaining data\")\n")
+	buf.WriteString("\t\t}\n\n")
+
+	buf.WriteString("\t\t// Extract AVP data\n")
+	buf.WriteString("\t\theaderSize := 8\n")
+
+	// Check if any grouped field has a vendor ID that needs to be matched
+	hasVendorSpecificFields := false
+	for _, field := range avp.GroupedFields {
+		if field.AVP.VendorID != 0 {
+			hasVendorSpecificFields = true
+			break
+		}
+	}
+
+	if hasVendorSpecificFields {
+		buf.WriteString("\t\tvar vendorID uint32\n")
+	}
+	buf.WriteString("\t\tif avpFlags&0x80 != 0 { // V-bit set\n")
+	buf.WriteString("\t\t\tif len(avpData) < 12 {\n")
+	buf.WriteString("\t\t\t\treturn fmt.Errorf(\"AVP data too short for vendor ID\")\n")
+	buf.WriteString("\t\t\t}\n")
+	if hasVendorSpecificFields {
+		buf.WriteString("\t\t\tvendorID = binary.BigEndian.Uint32(avpData[8:12])\n")
+	} else {
+		buf.WriteString("\t\t\t_ = binary.BigEndian.Uint32(avpData[8:12]) // vendorID not used\n")
+	}
+	buf.WriteString("\t\t\theaderSize = 12\n")
+	buf.WriteString("\t\t}\n")
+	buf.WriteString("\t\tavpDataLen := int(avpLength) - headerSize\n")
+	buf.WriteString("\t\tif avpDataLen < 0 {\n")
+	buf.WriteString("\t\t\treturn fmt.Errorf(\"invalid AVP data length\")\n")
+	buf.WriteString("\t\t}\n")
+
+	if hasValidCodes {
+		buf.WriteString("\t\tavpValue := avpData[headerSize : headerSize+avpDataLen]\n\n")
+		buf.WriteString("\t\t// Parse AVP based on code and vendor ID\n")
+		buf.WriteString("\t\tswitch avpCode {\n")
+
+		// Generate case for each field
+		for _, field := range avp.GroupedFields {
+			// Skip AVPs with code 0 (undefined/generic AVPs) - add comment instead
+			if field.AVP.Code == 0 {
+				buf.WriteString(fmt.Sprintf("\t\t// case 0: // %s (AVP code not defined)\n", field.AVP.Name))
+				continue
+			}
+			buf.WriteString(fmt.Sprintf("\t\tcase %d: // %s\n", field.AVP.Code, field.AVP.Name))
+
+			// Check vendor ID if it's a vendor-specific AVP
+			if field.AVP.VendorID != 0 {
+				buf.WriteString(fmt.Sprintf("\t\t\tif vendorID != %d {\n", field.AVP.VendorID))
+				buf.WriteString("\t\t\t\tbreak // Vendor ID mismatch\n")
+				buf.WriteString("\t\t\t}\n")
+			}
+
+			// Handle Grouped types differently
+			if field.AVP.TypeName == "Grouped" {
+				structType := g.getBaseGoTypeForField(field)
+				if field.Repeated {
+					buf.WriteString(fmt.Sprintf("\t\t\tgrouped := &%s{}\n", structType))
+					buf.WriteString("\t\t\tif err := grouped.Unmarshal(avpValue); err == nil {\n")
+					buf.WriteString(fmt.Sprintf("\t\t\t\tg.%s = append(g.%s, grouped)\n", field.FieldName, field.FieldName))
+					buf.WriteString("\t\t\t}\n")
+				} else {
+					buf.WriteString(fmt.Sprintf("\t\t\tgrouped := &%s{}\n", structType))
+					buf.WriteString("\t\t\tif err := grouped.Unmarshal(avpValue); err == nil {\n")
+					buf.WriteString(fmt.Sprintf("\t\t\t\tg.%s = grouped\n", field.FieldName))
+					buf.WriteString("\t\t\t}\n")
+				}
+			} else {
+				decoder := g.getDecoder(field.AVP.TypeName)
+				if field.Repeated {
+					buf.WriteString(fmt.Sprintf("\t\t\tval, err := %s(avpValue)\n", decoder))
+					buf.WriteString("\t\t\tif err == nil {\n")
+					buf.WriteString(fmt.Sprintf("\t\t\t\tg.%s = append(g.%s, val.(%s))\n",
+						field.FieldName, field.FieldName, g.getBaseGoType(field.AVP.TypeName)))
+					buf.WriteString("\t\t\t}\n")
+				} else if !field.Required {
+					buf.WriteString(fmt.Sprintf("\t\t\tval, err := %s(avpValue)\n", decoder))
+					buf.WriteString("\t\t\tif err == nil {\n")
+					buf.WriteString(fmt.Sprintf("\t\t\t\tv := val.(%s)\n", g.getBaseGoType(field.AVP.TypeName)))
+					buf.WriteString(fmt.Sprintf("\t\t\t\tg.%s = &v\n", field.FieldName))
+					buf.WriteString("\t\t\t}\n")
+				} else {
+					buf.WriteString(fmt.Sprintf("\t\t\tval, err := %s(avpValue)\n", decoder))
+					buf.WriteString("\t\t\tif err == nil {\n")
+					buf.WriteString(fmt.Sprintf("\t\t\t\tg.%s = val.(%s)\n",
+						field.FieldName, g.getBaseGoType(field.AVP.TypeName)))
+					buf.WriteString("\t\t\t}\n")
+				}
+			}
+		}
+
+		buf.WriteString("\t\t}\n\n")
+	} else {
+		buf.WriteString("\t\t_ = avpDataLen // avpValue not needed when no fields are defined\n\n")
+	}
+
+	buf.WriteString("\t\t// Move to next AVP (with padding)\n")
+	buf.WriteString("\t\tpaddedLength := int(avpLength)\n")
+	buf.WriteString("\t\tif paddedLength%4 != 0 {\n")
+	buf.WriteString("\t\t\tpaddedLength += 4 - (paddedLength % 4)\n")
+	buf.WriteString("\t\t}\n")
+	buf.WriteString("\t\tif paddedLength > len(avpData) {\n")
+	buf.WriteString("\t\t\tbreak\n")
+	buf.WriteString("\t\t}\n")
+	buf.WriteString("\t\tavpData = avpData[paddedLength:]\n")
+	buf.WriteString("\t}\n\n")
+
+	buf.WriteString("\treturn nil\n")
+	buf.WriteString("}\n\n")
 }

@@ -1,8 +1,6 @@
-// S13/S13' Interface Diameter Protocol Definition
+// Diameter S13/S13' Interface Application
 // Based on 3GPP TS 29.272 v16.5.0
 // Interface between MME/SGSN and EIR (Equipment Identity Register)
-// S13: MME - EIR
-// S13': SGSN - EIR
 
 syntax = "diameter1";
 
@@ -10,350 +8,273 @@ package diameter.s13;
 
 option go_package = "github.com/hsdfat8/diam-gw/commands/s13";
 
-// Application ID for S13/S13'
+// ================================================================================
+//                         APPLICATION IDENTIFIER
+// ================================================================================
+// S13/S13' Application ID: 16777252 (allocated by IANA)
+// Vendor ID: 10415 (3GPP)
+
 const S13_APPLICATION_ID = 16777252;
 const VENDOR_ID_3GPP = 10415;
 
-// ============================================================================
-// AVP Definitions - 3GPP Vendor Specific (Vendor-Id: 10415)
-// ============================================================================
+// ================================================================================
+//                         COMMAND CODE VALUES
+// ================================================================================
+// Table 7.2.2/2: Command-Code values for S13/S13'
 
-// Terminal-Information AVP - Contains IMEI and Software Version
+const ECR_COMMAND_CODE = 324;  // ME-Identity-Check-Request/Answer
+
+// ================================================================================
+//                         ENUMERATED VALUE DEFINITIONS
+// ================================================================================
+
+// Equipment-Status (AVP Code 1445)
+// Indicates the status of the mobile equipment
+enum EquipmentStatus {
+  WHITELISTED = 0;    // Equipment is allowed (on white list)
+  BLACKLISTED = 1;    // Equipment is not allowed (on black list)
+  GREYLISTED = 2;     // Equipment is under investigation (on grey list)
+}
+
+// ================================================================================
+//                         EXPERIMENTAL RESULT CODES
+// ================================================================================
+
+// S13/S13' Specific Experimental-Result-Code values
+// Vendor-Id: 10415 (3GPP)
+
+const DIAMETER_ERROR_USER_UNKNOWN = 5001;
+const DIAMETER_ERROR_EQUIPMENT_UNKNOWN = 5422;
+
+// ================================================================================
+//                         S13 SPECIFIC AVP DEFINITIONS
+// ================================================================================
+
+// Terminal-Information (AVP Code 1401) - Grouped
+// Contains information about the mobile equipment being checked
 avp Terminal-Information {
   code = 1401;
   vendor_id = 10415;
   type = Grouped;
   must = true;
   may_encrypt = false;
-  // Contains:
-  //   IMEI
-  //   3GPP2-MEID
-  //   Software-Version
+  description = "Contains information about the user's mobile equipment";
+
+  grouped {
+    // IMEI: International Mobile Equipment Identity (15 or 16 digits)
+    // The EIR uses the first 14 digits (TAC + SNR) for identification
+    // The 15th digit (check digit) is ignored by EIR
+    // The 16th digit (SVN) is optional
+    optional IMEI imei = 1;                        // Code 1402, UTF8String
+    
+    // 3GPP2-MEID: Mobile Equipment Identifier for 3GPP2 networks
+    optional 3GPP2-MEID meid = 2;                  // Code 1471, OctetString
+    
+    // Software-Version: IMEISV software version (2 digits)
+    // May be used by EIR in addition to IMEI for black/grey list checks
+    optional Software-Version software_version = 3; // Code 1403, UTF8String
+  }
 }
 
-// IMEI - International Mobile Equipment Identity
+// IMEI (AVP Code 1402)
+// International Mobile Equipment Identity
+// Format: 14-16 digits as UTF8String
+// Structure: TAC (8 digits) + SNR (6 digits) + optional CD (1 digit) + optional SVN (2 digits)
 avp IMEI {
   code = 1402;
   vendor_id = 10415;
   type = UTF8String;
   must = true;
   may_encrypt = false;
-  // 14-15 digit IMEI number
+  description = "International Mobile Equipment Identity (IMEI)";
 }
 
-// Software-Version - 2-digit Software Version Number (SVN)
+// Software-Version (AVP Code 1403)
+// Software Version Number from IMEISV
+// Format: 2 digits as UTF8String
 avp Software-Version {
   code = 1403;
   vendor_id = 10415;
   type = UTF8String;
   must = true;
   may_encrypt = false;
-  // 2 digit SVN
+  description = "Software version number of mobile equipment (from IMEISV)";
 }
 
-// 3GPP2-MEID - Mobile Equipment Identifier for CDMA
+// 3GPP2-MEID (AVP Code 1471)
+// Mobile Equipment Identifier for 3GPP2 networks
+// Format: 56 bits as OctetString
 avp 3GPP2-MEID {
   code = 1471;
   vendor_id = 10415;
   type = OctetString;
   must = true;
   may_encrypt = false;
+  description = "Mobile Equipment Identifier for 3GPP2 networks";
 }
 
-// Equipment-Status - Result of equipment identity check
+// Equipment-Status (AVP Code 1445)
+// Result of the ME identity check
 avp Equipment-Status {
   code = 1445;
   vendor_id = 10415;
   type = Enumerated;
   must = true;
   may_encrypt = false;
+  description = "Status of the mobile equipment from EIR check";
   // Values:
-  // 0 - WHITELISTED: Equipment is on whitelist, allowed
-  // 1 - BLACKLISTED: Equipment is on blacklist, not allowed
-  // 2 - GREYLISTED: Equipment is on greylist, allowed with tracking
+  //   0 = WHITELISTED - Equipment is on white list (allowed)
+  //   1 = BLACKLISTED - Equipment is on black list (not allowed, e.g., stolen)
+  //   2 = GREYLISTED  - Equipment is on grey list (under investigation)
 }
 
-// ============================================================================
-// Common AVPs (from RFC 6733 / 3GPP TS 29.229)
-// ============================================================================
+// ================================================================================
+//                         COMMAND DEFINITIONS
+// ================================================================================
 
-// DRMP - Diameter Routing Message Priority
-avp DRMP {
-  code = 301;
-  type = Enumerated;
-  must = false;
-  may_encrypt = false;
-  // Values: 0-15 (0 = highest priority)
-}
-
-// Supported-Features - For feature negotiation
-avp Supported-Features {
-  code = 628;
-  vendor_id = 10415;
-  type = Grouped;
-  must = false;
-  may_encrypt = false;
-}
-
-avp Feature-List-ID {
-  code = 629;
-  vendor_id = 10415;
-  type = Unsigned32;
-  must = false;
-  may_encrypt = false;
-}
-
-avp Feature-List {
-  code = 630;
-  vendor_id = 10415;
-  type = Unsigned32;
-  must = false;
-  may_encrypt = false;
-}
-
-// Experimental-Result - For 3GPP specific result codes
-avp Experimental-Result {
-  code = 297;
-  type = Grouped;
-  must = true;
-  may_encrypt = false;
-}
-
-avp Experimental-Result-Code {
-  code = 298;
-  type = Unsigned32;
-  must = true;
-  may_encrypt = false;
-}
-
-// ============================================================================
-// Base Protocol AVPs (from RFC 6733)
-// ============================================================================
-
-avp Session-Id {
-  code = 263;
-  type = UTF8String;
-  must = true;
-  may_encrypt = false;
-}
-
-avp Auth-Session-State {
-  code = 277;
-  type = Enumerated;
-  must = true;
-  may_encrypt = false;
-  // 0: STATE_MAINTAINED
-  // 1: NO_STATE_MAINTAINED (typically used for S13)
-}
-
-avp Origin-Host {
-  code = 264;
-  type = DiameterIdentity;
-  must = true;
-  may_encrypt = false;
-}
-
-avp Origin-Realm {
-  code = 296;
-  type = DiameterIdentity;
-  must = true;
-  may_encrypt = false;
-}
-
-avp Destination-Host {
-  code = 293;
-  type = DiameterIdentity;
-  must = false;
-  may_encrypt = false;
-}
-
-avp Destination-Realm {
-  code = 283;
-  type = DiameterIdentity;
-  must = true;
-  may_encrypt = false;
-}
-
-avp User-Name {
-  code = 1;
-  type = UTF8String;
-  must = false;
-  may_encrypt = true;
-  // Contains IMSI when present
-}
-
-avp Vendor-Specific-Application-Id {
-  code = 260;
-  type = Grouped;
-  must = false;
-  may_encrypt = false;
-}
-
-avp Result-Code {
-  code = 268;
-  type = Unsigned32;
-  must = true;
-  may_encrypt = false;
-}
-
-avp Failed-AVP {
-  code = 279;
-  type = Grouped;
-  must = false;
-  may_encrypt = false;
-}
-
-avp Proxy-Info {
-  code = 284;
-  type = Grouped;
-  must = false;
-  may_encrypt = false;
-}
-
-avp Route-Record {
-  code = 282;
-  type = DiameterIdentity;
-  must = false;
-  may_encrypt = false;
-}
-
-// ============================================================================
-// Command Definitions
-// ============================================================================
-
+// ================================================================================
 // ME-Identity-Check-Request (ECR) - Command Code 324
-// Direction: MME/SGSN -> EIR
-// Purpose: Check if Mobile Equipment (IMEI) is allowed to access network
+// 3GPP TS 29.272 Section 7.2.19
+// Sent from MME/SGSN to EIR
+// Purpose: Check if the Mobile Equipment identity (IMEI) is valid
+// ================================================================================
 command ME-Identity-Check-Request {
   code = 324;
   application_id = 16777252;
   request = true;
   proxiable = true;
+  description = "Request to check mobile equipment identity against EIR";
 
   // Required AVPs
   fixed required Session-Id session_id = 1;
-  optional DRMP drmp = 2;
-  optional Vendor-Specific-Application-Id vendor_specific_application_id = 3;
-  fixed required Auth-Session-State auth_session_state = 4;
-  fixed required Origin-Host origin_host = 5;
-  fixed required Origin-Realm origin_realm = 6;
-  optional Destination-Host destination_host = 7;
-  fixed required Destination-Realm destination_realm = 8;
-  
-  // Terminal Information containing IMEI
-  fixed required Terminal-Information terminal_information = 9;
-  
-  // Optional: IMSI of subscriber using this equipment
-  optional User-Name user_name = 10;
-  
-  // Proxy/Routing AVPs
-  repeated optional Proxy-Info proxy_info = 100;
-  repeated optional Route-Record route_record = 101;
+  fixed required Auth-Session-State auth_session_state = 2;  // Must be NO_STATE_MAINTAINED
+  fixed required Origin-Host origin_host = 3;                // MME/SGSN identity
+  fixed required Origin-Realm origin_realm = 4;              // MME/SGSN realm
+  fixed required Destination-Realm destination_realm = 5;    // EIR realm
+  fixed required Terminal-Information terminal_information = 6;  // Contains IMEI
+
+  // Optional AVPs
+  optional DRMP drmp = 7;                                    // Diameter Routing Message Priority
+  optional Vendor-Specific-Application-Id vendor_specific_application_id = 8;
+  optional Destination-Host destination_host = 9;            // Specific EIR host
+  optional User-Name user_name = 10;                         // IMSI (optional, for operator purposes)
+  repeated optional AVP avp = 11;                            // Additional AVPs
+  repeated optional Proxy-Info proxy_info = 12;              // Proxy state information
+  repeated optional Route-Record route_record = 13;          // Route tracking
 }
 
+// ================================================================================
 // ME-Identity-Check-Answer (ECA) - Command Code 324
-// Direction: EIR -> MME/SGSN
-// Purpose: Return equipment check result
+// 3GPP TS 29.272 Section 7.2.20
+// Sent from EIR to MME/SGSN
+// Purpose: Return the equipment status (whitelisted/blacklisted/greylisted)
+// ================================================================================
 command ME-Identity-Check-Answer {
   code = 324;
   application_id = 16777252;
   request = false;
   proxiable = true;
+  description = "Response to ME identity check with equipment status";
 
   // Required AVPs
   fixed required Session-Id session_id = 1;
-  optional DRMP drmp = 2;
-  optional Vendor-Specific-Application-Id vendor_specific_application_id = 3;
+  fixed required Auth-Session-State auth_session_state = 2;  // Must be NO_STATE_MAINTAINED
+  fixed required Origin-Host origin_host = 3;                // EIR identity
+  fixed required Origin-Realm origin_realm = 4;              // EIR realm
+
+  // Conditional AVPs
+  // Result-Code: Success (DIAMETER_SUCCESS = 2001) or base protocol errors
+  // Experimental-Result: S13/S13' specific errors (Equipment Unknown)
+  optional Result-Code result_code = 5;
+  optional Experimental-Result experimental_result = 6;
   
-  // Result - one of these must be present
-  optional Result-Code result_code = 4;
-  optional Experimental-Result experimental_result = 5;
-  
-  fixed required Auth-Session-State auth_session_state = 6;
-  fixed required Origin-Host origin_host = 7;
-  fixed required Origin-Realm origin_realm = 8;
-  
-  // Equipment check result
-  optional Equipment-Status equipment_status = 9;
-  
-  // Error handling
-  optional Failed-AVP failed_avp = 10;
-  
-  // Proxy/Routing AVPs
-  repeated optional Proxy-Info proxy_info = 100;
-  repeated optional Route-Record route_record = 101;
+  // Equipment-Status: Present only if Result-Code is DIAMETER_SUCCESS
+  // Indicates WHITELISTED(0), BLACKLISTED(1), or GREYLISTED(2)
+  optional Equipment-Status equipment_status = 7;
+
+  // Optional AVPs
+  optional DRMP drmp = 8;
+  optional Vendor-Specific-Application-Id vendor_specific_application_id = 9;
+  repeated optional AVP avp = 10;
+  optional Failed-AVP failed_avp = 11;                       // AVPs causing failure
+  repeated optional Proxy-Info proxy_info = 12;
+  repeated optional Route-Record route_record = 13;
 }
 
-// ============================================================================
-// Result Codes for S13/S13' Interface
-// ============================================================================
-
-// Standard Diameter Result Codes (from RFC 6733):
-// 2001 - DIAMETER_SUCCESS
-// 5001 - DIAMETER_AVP_UNSUPPORTED  
-// 5004 - DIAMETER_INVALID_AVP_VALUE
-// 5005 - DIAMETER_MISSING_AVP
-// 5012 - DIAMETER_UNABLE_TO_COMPLY
-
-// 3GPP Experimental Result Codes for S13/S13':
-// 5422 - DIAMETER_ERROR_UNKNOWN_EPS_SUBSCRIPTION
-// 5421 - DIAMETER_ERROR_RAT_NOT_ALLOWED
-// 5420 - DIAMETER_ERROR_EQUIPMENT_UNKNOWN
-
-// ============================================================================
-// Message Flow Examples
-// ============================================================================
-
-/*
-IMEI Check during Attach/TAU:
------------------------------
-    MME                                    EIR
-     |                                      |
-     |--- ME-Identity-Check-Request (ECR) -->|
-     |    Terminal-Information:             |
-     |      IMEI: "123456789012345"         |
-     |      Software-Version: "01"          |
-     |    User-Name: "123456789012345"      |
-     |                                      |
-     |<-- ME-Identity-Check-Answer (ECA) ---|
-     |    Result-Code: 2001 (SUCCESS)       |
-     |    Equipment-Status: WHITELISTED (0) |
-     |                                      |
-
-Equipment Status Results:
--------------------------
-- WHITELISTED (0): Equipment allowed, proceed with attach
-- BLACKLISTED (1): Equipment not allowed, reject attach
-- GREYLISTED (2): Equipment allowed but tracked/monitored
-
-Error Scenarios:
-----------------
-1. Unknown IMEI:
-   ECA with Experimental-Result-Code: 5420 (EQUIPMENT_UNKNOWN)
-   
-2. Invalid IMEI format:
-   ECA with Result-Code: 5004 (INVALID_AVP_VALUE)
-   Failed-AVP contains Terminal-Information
-*/
-
-// ============================================================================
-// Grouped AVP Definitions
-// ============================================================================
-
-/*
-Terminal-Information ::= <AVP header: 1401 10415>
-    [ IMEI ]
-    [ 3GPP2-MEID ]
-    [ Software-Version ]
-
-Note: At least one of IMEI or 3GPP2-MEID must be present
-
-Supported-Features ::= <AVP header: 628 10415>
-    { Vendor-Id }
-    { Feature-List-ID }
-    { Feature-List }
-
-Experimental-Result ::= <AVP header: 297>
-    { Vendor-Id }
-    { Experimental-Result-Code }
-*/
+// ================================================================================
+//                         USAGE NOTES
+// ================================================================================
+//
+// 1. SESSION HANDLING:
+//    - S13/S13' uses implicitly terminated sessions
+//    - Auth-Session-State MUST be set to NO_STATE_MAINTAINED (1)
+//    - No session termination or re-authorization messages are used
+//
+// 2. IMEI CHECKING:
+//    - EIR identifies equipment using first 14 digits of IMEI (TAC + SNR)
+//    - 15th digit (check digit) is ignored by EIR
+//    - Software-Version may optionally be used for enhanced checking
+//
+// 3. RESULT HANDLING:
+//    Result-Code = DIAMETER_SUCCESS (2001):
+//      - Equipment-Status AVP will be present
+//      - MME/SGSN decides action based on status:
+//        * WHITELISTED: Allow attachment
+//        * BLACKLISTED: Reject attachment
+//        * GREYLISTED: Operator policy dependent
+//
+//    Experimental-Result-Code = DIAMETER_ERROR_EQUIPMENT_UNKNOWN (5422):
+//      - Equipment not found in any list
+//      - Equipment-Status will NOT be present
+//      - MME/SGSN may reject attachment based on operator policy
+//
+// 4. TRANSPORT:
+//    - S13/S13' uses SCTP as transport protocol
+//    - Port: 3868 (Diameter standard port)
+//
+// 5. SECURITY:
+//    - IPsec should be used for secure transport
+//    - See 3GPP TS 33.210 for security requirements
+//
+// ================================================================================
+//                         MESSAGE FLOW EXAMPLE
+// ================================================================================
+//
+//     MME/SGSN                                    EIR
+//         |                                        |
+//         |  1. ECR (IMEI in Terminal-Information) |
+//         |--------------------------------------->|
+//         |                                        |
+//         |    (EIR checks IMEI against lists)     |
+//         |                                        |
+//         |  2. ECA (Equipment-Status=WHITELISTED) |
+//         |<---------------------------------------|
+//         |                                        |
+//         | (MME/SGSN allows UE attachment)        |
+//         |                                        |
+//
+// ================================================================================
+//                         GROUPED AVP STRUCTURE SUMMARY
+// ================================================================================
+//
+// Terminal-Information (1401):
+//   +-- IMEI (1402)              [Optional, UTF8String]
+//   +-- 3GPP2-MEID (1471)        [Optional, OctetString]
+//   +-- Software-Version (1403)  [Optional, UTF8String]
+//
+// Experimental-Result (297) - Base Protocol:
+//   +-- Vendor-Id (266)                    [Required, Unsigned32] = 10415
+//   +-- Experimental-Result-Code (298)     [Required, Unsigned32]
+//
+// ================================================================================
+//                         RELATED SPECIFICATIONS
+// ================================================================================
+//
+// - 3GPP TS 29.272: S6a/S6d and S13/S13' interface specification
+// - 3GPP TS 23.003: Numbering, addressing and identification (IMEI format)
+// - 3GPP TS 22.016: International Mobile station Equipment Identities (IMEI)
+// - 3GPP TS 23.401: GPRS enhancements for E-UTRAN access
+// - 3GPP TS 33.210: Network Domain Security (NDS)
+// - RFC 6733: Diameter Base Protocol
+//
+// ================================================================================
