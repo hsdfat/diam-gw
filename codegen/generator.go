@@ -56,6 +56,57 @@ func (g *Generator) GenerateTestFile(testFile string) error {
 	return os.WriteFile(testFile, formatted, 0644)
 }
 
+// GenerateUnitTestFile generates a unit test file with validation and roundtrip tests
+func (g *Generator) GenerateUnitTestFile(testFile string) error {
+	code, err := g.GenerateUnitTests()
+	if err != nil {
+		return err
+	}
+
+	// Format the code
+	formatted, err := format.Source([]byte(code))
+	if err != nil {
+		// If formatting fails, write the unformatted code for debugging
+		return os.WriteFile(testFile, []byte(code), 0644)
+	}
+
+	return os.WriteFile(testFile, formatted, 0644)
+}
+
+// GeneratePcapTestFile generates a PCAP test file for network packet generation
+func (g *Generator) GeneratePcapTestFile(testFile string) error {
+	code, err := g.GeneratePcapTests()
+	if err != nil {
+		return err
+	}
+
+	// Format the code
+	formatted, err := format.Source([]byte(code))
+	if err != nil {
+		// If formatting fails, write the unformatted code for debugging
+		return os.WriteFile(testFile, []byte(code), 0644)
+	}
+
+	return os.WriteFile(testFile, formatted, 0644)
+}
+
+// GenerateBenchmarkTestFile generates a benchmark test file
+func (g *Generator) GenerateBenchmarkTestFile(testFile string) error {
+	code, err := g.GenerateBenchmarkTests()
+	if err != nil {
+		return err
+	}
+
+	// Format the code
+	formatted, err := format.Source([]byte(code))
+	if err != nil {
+		// If formatting fails, write the unformatted code for debugging
+		return os.WriteFile(testFile, []byte(code), 0644)
+	}
+
+	return os.WriteFile(testFile, formatted, 0644)
+}
+
 // Generate generates Go code from parsed definitions
 func (g *Generator) Generate() (string, error) {
 	var buf bytes.Buffer
@@ -692,7 +743,7 @@ func toConstantCase(s string) string {
 	return strings.ToUpper(string(result))
 }
 
-// GenerateTest generates test code with pcap writing capabilities
+// GenerateTest generates comprehensive test code
 func (g *Generator) GenerateTest() (string, error) {
 	var buf bytes.Buffer
 
@@ -702,6 +753,7 @@ func (g *Generator) GenerateTest() (string, error) {
 
 	// Write imports
 	buf.WriteString("import (\n")
+	buf.WriteString("\t\"bytes\"\n")
 	buf.WriteString("\t\"net\"\n")
 	buf.WriteString("\t\"os\"\n")
 	buf.WriteString("\t\"path/filepath\"\n")
@@ -713,17 +765,28 @@ func (g *Generator) GenerateTest() (string, error) {
 	buf.WriteString("\t\"github.com/google/gopacket/pcapgo\"\n")
 	buf.WriteString("\t\"github.com/hsdfat8/diam-gw/models_base\"\n")
 	buf.WriteString(")\n\n")
-	buf.WriteString("// keepPcapFiles determines if pcap files should be kept after tests\n")
-	buf.WriteString("// Set KEEP_PCAP=1 environment variable to keep the files\n")
-	buf.WriteString("var keepPcapFiles = os.Getenv(\"KEEP_PCAP\") == \"1\"\n\n")
 
 	// Generate pcap helper functions
 	g.generatePcapHelpers(&buf)
 
 	// Generate test functions for each command
 	for _, cmd := range g.Parser.Commands {
-		g.generateCommandTest(&buf, cmd)
+		// Generate comprehensive unit tests
+		g.generateCommandUnitTest(&buf, cmd)
+		// Generate validation test
+		g.generateCommandValidationTest(&buf, cmd)
+		// Generate validation test for missing required fields
+		g.generateCommandValidationMissingFieldsTest(&buf, cmd)
+		// Generate PCAP test
+		g.generateCommandPcapTest(&buf, cmd)
+		// Generate Marshal/Unmarshal roundtrip test
+		g.generateCommandRoundtripTest(&buf, cmd)
+		// Generate benchmark tests
+		g.generateCommandBenchmarkTest(&buf, cmd)
 	}
+
+	// Generate paired request-response PCAP tests
+	g.generatePairedPcapTests(&buf)
 
 	return buf.String(), nil
 }
@@ -902,6 +965,50 @@ func writePacketToPcap(w *pcapgo.Writer, diameterData []byte, srcIP, dstIP net.I
 	return w.WritePacket(ci, packetBuf.Bytes())
 }
 
+// writeDiameterPairToPcap writes a request-response pair to a single pcap file
+func writeDiameterPairToPcap(filename string, requestData, responseData []byte, clientIP, serverIP net.IP) error {
+	// Create directory if it doesn't exist
+	dir := filepath.Dir(filename)
+	if dir != "" && dir != "." {
+		if err := os.MkdirAll(dir, 0755); err != nil {
+			return err
+		}
+	}
+
+	// Create the pcap file
+	f, err := os.Create(filename)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	// Create pcap writer
+	w := pcapgo.NewWriter(f)
+	err = w.WriteFileHeader(65536, layers.LinkTypeEthernet)
+	if err != nil {
+		return err
+	}
+
+	baseTime := time.Now()
+	clientPort := 54321
+	serverPort := 3868
+
+	// Write request packet (client -> server)
+	err = writePacketToPcap(w, requestData, clientIP, serverIP, clientPort, serverPort, 1000, 1, baseTime)
+	if err != nil {
+		return err
+	}
+
+	// Write response packet (server -> client) with small delay
+	responseTime := baseTime.Add(10 * time.Millisecond)
+	err = writePacketToPcap(w, responseData, serverIP, clientIP, serverPort, clientPort, 1, 1000+uint32(len(requestData)), responseTime)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 `)
 }
 
@@ -964,8 +1071,13 @@ func (g *Generator) generateCommandTest(buf *bytes.Buffer, cmd *CommandDefinitio
 	buf.WriteString("}\n\n")
 }
 
-// generateTestFieldAssignment generates code to assign test values to a field
+// generateTestFieldAssignment generates code to assign test values to a field (uses "msg" variable)
 func (g *Generator) generateTestFieldAssignment(buf *bytes.Buffer, field *AVPField, cmdName *string) {
+	g.generateTestFieldAssignmentWithVar(buf, field, cmdName, "msg")
+}
+
+// generateTestFieldAssignmentWithVar generates code to assign test values to a field with custom variable name
+func (g *Generator) generateTestFieldAssignmentWithVar(buf *bytes.Buffer, field *AVPField, cmdName *string, varName string) {
 	fieldName := field.FieldName
 	isRepeated := field.Repeated
 
@@ -978,9 +1090,9 @@ func (g *Generator) generateTestFieldAssignment(buf *bytes.Buffer, field *AVPFie
 			value = "\"server.example.com\""
 		}
 		if isRepeated {
-			buf.WriteString(fmt.Sprintf("\tmsg.%s = []models_base.DiameterIdentity{models_base.DiameterIdentity(%s)}\n", fieldName, value))
+			buf.WriteString(fmt.Sprintf("\t%s.%s = []models_base.DiameterIdentity{models_base.DiameterIdentity(%s)}\n", varName, fieldName, value))
 		} else {
-			buf.WriteString(fmt.Sprintf("\tmsg.%s = models_base.DiameterIdentity(%s)\n", fieldName, value))
+			buf.WriteString(fmt.Sprintf("\t%s.%s = models_base.DiameterIdentity(%s)\n", varName, fieldName, value))
 		}
 	case "UTF8String":
 		value := "\"test\""
@@ -990,19 +1102,32 @@ func (g *Generator) generateTestFieldAssignment(buf *bytes.Buffer, field *AVPFie
 			value = "\"TestProduct/1.0\""
 		}
 		if isRepeated {
-			buf.WriteString(fmt.Sprintf("\tmsg.%s = []models_base.UTF8String{models_base.UTF8String(%s)}\n", fieldName, value))
+			buf.WriteString(fmt.Sprintf("\t%s.%s = []models_base.UTF8String{models_base.UTF8String(%s)}\n", varName, fieldName, value))
 		} else {
-			buf.WriteString(fmt.Sprintf("\tmsg.%s = models_base.UTF8String(%s)\n", fieldName, value))
+			buf.WriteString(fmt.Sprintf("\t%s.%s = models_base.UTF8String(%s)\n", varName, fieldName, value))
 		}
 	case "Address":
 		if isRepeated {
-			buf.WriteString(fmt.Sprintf("\tmsg.%s = []models_base.Address{\n", fieldName))
+			buf.WriteString(fmt.Sprintf("\t%s.%s = []models_base.Address{\n", varName, fieldName))
 		} else {
 			// Single address - this shouldn't happen for required fields, but handle it
-			buf.WriteString(fmt.Sprintf("\tmsg.%s = []models_base.Address{\n", fieldName))
+			buf.WriteString(fmt.Sprintf("\t%s.%s = []models_base.Address{\n", varName, fieldName))
 		}
 		buf.WriteString("\t\tmodels_base.Address(net.ParseIP(\"192.168.1.100\")),\n")
 		buf.WriteString("\t}\n")
+	case "OctetString":
+		// Generate appropriate test data for OctetString
+		value := "[]byte{0x01, 0x02, 0x03}"
+		if strings.Contains(strings.ToLower(fieldName), "plmn") {
+			value = "[]byte{0x00, 0xF1, 0x10}" // Example PLMN ID (MCC=001, MNC=01)
+		} else if strings.Contains(strings.ToLower(fieldName), "imsi") {
+			value = "[]byte{0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11}" // Example IMSI
+		}
+		if isRepeated {
+			buf.WriteString(fmt.Sprintf("\t%s.%s = []models_base.OctetString{models_base.OctetString(%s)}\n", varName, fieldName, value))
+		} else {
+			buf.WriteString(fmt.Sprintf("\t%s.%s = models_base.OctetString(%s)\n", varName, fieldName, value))
+		}
 	case "Unsigned32":
 		var value string
 		var comment string
@@ -1017,25 +1142,616 @@ func (g *Generator) generateTestFieldAssignment(buf *bytes.Buffer, field *AVPFie
 			comment = ""
 		}
 		if isRepeated {
-			buf.WriteString(fmt.Sprintf("\tmsg.%s = []models_base.Unsigned32{models_base.Unsigned32(%s)}%s\n", fieldName, value, comment))
+			buf.WriteString(fmt.Sprintf("\t%s.%s = []models_base.Unsigned32{models_base.Unsigned32(%s)}%s\n", varName, fieldName, value, comment))
 		} else {
-			buf.WriteString(fmt.Sprintf("\tmsg.%s = models_base.Unsigned32(%s)%s\n", fieldName, value, comment))
+			buf.WriteString(fmt.Sprintf("\t%s.%s = models_base.Unsigned32(%s)%s\n", varName, fieldName, value, comment))
 		}
 	case "Enumerated":
 		value := "1"
 		if isRepeated {
-			buf.WriteString(fmt.Sprintf("\tmsg.%s = []models_base.Enumerated{models_base.Enumerated(%s)}\n", fieldName, value))
+			buf.WriteString(fmt.Sprintf("\t%s.%s = []models_base.Enumerated{models_base.Enumerated(%s)}\n", varName, fieldName, value))
 		} else {
-			buf.WriteString(fmt.Sprintf("\tmsg.%s = models_base.Enumerated(%s)\n", fieldName, value))
+			buf.WriteString(fmt.Sprintf("\t%s.%s = models_base.Enumerated(%s)\n", varName, fieldName, value))
 		}
 	case "Grouped":
 		if isRepeated {
-			buf.WriteString(fmt.Sprintf("\t// msg.%s (Grouped) needs to be set manually\n", fieldName))
+			buf.WriteString(fmt.Sprintf("\t// %s.%s (Grouped) needs to be set manually\n", varName, fieldName))
 		} else {
-			buf.WriteString(fmt.Sprintf("\t// msg.%s (Grouped) needs to be set manually\n", fieldName))
+			buf.WriteString(fmt.Sprintf("\t// %s.%s (Grouped) needs to be set manually\n", varName, fieldName))
 		}
 	default:
 		// For other types, add a comment
-		buf.WriteString(fmt.Sprintf("\t// msg.%s needs to be set manually (type: %s)\n", fieldName, field.AVP.TypeName))
+		buf.WriteString(fmt.Sprintf("\t// %s.%s needs to be set manually (type: %s)\n", varName, fieldName, field.AVP.TypeName))
 	}
+}
+
+// generateCommandUnitTest generates basic unit tests for a command
+func (g *Generator) generateCommandUnitTest(buf *bytes.Buffer, cmd *CommandDefinition) {
+	structName := toCamelCase(strings.ReplaceAll(cmd.Name, "-", "_"))
+	testFuncName := fmt.Sprintf("Test%s_Creation", structName)
+
+	buf.WriteString(fmt.Sprintf("// %s tests basic creation and initialization\n", testFuncName))
+	buf.WriteString(fmt.Sprintf("func %s(t *testing.T) {\n", testFuncName))
+	buf.WriteString(fmt.Sprintf("\tmsg := New%s()\n\n", structName))
+
+	buf.WriteString("\t// Verify header initialization\n")
+	buf.WriteString("\tif msg.Header.Version != 1 {\n")
+	buf.WriteString("\t\tt.Errorf(\"Expected version 1, got %d\", msg.Header.Version)\n")
+	buf.WriteString("\t}\n\n")
+
+	buf.WriteString(fmt.Sprintf("\tif msg.Header.CommandCode != %d {\n", cmd.Code))
+	buf.WriteString(fmt.Sprintf("\t\tt.Errorf(\"Expected command code %d, got %%d\", msg.Header.CommandCode)\n", cmd.Code))
+	buf.WriteString("\t}\n\n")
+
+	buf.WriteString(fmt.Sprintf("\tif msg.Header.ApplicationID != %d {\n", cmd.ApplicationID))
+	buf.WriteString(fmt.Sprintf("\t\tt.Errorf(\"Expected application ID %d, got %%d\", msg.Header.ApplicationID)\n", cmd.ApplicationID))
+	buf.WriteString("\t}\n\n")
+
+	buf.WriteString(fmt.Sprintf("\tif msg.Header.Flags.Request != %v {\n", cmd.Request))
+	buf.WriteString(fmt.Sprintf("\t\tt.Errorf(\"Expected Request flag %v, got %%v\", msg.Header.Flags.Request)\n", cmd.Request))
+	buf.WriteString("\t}\n\n")
+
+	buf.WriteString(fmt.Sprintf("\tif msg.Header.Flags.Proxiable != %v {\n", cmd.Proxiable))
+	buf.WriteString(fmt.Sprintf("\t\tt.Errorf(\"Expected Proxiable flag %v, got %%v\", msg.Header.Flags.Proxiable)\n", cmd.Proxiable))
+	buf.WriteString("\t}\n")
+
+	buf.WriteString("}\n\n")
+}
+
+// generateCommandValidationTest generates validation tests
+func (g *Generator) generateCommandValidationTest(buf *bytes.Buffer, cmd *CommandDefinition) {
+	structName := toCamelCase(strings.ReplaceAll(cmd.Name, "-", "_"))
+	testFuncName := fmt.Sprintf("Test%s_Validation", structName)
+
+	buf.WriteString(fmt.Sprintf("// %s tests field validation\n", testFuncName))
+	buf.WriteString(fmt.Sprintf("func %s(t *testing.T) {\n", testFuncName))
+
+	// Test 1: Empty message should fail validation
+	buf.WriteString("\tt.Run(\"EmptyMessage\", func(t *testing.T) {\n")
+	buf.WriteString(fmt.Sprintf("\t\tmsg := &%s{}\n", structName))
+	buf.WriteString("\t\terr := msg.Validate()\n")
+
+	// Check if there are any required fields that can be validated
+	hasValidatableRequired := false
+	for _, field := range cmd.Fields {
+		if field.Required && !field.Repeated {
+			switch field.AVP.TypeName {
+			case "UTF8String", "DiameterIdentity", "DiameterURI", "OctetString":
+				hasValidatableRequired = true
+				break
+			}
+		} else if field.Required && field.Repeated {
+			hasValidatableRequired = true
+			break
+		}
+	}
+
+	if hasValidatableRequired {
+		buf.WriteString("\t\tif err == nil {\n")
+		buf.WriteString("\t\t\tt.Error(\"Expected validation error for empty message, got nil\")\n")
+		buf.WriteString("\t\t}\n")
+	} else {
+		buf.WriteString("\t\t// No validatable required fields\n")
+		buf.WriteString("\t\t_ = err\n")
+	}
+	buf.WriteString("\t})\n\n")
+
+	// Test 2: Valid message should pass validation
+	buf.WriteString("\tt.Run(\"ValidMessage\", func(t *testing.T) {\n")
+	buf.WriteString(fmt.Sprintf("\t\tmsg := New%s()\n", structName))
+
+	// Set required fields
+	cmdName := cmd.Name
+	for _, field := range cmd.Fields {
+		if field.Required {
+			g.generateTestFieldAssignment(buf, field, &cmdName)
+		}
+	}
+
+	buf.WriteString("\n\t\terr := msg.Validate()\n")
+	buf.WriteString("\t\tif err != nil {\n")
+	buf.WriteString("\t\t\tt.Errorf(\"Expected no validation error, got: %v\", err)\n")
+	buf.WriteString("\t\t}\n")
+	buf.WriteString("\t})\n")
+
+	buf.WriteString("}\n\n")
+}
+
+// generateCommandPcapTest generates PCAP file tests for both request and answer
+func (g *Generator) generateCommandPcapTest(buf *bytes.Buffer, cmd *CommandDefinition) {
+	structName := toCamelCase(strings.ReplaceAll(cmd.Name, "-", "_"))
+	testFuncName := fmt.Sprintf("Test%s_PCAP", structName)
+	pcapFileName := fmt.Sprintf("test_%s.pcap", strings.ToLower(strings.ReplaceAll(cmd.Abbreviation, "-", "_")))
+
+	isRequest := cmd.Request
+	msgType := "Request"
+	if !isRequest {
+		msgType = "Answer"
+	}
+
+	buf.WriteString(fmt.Sprintf("// %s tests PCAP file generation for %s message\n", testFuncName, msgType))
+	buf.WriteString(fmt.Sprintf("func %s(t *testing.T) {\n", testFuncName))
+	buf.WriteString("\t// Create testdata directory\n")
+	buf.WriteString("\tif err := os.MkdirAll(\"testdata\", 0755); err != nil {\n")
+	buf.WriteString("\t\tt.Fatalf(\"Failed to create testdata directory: %v\", err)\n")
+	buf.WriteString("\t}\n\n")
+
+	buf.WriteString("\t// Create pcap file path\n")
+	buf.WriteString(fmt.Sprintf("\tpcapFile := filepath.Join(\"testdata\", \"%s\")\n", pcapFileName))
+	buf.WriteString("\t// PCAP files are kept for Wireshark analysis\n\n")
+
+	buf.WriteString(fmt.Sprintf("\t// Create %s message\n", msgType))
+	buf.WriteString(fmt.Sprintf("\tmsg := New%s()\n", structName))
+
+	// Set required fields
+	cmdName := cmd.Name
+	for _, field := range cmd.Fields {
+		if field.Required {
+			g.generateTestFieldAssignment(buf, field, &cmdName)
+		}
+	}
+
+	buf.WriteString("\n\t// Set header identifiers\n")
+	buf.WriteString("\tmsg.Header.HopByHopID = 0x12345678\n")
+	buf.WriteString("\tmsg.Header.EndToEndID = 0x87654321\n\n")
+
+	buf.WriteString("\t// Marshal message\n")
+	buf.WriteString("\tdata, err := msg.Marshal()\n")
+	buf.WriteString("\tif err != nil {\n")
+	buf.WriteString("\t\tt.Fatalf(\"Failed to marshal message: %v\", err)\n")
+	buf.WriteString("\t}\n\n")
+
+	buf.WriteString("\t// Write to PCAP\n")
+	if isRequest {
+		buf.WriteString("\terr = writeDiameterToPcap(pcapFile, data, net.ParseIP(\"192.168.1.100\"), net.ParseIP(\"192.168.1.1\"), 3868)\n")
+	} else {
+		buf.WriteString("\terr = writeDiameterToPcap(pcapFile, data, net.ParseIP(\"192.168.1.1\"), net.ParseIP(\"192.168.1.100\"), 3868)\n")
+	}
+	buf.WriteString("\tif err != nil {\n")
+	buf.WriteString("\t\tt.Fatalf(\"Failed to write PCAP: %v\", err)\n")
+	buf.WriteString("\t}\n\n")
+
+	buf.WriteString("\t// Verify PCAP file\n")
+	buf.WriteString("\tinfo, err := os.Stat(pcapFile)\n")
+	buf.WriteString("\tif err != nil {\n")
+	buf.WriteString("\t\tt.Fatalf(\"PCAP file not created: %v\", err)\n")
+	buf.WriteString("\t}\n")
+	buf.WriteString("\tif info.Size() == 0 {\n")
+	buf.WriteString("\t\tt.Fatal(\"PCAP file is empty\")\n")
+	buf.WriteString("\t}\n\n")
+
+	buf.WriteString("\tt.Logf(\"PCAP file created: %s (%d bytes)\", pcapFile, info.Size())\n")
+	buf.WriteString(fmt.Sprintf("\tt.Logf(\"Open in Wireshark to view the %s message\")\n", msgType))
+	buf.WriteString("}\n\n")
+}
+
+// generateCommandPairPcapTest generates PCAP file tests for request-response pairs
+func (g *Generator) generateCommandPairPcapTest(buf *bytes.Buffer, requestCmd, answerCmd *CommandDefinition) {
+	requestStructName := toCamelCase(strings.ReplaceAll(requestCmd.Name, "-", "_"))
+	answerStructName := toCamelCase(strings.ReplaceAll(answerCmd.Name, "-", "_"))
+	// Generate a clean test name based on command abbreviation
+	baseName := strings.TrimSuffix(requestCmd.Abbreviation, "R")
+	if baseName == requestCmd.Abbreviation {
+		// Try other patterns
+		baseName = strings.TrimSuffix(requestCmd.Abbreviation, "Req")
+	}
+	pcapFileName := fmt.Sprintf("test_%s_pair.pcap", strings.ToLower(baseName))
+
+	buf.WriteString(fmt.Sprintf("// Test%s_Pair_PCAP tests PCAP file generation for %s request-response pair\n", baseName, baseName))
+	buf.WriteString(fmt.Sprintf("func Test%s_Pair_PCAP(t *testing.T) {\n", baseName))
+	buf.WriteString("\t// Create testdata directory\n")
+	buf.WriteString("\tif err := os.MkdirAll(\"testdata\", 0755); err != nil {\n")
+	buf.WriteString("\t\tt.Fatalf(\"Failed to create testdata directory: %v\", err)\n")
+	buf.WriteString("\t}\n\n")
+
+	buf.WriteString("\t// Create pcap file path\n")
+	buf.WriteString(fmt.Sprintf("\tpcapFile := filepath.Join(\"testdata\", \"%s\")\n", pcapFileName))
+	buf.WriteString("\t// PCAP files are kept for Wireshark analysis\n\n")
+
+	buf.WriteString("\t// Create Request message\n")
+	buf.WriteString(fmt.Sprintf("\trequest := New%s()\n", requestStructName))
+
+	// Set required fields for request
+	cmdName := requestCmd.Name
+	for _, field := range requestCmd.Fields {
+		if field.Required {
+			g.generateTestFieldAssignmentWithVar(buf, field, &cmdName, "request")
+		}
+	}
+
+	buf.WriteString("\n\t// Set header identifiers for request\n")
+	buf.WriteString("\trequest.Header.HopByHopID = 0x12345678\n")
+	buf.WriteString("\trequest.Header.EndToEndID = 0x87654321\n\n")
+
+	buf.WriteString("\t// Create Answer message\n")
+	buf.WriteString(fmt.Sprintf("\tanswer := New%s()\n", answerStructName))
+
+	// Set required fields for answer
+	cmdName = answerCmd.Name
+	for _, field := range answerCmd.Fields {
+		if field.Required {
+			g.generateTestFieldAssignmentWithVar(buf, field, &cmdName, "answer")
+		}
+	}
+
+	buf.WriteString("\n\t// Set header identifiers for answer (must match request)\n")
+	buf.WriteString("\tanswer.Header.HopByHopID = 0x12345678\n")
+	buf.WriteString("\tanswer.Header.EndToEndID = 0x87654321\n\n")
+
+	buf.WriteString("\t// Marshal request\n")
+	buf.WriteString("\trequestData, err := request.Marshal()\n")
+	buf.WriteString("\tif err != nil {\n")
+	buf.WriteString("\t\tt.Fatalf(\"Failed to marshal request: %v\", err)\n")
+	buf.WriteString("\t}\n\n")
+
+	buf.WriteString("\t// Marshal answer\n")
+	buf.WriteString("\tanswerData, err := answer.Marshal()\n")
+	buf.WriteString("\tif err != nil {\n")
+	buf.WriteString("\t\tt.Fatalf(\"Failed to marshal answer: %v\", err)\n")
+	buf.WriteString("\t}\n\n")
+
+	buf.WriteString("\t// Write request-response pair to PCAP\n")
+	buf.WriteString("\terr = writeDiameterPairToPcap(pcapFile, requestData, answerData, net.ParseIP(\"192.168.1.100\"), net.ParseIP(\"192.168.1.1\"))\n")
+	buf.WriteString("\tif err != nil {\n")
+	buf.WriteString("\t\tt.Fatalf(\"Failed to write PCAP: %v\", err)\n")
+	buf.WriteString("\t}\n\n")
+
+	buf.WriteString("\t// Verify PCAP file\n")
+	buf.WriteString("\tinfo, err := os.Stat(pcapFile)\n")
+	buf.WriteString("\tif err != nil {\n")
+	buf.WriteString("\t\tt.Fatalf(\"PCAP file not created: %v\", err)\n")
+	buf.WriteString("\t}\n")
+	buf.WriteString("\tif info.Size() == 0 {\n")
+	buf.WriteString("\t\tt.Fatal(\"PCAP file is empty\")\n")
+	buf.WriteString("\t}\n\n")
+
+	buf.WriteString("\tt.Logf(\"PCAP file created: %s (%d bytes)\", pcapFile, info.Size())\n")
+	buf.WriteString("\tt.Logf(\"Open in Wireshark to view the request-response pair\")\n")
+	buf.WriteString("}\n\n")
+}
+
+// generatePairedPcapTests generates PCAP tests for all request-response pairs
+func (g *Generator) generatePairedPcapTests(buf *bytes.Buffer) {
+	// Build a map of command codes to their request and answer commands
+	commandPairs := make(map[uint32]struct {
+		request *CommandDefinition
+		answer  *CommandDefinition
+	})
+
+	// First pass: collect all commands by code
+	for _, cmd := range g.Parser.Commands {
+		pair := commandPairs[cmd.Code]
+		if cmd.Request {
+			pair.request = cmd
+		} else {
+			pair.answer = cmd
+		}
+		commandPairs[cmd.Code] = pair
+	}
+
+	// Second pass: generate tests for complete pairs
+	for _, pair := range commandPairs {
+		if pair.request != nil && pair.answer != nil {
+			g.generateCommandPairPcapTest(buf, pair.request, pair.answer)
+		}
+	}
+}
+
+// generateCommandRoundtripTest generates Marshal/Unmarshal roundtrip tests
+func (g *Generator) generateCommandRoundtripTest(buf *bytes.Buffer, cmd *CommandDefinition) {
+	structName := toCamelCase(strings.ReplaceAll(cmd.Name, "-", "_"))
+	testFuncName := fmt.Sprintf("Test%s_MarshalUnmarshal", structName)
+
+	buf.WriteString(fmt.Sprintf("// %s tests Marshal and Unmarshal roundtrip\n", testFuncName))
+	buf.WriteString(fmt.Sprintf("func %s(t *testing.T) {\n", testFuncName))
+
+	buf.WriteString("\t// Create original message\n")
+	buf.WriteString(fmt.Sprintf("\toriginal := New%s()\n", structName))
+
+	// Set required fields using original variable
+	cmdName := cmd.Name
+	for _, field := range cmd.Fields {
+		if field.Required {
+			g.generateTestFieldAssignmentWithVar(buf, field, &cmdName, "original")
+		}
+	}
+
+	buf.WriteString("\n\t// Set header identifiers for comparison\n")
+	buf.WriteString("\toriginal.Header.HopByHopID = 0xAABBCCDD\n")
+	buf.WriteString("\toriginal.Header.EndToEndID = 0x11223344\n\n")
+
+	buf.WriteString("\t// Marshal original\n")
+	buf.WriteString("\tdata, err := original.Marshal()\n")
+	buf.WriteString("\tif err != nil {\n")
+	buf.WriteString("\t\tt.Fatalf(\"Failed to marshal: %v\", err)\n")
+	buf.WriteString("\t}\n\n")
+
+	buf.WriteString("\t// Unmarshal into new message\n")
+	buf.WriteString(fmt.Sprintf("\tdecoded := &%s{}\n", structName))
+	buf.WriteString("\terr = decoded.Unmarshal(data)\n")
+	buf.WriteString("\tif err != nil {\n")
+	buf.WriteString("\t\tt.Fatalf(\"Failed to unmarshal: %v\", err)\n")
+	buf.WriteString("\t}\n\n")
+
+	buf.WriteString("\t// Verify header fields\n")
+	buf.WriteString("\tif decoded.Header.Version != original.Header.Version {\n")
+	buf.WriteString("\t\tt.Errorf(\"Version mismatch: got %d, want %d\", decoded.Header.Version, original.Header.Version)\n")
+	buf.WriteString("\t}\n")
+	buf.WriteString("\tif decoded.Header.CommandCode != original.Header.CommandCode {\n")
+	buf.WriteString("\t\tt.Errorf(\"CommandCode mismatch: got %d, want %d\", decoded.Header.CommandCode, original.Header.CommandCode)\n")
+	buf.WriteString("\t}\n")
+	buf.WriteString("\tif decoded.Header.ApplicationID != original.Header.ApplicationID {\n")
+	buf.WriteString("\t\tt.Errorf(\"ApplicationID mismatch: got %d, want %d\", decoded.Header.ApplicationID, original.Header.ApplicationID)\n")
+	buf.WriteString("\t}\n")
+	buf.WriteString("\tif decoded.Header.HopByHopID != original.Header.HopByHopID {\n")
+	buf.WriteString("\t\tt.Errorf(\"HopByHopID mismatch: got 0x%X, want 0x%X\", decoded.Header.HopByHopID, original.Header.HopByHopID)\n")
+	buf.WriteString("\t}\n")
+	buf.WriteString("\tif decoded.Header.EndToEndID != original.Header.EndToEndID {\n")
+	buf.WriteString("\t\tt.Errorf(\"EndToEndID mismatch: got 0x%X, want 0x%X\", decoded.Header.EndToEndID, original.Header.EndToEndID)\n")
+	buf.WriteString("\t}\n\n")
+
+	// Verify required string fields
+	for _, field := range cmd.Fields {
+		if field.Required && !field.Repeated {
+			switch field.AVP.TypeName {
+			case "UTF8String", "DiameterIdentity":
+				buf.WriteString(fmt.Sprintf("\tif decoded.%s != original.%s {\n", field.FieldName, field.FieldName))
+				buf.WriteString(fmt.Sprintf("\t\tt.Errorf(\"%s mismatch: got %%v, want %%v\", decoded.%s, original.%s)\n", field.FieldName, field.FieldName, field.FieldName))
+				buf.WriteString("\t}\n")
+			case "Unsigned32", "Enumerated":
+				buf.WriteString(fmt.Sprintf("\tif decoded.%s != original.%s {\n", field.FieldName, field.FieldName))
+				buf.WriteString(fmt.Sprintf("\t\tt.Errorf(\"%s mismatch: got %%d, want %%d\", decoded.%s, original.%s)\n", field.FieldName, field.FieldName, field.FieldName))
+				buf.WriteString("\t}\n")
+			}
+		} else if field.Required && field.Repeated {
+			switch field.AVP.TypeName {
+			case "Address":
+				buf.WriteString(fmt.Sprintf("\tif len(decoded.%s) != len(original.%s) {\n", field.FieldName, field.FieldName))
+				buf.WriteString(fmt.Sprintf("\t\tt.Errorf(\"%s length mismatch: got %%d, want %%d\", len(decoded.%s), len(original.%s))\n", field.FieldName, field.FieldName, field.FieldName))
+				buf.WriteString("\t}\n")
+			}
+		}
+	}
+
+	buf.WriteString("\n\t// Marshal again and compare bytes\n")
+	buf.WriteString("\tdata2, err := decoded.Marshal()\n")
+	buf.WriteString("\tif err != nil {\n")
+	buf.WriteString("\t\tt.Fatalf(\"Failed to marshal decoded message: %v\", err)\n")
+	buf.WriteString("\t}\n\n")
+
+	buf.WriteString("\tif !bytes.Equal(data, data2) {\n")
+	buf.WriteString("\t\tt.Errorf(\"Marshaled data differs after roundtrip (len: %d vs %d)\", len(data), len(data2))\n")
+	buf.WriteString("\t}\n")
+
+	buf.WriteString("}\n\n")
+}
+
+// generateCommandValidationMissingFieldsTest generates validation tests for missing required fields
+func (g *Generator) generateCommandValidationMissingFieldsTest(buf *bytes.Buffer, cmd *CommandDefinition) {
+	// Get all required fields
+	requiredFields := make([]*AVPField, 0)
+	for _, field := range cmd.Fields {
+		if field.Required && !field.Fixed {
+			requiredFields = append(requiredFields, field)
+		}
+	}
+
+	// Skip if no required fields
+	if len(requiredFields) == 0 {
+		return
+	}
+
+	structName := toCamelCase(strings.ReplaceAll(cmd.Name, "-", "_"))
+	funcName := fmt.Sprintf("TestValidateMissingFields_%s", cmd.Abbreviation)
+	buf.WriteString(fmt.Sprintf("func %s(t *testing.T) {\n", funcName))
+	buf.WriteString("\t// Test validation with each required field missing\n")
+	buf.WriteString("\ttests := []struct {\n")
+	buf.WriteString("\t\tname         string\n")
+	buf.WriteString("\t\tmissingField string\n")
+	buf.WriteString(fmt.Sprintf("\t\tsetupFunc    func(*%s)\n", structName))
+	buf.WriteString("\t}{\n")
+
+	// Generate test cases for each required field
+	for _, field := range requiredFields {
+		buf.WriteString(fmt.Sprintf("\t\t{\n"))
+		buf.WriteString(fmt.Sprintf("\t\t\tname:         \"missing_%s\",\n", field.FieldName))
+		buf.WriteString(fmt.Sprintf("\t\t\tmissingField: \"%s\",\n", field.AVP.Name))
+		buf.WriteString(fmt.Sprintf("\t\t\tsetupFunc: func(msg *%s) {\n", structName))
+		buf.WriteString("\t\t\t\t// Set all fields except the one being tested\n")
+
+		// Set all required fields except the current one
+		for _, f := range requiredFields {
+			if f.FieldName != field.FieldName {
+				g.generateTestFieldAssignment(buf, f, &cmd.Name)
+			}
+		}
+
+		buf.WriteString("\t\t\t},\n")
+		buf.WriteString("\t\t},\n")
+	}
+
+	buf.WriteString("\t}\n\n")
+
+	buf.WriteString("\tfor _, tt := range tests {\n")
+	buf.WriteString("\t\tt.Run(tt.name, func(t *testing.T) {\n")
+	buf.WriteString(fmt.Sprintf("\t\t\tmsg := New%s()\n", structName))
+	buf.WriteString("\t\t\ttt.setupFunc(msg)\n\n")
+	buf.WriteString("\t\t\terr := msg.Validate()\n")
+	buf.WriteString("\t\t\tif err == nil {\n")
+	buf.WriteString("\t\t\t\tt.Errorf(\"Expected validation error for missing %s, but got nil\", tt.missingField)\n")
+	buf.WriteString("\t\t\t}\n")
+	buf.WriteString("\t\t})\n")
+	buf.WriteString("\t}\n")
+
+	buf.WriteString("}\n\n")
+}
+
+// generateCommandBenchmarkTest generates benchmark tests for the command
+func (g *Generator) generateCommandBenchmarkTest(buf *bytes.Buffer, cmd *CommandDefinition) {
+	structName := toCamelCase(strings.ReplaceAll(cmd.Name, "-", "_"))
+
+	// Benchmark for message creation
+	buf.WriteString(fmt.Sprintf("func BenchmarkNew%s(b *testing.B) {\n", structName))
+	buf.WriteString("\tb.ReportAllocs()\n")
+	buf.WriteString("\tfor i := 0; i < b.N; i++ {\n")
+	buf.WriteString(fmt.Sprintf("\t\t_ = New%s()\n", structName))
+	buf.WriteString("\t}\n")
+	buf.WriteString("}\n\n")
+
+	// Benchmark for Marshal operation
+	buf.WriteString(fmt.Sprintf("func Benchmark%s_Marshal(b *testing.B) {\n", structName))
+	buf.WriteString(fmt.Sprintf("\tmsg := New%s()\n", structName))
+	buf.WriteString("\n\t// Set required fields\n")
+	for _, field := range cmd.Fields {
+		if field.Required {
+			g.generateTestFieldAssignment(buf, field, &cmd.Name)
+		}
+	}
+	buf.WriteString("\n\tb.ResetTimer()\n")
+	buf.WriteString("\tb.ReportAllocs()\n")
+	buf.WriteString("\tfor i := 0; i < b.N; i++ {\n")
+	buf.WriteString("\t\t_, err := msg.Marshal()\n")
+	buf.WriteString("\t\tif err != nil {\n")
+	buf.WriteString("\t\t\tb.Fatal(err)\n")
+	buf.WriteString("\t\t}\n")
+	buf.WriteString("\t}\n")
+	buf.WriteString("}\n\n")
+
+	// Benchmark for Unmarshal operation
+	buf.WriteString(fmt.Sprintf("func Benchmark%s_Unmarshal(b *testing.B) {\n", structName))
+	buf.WriteString(fmt.Sprintf("\tmsg := New%s()\n", structName))
+	buf.WriteString("\n\t// Set required fields\n")
+	for _, field := range cmd.Fields {
+		if field.Required {
+			g.generateTestFieldAssignment(buf, field, &cmd.Name)
+		}
+	}
+	buf.WriteString("\n\tdata, err := msg.Marshal()\n")
+	buf.WriteString("\tif err != nil {\n")
+	buf.WriteString("\t\tb.Fatal(err)\n")
+	buf.WriteString("\t}\n\n")
+	buf.WriteString("\tb.ResetTimer()\n")
+	buf.WriteString("\tb.ReportAllocs()\n")
+	buf.WriteString("\tfor i := 0; i < b.N; i++ {\n")
+	buf.WriteString(fmt.Sprintf("\t\tresult := &%s{}\n", structName))
+	buf.WriteString("\t\terr := result.Unmarshal(data)\n")
+	buf.WriteString("\t\tif err != nil {\n")
+	buf.WriteString("\t\t\tb.Fatal(err)\n")
+	buf.WriteString("\t\t}\n")
+	buf.WriteString("\t}\n")
+	buf.WriteString("}\n\n")
+
+	// Benchmark for full roundtrip
+	buf.WriteString(fmt.Sprintf("func Benchmark%s_Roundtrip(b *testing.B) {\n", structName))
+	buf.WriteString(fmt.Sprintf("\tmsg := New%s()\n", structName))
+	buf.WriteString("\n\t// Set required fields\n")
+	for _, field := range cmd.Fields {
+		if field.Required {
+			g.generateTestFieldAssignment(buf, field, &cmd.Name)
+		}
+	}
+	buf.WriteString("\n\tb.ResetTimer()\n")
+	buf.WriteString("\tb.ReportAllocs()\n")
+	buf.WriteString("\tfor i := 0; i < b.N; i++ {\n")
+	buf.WriteString("\t\tdata, err := msg.Marshal()\n")
+	buf.WriteString("\t\tif err != nil {\n")
+	buf.WriteString("\t\t\tb.Fatal(err)\n")
+	buf.WriteString("\t\t}\n")
+	buf.WriteString(fmt.Sprintf("\t\tresult := &%s{}\n", structName))
+	buf.WriteString("\t\terr = result.Unmarshal(data)\n")
+	buf.WriteString("\t\tif err != nil {\n")
+	buf.WriteString("\t\t\tb.Fatal(err)\n")
+	buf.WriteString("\t\t}\n")
+	buf.WriteString("\t}\n")
+	buf.WriteString("}\n\n")
+}
+
+// GenerateUnitTests generates only unit tests (creation, validation, roundtrip)
+func (g *Generator) GenerateUnitTests() (string, error) {
+	var buf bytes.Buffer
+
+	// Write package header
+	buf.WriteString("// Code generated by diameter-codegen. DO NOT EDIT.\n\n")
+	buf.WriteString(fmt.Sprintf("package %s\n\n", g.PackageName))
+
+	// Write imports
+	buf.WriteString("import (\n")
+	buf.WriteString("\t\"bytes\"\n")
+	buf.WriteString("\t\"testing\"\n")
+	buf.WriteString("\n")
+	buf.WriteString("\t\"github.com/hsdfat8/diam-gw/models_base\"\n")
+	buf.WriteString(")\n\n")
+
+	// Generate test functions for each command
+	for _, cmd := range g.Parser.Commands {
+		// Generate comprehensive unit tests
+		g.generateCommandUnitTest(&buf, cmd)
+		// Generate validation test
+		g.generateCommandValidationTest(&buf, cmd)
+		// Generate validation test for missing required fields
+		g.generateCommandValidationMissingFieldsTest(&buf, cmd)
+		// Generate Marshal/Unmarshal roundtrip test
+		g.generateCommandRoundtripTest(&buf, cmd)
+	}
+
+	return buf.String(), nil
+}
+
+// GeneratePcapTests generates only PCAP generation tests
+func (g *Generator) GeneratePcapTests() (string, error) {
+	var buf bytes.Buffer
+
+	// Write package header
+	buf.WriteString("// Code generated by diameter-codegen. DO NOT EDIT.\n\n")
+	buf.WriteString(fmt.Sprintf("package %s\n\n", g.PackageName))
+
+	// Write imports
+	buf.WriteString("import (\n")
+	buf.WriteString("\t\"net\"\n")
+	buf.WriteString("\t\"os\"\n")
+	buf.WriteString("\t\"path/filepath\"\n")
+	buf.WriteString("\t\"testing\"\n")
+	buf.WriteString("\t\"time\"\n")
+	buf.WriteString("\n")
+	buf.WriteString("\t\"github.com/google/gopacket\"\n")
+	buf.WriteString("\t\"github.com/google/gopacket/layers\"\n")
+	buf.WriteString("\t\"github.com/google/gopacket/pcapgo\"\n")
+	buf.WriteString("\t\"github.com/hsdfat8/diam-gw/models_base\"\n")
+	buf.WriteString(")\n\n")
+
+	// Generate pcap helper functions
+	g.generatePcapHelpers(&buf)
+
+	// Generate PCAP test functions for each command
+	for _, cmd := range g.Parser.Commands {
+		g.generateCommandPcapTest(&buf, cmd)
+	}
+
+	// Generate paired request-response PCAP tests
+	g.generatePairedPcapTests(&buf)
+
+	return buf.String(), nil
+}
+
+// GenerateBenchmarkTests generates only benchmark tests
+func (g *Generator) GenerateBenchmarkTests() (string, error) {
+	var buf bytes.Buffer
+
+	// Write package header
+	buf.WriteString("// Code generated by diameter-codegen. DO NOT EDIT.\n\n")
+	buf.WriteString(fmt.Sprintf("package %s\n\n", g.PackageName))
+
+	// Write imports
+	buf.WriteString("import (\n")
+	buf.WriteString("\t\"testing\"\n")
+	buf.WriteString("\n")
+	buf.WriteString("\t\"github.com/hsdfat8/diam-gw/models_base\"\n")
+	buf.WriteString(")\n\n")
+
+	// Generate benchmark tests for each command
+	for _, cmd := range g.Parser.Commands {
+		g.generateCommandBenchmarkTest(&buf, cmd)
+	}
+
+	return buf.String(), nil
 }

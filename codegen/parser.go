@@ -12,8 +12,11 @@ import (
 
 // ProtoParser parses diameter proto files
 type ProtoParser struct {
-	AVPs     map[string]*AVPDefinition
-	Commands []*CommandDefinition
+	AVPs        map[string]*AVPDefinition
+	Commands    []*CommandDefinition
+	Package     string // Proto package name (e.g., "diameter.base")
+	GoPackage   string // Go package path (e.g., "github.com/hsdfat8/diam-gw/commands/base")
+	PackageName string // Simple package name extracted from go_package (e.g., "base")
 }
 
 // NewProtoParser creates a new parser
@@ -44,10 +47,34 @@ func (p *ProtoParser) ParseFile(filename string) error {
 			continue
 		}
 
-		// Skip syntax, package, and option declarations
-		if strings.HasPrefix(line, "syntax") ||
-			strings.HasPrefix(line, "package") ||
-			strings.HasPrefix(line, "option") {
+		// Parse syntax, package, and option declarations
+		if strings.HasPrefix(line, "syntax") {
+			continue
+		}
+
+		if strings.HasPrefix(line, "package ") {
+			// Extract package name: "package diameter.base;"
+			parts := strings.Fields(line)
+			if len(parts) >= 2 {
+				p.Package = strings.TrimSuffix(parts[1], ";")
+			}
+			continue
+		}
+
+		if strings.HasPrefix(line, "option go_package") {
+			// Extract go_package: option go_package = "github.com/hsdfat8/diam-gw/commands/base";
+			parts := strings.Split(line, "=")
+			if len(parts) >= 2 {
+				goPackage := strings.TrimSpace(parts[1])
+				goPackage = strings.Trim(goPackage, "\"';")
+				p.GoPackage = goPackage
+
+				// Extract simple package name from go_package path
+				pathParts := strings.Split(goPackage, "/")
+				if len(pathParts) > 0 {
+					p.PackageName = pathParts[len(pathParts)-1]
+				}
+			}
 			continue
 		}
 

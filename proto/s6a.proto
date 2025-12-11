@@ -1194,6 +1194,105 @@ avp Visited-Network-Identifier {
   may_encrypt = false;
 }
 
+avp UE-Usage-Type {
+  code = 1680;
+  vendor_id = 10415;
+  type = Unsigned32;
+  must = false;
+  may_encrypt = false;
+}
+
+// ============================================================================
+// Base Protocol AVPs (from RFC 6733)
+// ============================================================================
+
+avp Session-Id {
+  code = 263;
+  type = UTF8String;
+  must = true;
+  may_encrypt = false;
+}
+
+avp Auth-Session-State {
+  code = 277;
+  type = Enumerated;
+  must = true;
+  may_encrypt = false;
+  // 0: STATE_MAINTAINED
+  // 1: NO_STATE_MAINTAINED
+}
+
+avp Origin-Host {
+  code = 264;
+  type = DiameterIdentity;
+  must = true;
+  may_encrypt = false;
+}
+
+avp Origin-Realm {
+  code = 296;
+  type = DiameterIdentity;
+  must = true;
+  may_encrypt = false;
+}
+
+avp Destination-Host {
+  code = 293;
+  type = DiameterIdentity;
+  must = false;
+  may_encrypt = false;
+}
+
+avp Destination-Realm {
+  code = 283;
+  type = DiameterIdentity;
+  must = true;
+  may_encrypt = false;
+}
+
+avp User-Name {
+  code = 1;
+  type = UTF8String;
+  must = false;
+  may_encrypt = true;
+  // Contains IMSI when present
+}
+
+avp Vendor-Specific-Application-Id {
+  code = 260;
+  type = Grouped;
+  must = false;
+  may_encrypt = false;
+}
+
+avp Result-Code {
+  code = 268;
+  type = Unsigned32;
+  must = true;
+  may_encrypt = false;
+}
+
+avp Failed-AVP {
+  code = 279;
+  type = Grouped;
+  must = false;
+  may_encrypt = false;
+}
+
+avp Proxy-Info {
+  code = 284;
+  type = Grouped;
+  must = false;
+  may_encrypt = false;
+}
+
+avp Route-Record {
+  code = 282;
+  type = DiameterIdentity;
+  must = false;
+  may_encrypt = false;
+}
+
 // ============================================================================
 // Command Definitions
 // ============================================================================

@@ -31,30 +31,30 @@ type DiameterHeader struct {
 
 // AVP Codes
 const (
-	AVPCodeORIGINSTATEID               uint32 = 278
-	AVPCodeSUPPORTEDVENDORID           uint32 = 265
-	AVPCodeFAILEDAVP                   uint32 = 279
-	AVPCodeDISCONNECTCAUSE             uint32 = 273
-	AVPCodeTERMINATIONCAUSE            uint32 = 295
-	AVPCodeINBANDSECURITYID            uint32 = 299
-	AVPCodeFIRMWAREREVISION            uint32 = 267
-	AVPCodeUSERNAME                    uint32 = 1
-	AVPCodeERRORMESSAGE                uint32 = 281
-	AVPCodeHOSTIPADDRESS               uint32 = 257
-	AVPCodeVENDORID                    uint32 = 266
-	AVPCodePRODUCTNAME                 uint32 = 269
-	AVPCodeAUTHAPPLICATIONID           uint32 = 258
-	AVPCodeACCTAPPLICATIONID           uint32 = 259
-	AVPCodeVENDORSPECIFICAPPLICATIONID uint32 = 260
-	AVPCodeSESSIONID                   uint32 = 263
-	AVPCodeORIGINHOST                  uint32 = 264
-	AVPCodeORIGINREALM                 uint32 = 296
-	AVPCodeDESTINATIONREALM            uint32 = 283
-	AVPCodeDESTINATIONHOST             uint32 = 293
-	AVPCodeREAUTHREQUESTTYPE           uint32 = 285
 	AVPCodeACCOUNTINGRECORDTYPE        uint32 = 480
 	AVPCodeACCOUNTINGRECORDNUMBER      uint32 = 485
+	AVPCodeHOSTIPADDRESS               uint32 = 257
+	AVPCodeSUPPORTEDVENDORID           uint32 = 265
+	AVPCodeINBANDSECURITYID            uint32 = 299
+	AVPCodeACCTAPPLICATIONID           uint32 = 259
+	AVPCodeVENDORSPECIFICAPPLICATIONID uint32 = 260
+	AVPCodeFAILEDAVP                   uint32 = 279
+	AVPCodeDISCONNECTCAUSE             uint32 = 273
+	AVPCodeREAUTHREQUESTTYPE           uint32 = 285
+	AVPCodeORIGINSTATEID               uint32 = 278
+	AVPCodeAUTHAPPLICATIONID           uint32 = 258
 	AVPCodeRESULTCODE                  uint32 = 268
+	AVPCodeERRORMESSAGE                uint32 = 281
+	AVPCodeSESSIONID                   uint32 = 263
+	AVPCodeORIGINHOST                  uint32 = 264
+	AVPCodeDESTINATIONREALM            uint32 = 283
+	AVPCodeTERMINATIONCAUSE            uint32 = 295
+	AVPCodeORIGINREALM                 uint32 = 296
+	AVPCodeVENDORID                    uint32 = 266
+	AVPCodePRODUCTNAME                 uint32 = 269
+	AVPCodeFIRMWAREREVISION            uint32 = 267
+	AVPCodeDESTINATIONHOST             uint32 = 293
+	AVPCodeUSERNAME                    uint32 = 1
 )
 
 // Command Codes
@@ -85,11 +85,13 @@ type CapabilitiesExchangeRequest struct {
 	HostIpAddress               []models_base.Address        // Required
 	VendorId                    models_base.Unsigned32       // Required
 	ProductName                 models_base.UTF8String       // Required
+	OriginStateId               *models_base.Unsigned32      // Optional
 	SupportedVendorId           []models_base.Unsigned32     // Optional
 	AuthApplicationId           []models_base.Unsigned32     // Optional
 	InbandSecurityId            []models_base.Unsigned32     // Optional
 	AcctApplicationId           []models_base.Unsigned32     // Optional
 	VendorSpecificApplicationId []models_base.Grouped        // Optional
+	FirmwareRevision            *models_base.Unsigned32      // Optional
 }
 
 // NewCapabilitiesExchangeRequest creates a new CER message
@@ -159,6 +161,11 @@ func (m *CapabilitiesExchangeRequest) Marshal() ([]byte, error) {
 	// Marshal ProductName (required)
 	buf.Write(marshalAVP(269, m.ProductName, false, false))
 
+	// Marshal OriginStateId (optional)
+	if m.OriginStateId != nil {
+		buf.Write(marshalAVP(278, *m.OriginStateId, false, false))
+	}
+
 	// Marshal SupportedVendorId (repeated)
 	for _, v := range m.SupportedVendorId {
 		buf.Write(marshalAVP(265, v, false, false))
@@ -182,6 +189,11 @@ func (m *CapabilitiesExchangeRequest) Marshal() ([]byte, error) {
 	// Marshal VendorSpecificApplicationId (repeated)
 	for _, v := range m.VendorSpecificApplicationId {
 		buf.Write(marshalAVP(260, v, false, false))
+	}
+
+	// Marshal FirmwareRevision (optional)
+	if m.FirmwareRevision != nil {
+		buf.Write(marshalAVP(267, *m.FirmwareRevision, false, false))
 	}
 
 	// Get the final message
@@ -262,6 +274,12 @@ func (m *CapabilitiesExchangeRequest) Unmarshal(data []byte) error {
 			if err == nil {
 				m.ProductName = val.(models_base.UTF8String)
 			}
+		case 278: // Origin-State-Id
+			val, err := models_base.DecodeUnsigned32(avpValue)
+			if err == nil {
+				v := val.(models_base.Unsigned32)
+				m.OriginStateId = &v
+			}
 		case 265: // Supported-Vendor-Id
 			val, err := models_base.DecodeUnsigned32(avpValue)
 			if err == nil {
@@ -287,6 +305,12 @@ func (m *CapabilitiesExchangeRequest) Unmarshal(data []byte) error {
 			if err == nil {
 				m.VendorSpecificApplicationId = append(m.VendorSpecificApplicationId, val.(models_base.Grouped))
 			}
+		case 267: // Firmware-Revision
+			val, err := models_base.DecodeUnsigned32(avpValue)
+			if err == nil {
+				v := val.(models_base.Unsigned32)
+				m.FirmwareRevision = &v
+			}
 		}
 
 		// Move to next AVP (with padding)
@@ -311,7 +335,7 @@ func (m *CapabilitiesExchangeRequest) Len() int {
 
 // String returns a string representation of CapabilitiesExchangeRequest
 func (m *CapabilitiesExchangeRequest) String() string {
-	return fmt.Sprintf("CapabilitiesExchangeRequest{OriginHost:%v, OriginRealm:%v, HostIpAddress:%v, VendorId:%v, ProductName:%v, SupportedVendorId:%v, AuthApplicationId:%v, InbandSecurityId:%v, AcctApplicationId:%v, VendorSpecificApplicationId:%v}", m.OriginHost, m.OriginRealm, m.HostIpAddress, m.VendorId, m.ProductName, m.SupportedVendorId, m.AuthApplicationId, m.InbandSecurityId, m.AcctApplicationId, m.VendorSpecificApplicationId)
+	return fmt.Sprintf("CapabilitiesExchangeRequest{OriginHost:%v, OriginRealm:%v, HostIpAddress:%v, VendorId:%v, ProductName:%v, OriginStateId:%v, SupportedVendorId:%v, AuthApplicationId:%v, InbandSecurityId:%v, AcctApplicationId:%v, VendorSpecificApplicationId:%v, FirmwareRevision:%v}", m.OriginHost, m.OriginRealm, m.HostIpAddress, m.VendorId, m.ProductName, m.OriginStateId, m.SupportedVendorId, m.AuthApplicationId, m.InbandSecurityId, m.AcctApplicationId, m.VendorSpecificApplicationId, m.FirmwareRevision)
 }
 
 // CapabilitiesExchangeAnswer represents the Capabilities-Exchange-Answer (CEA) Diameter command
@@ -325,11 +349,15 @@ type CapabilitiesExchangeAnswer struct {
 	HostIpAddress               []models_base.Address        // Required
 	VendorId                    models_base.Unsigned32       // Required
 	ProductName                 models_base.UTF8String       // Required
+	OriginStateId               *models_base.Unsigned32      // Optional
+	ErrorMessage                *models_base.UTF8String      // Optional
+	FailedAvp                   *models_base.Grouped         // Optional
 	SupportedVendorId           []models_base.Unsigned32     // Optional
 	AuthApplicationId           []models_base.Unsigned32     // Optional
 	InbandSecurityId            []models_base.Unsigned32     // Optional
 	AcctApplicationId           []models_base.Unsigned32     // Optional
 	VendorSpecificApplicationId []models_base.Grouped        // Optional
+	FirmwareRevision            *models_base.Unsigned32      // Optional
 }
 
 // NewCapabilitiesExchangeAnswer creates a new CEA message
@@ -402,6 +430,21 @@ func (m *CapabilitiesExchangeAnswer) Marshal() ([]byte, error) {
 	// Marshal ProductName (required)
 	buf.Write(marshalAVP(269, m.ProductName, false, false))
 
+	// Marshal OriginStateId (optional)
+	if m.OriginStateId != nil {
+		buf.Write(marshalAVP(278, *m.OriginStateId, false, false))
+	}
+
+	// Marshal ErrorMessage (optional)
+	if m.ErrorMessage != nil {
+		buf.Write(marshalAVP(281, *m.ErrorMessage, false, false))
+	}
+
+	// Marshal FailedAvp (optional)
+	if m.FailedAvp != nil {
+		buf.Write(marshalAVP(279, *m.FailedAvp, false, false))
+	}
+
 	// Marshal SupportedVendorId (repeated)
 	for _, v := range m.SupportedVendorId {
 		buf.Write(marshalAVP(265, v, false, false))
@@ -425,6 +468,11 @@ func (m *CapabilitiesExchangeAnswer) Marshal() ([]byte, error) {
 	// Marshal VendorSpecificApplicationId (repeated)
 	for _, v := range m.VendorSpecificApplicationId {
 		buf.Write(marshalAVP(260, v, false, false))
+	}
+
+	// Marshal FirmwareRevision (optional)
+	if m.FirmwareRevision != nil {
+		buf.Write(marshalAVP(267, *m.FirmwareRevision, false, false))
 	}
 
 	// Get the final message
@@ -510,6 +558,24 @@ func (m *CapabilitiesExchangeAnswer) Unmarshal(data []byte) error {
 			if err == nil {
 				m.ProductName = val.(models_base.UTF8String)
 			}
+		case 278: // Origin-State-Id
+			val, err := models_base.DecodeUnsigned32(avpValue)
+			if err == nil {
+				v := val.(models_base.Unsigned32)
+				m.OriginStateId = &v
+			}
+		case 281: // Error-Message
+			val, err := models_base.DecodeUTF8String(avpValue)
+			if err == nil {
+				v := val.(models_base.UTF8String)
+				m.ErrorMessage = &v
+			}
+		case 279: // Failed-AVP
+			val, err := models_base.DecodeGrouped(avpValue)
+			if err == nil {
+				v := val.(models_base.Grouped)
+				m.FailedAvp = &v
+			}
 		case 265: // Supported-Vendor-Id
 			val, err := models_base.DecodeUnsigned32(avpValue)
 			if err == nil {
@@ -535,6 +601,12 @@ func (m *CapabilitiesExchangeAnswer) Unmarshal(data []byte) error {
 			if err == nil {
 				m.VendorSpecificApplicationId = append(m.VendorSpecificApplicationId, val.(models_base.Grouped))
 			}
+		case 267: // Firmware-Revision
+			val, err := models_base.DecodeUnsigned32(avpValue)
+			if err == nil {
+				v := val.(models_base.Unsigned32)
+				m.FirmwareRevision = &v
+			}
 		}
 
 		// Move to next AVP (with padding)
@@ -559,7 +631,7 @@ func (m *CapabilitiesExchangeAnswer) Len() int {
 
 // String returns a string representation of CapabilitiesExchangeAnswer
 func (m *CapabilitiesExchangeAnswer) String() string {
-	return fmt.Sprintf("CapabilitiesExchangeAnswer{ResultCode:%v, OriginHost:%v, OriginRealm:%v, HostIpAddress:%v, VendorId:%v, ProductName:%v, SupportedVendorId:%v, AuthApplicationId:%v, InbandSecurityId:%v, AcctApplicationId:%v, VendorSpecificApplicationId:%v}", m.ResultCode, m.OriginHost, m.OriginRealm, m.HostIpAddress, m.VendorId, m.ProductName, m.SupportedVendorId, m.AuthApplicationId, m.InbandSecurityId, m.AcctApplicationId, m.VendorSpecificApplicationId)
+	return fmt.Sprintf("CapabilitiesExchangeAnswer{ResultCode:%v, OriginHost:%v, OriginRealm:%v, HostIpAddress:%v, VendorId:%v, ProductName:%v, OriginStateId:%v, ErrorMessage:%v, FailedAvp:%v, SupportedVendorId:%v, AuthApplicationId:%v, InbandSecurityId:%v, AcctApplicationId:%v, VendorSpecificApplicationId:%v, FirmwareRevision:%v}", m.ResultCode, m.OriginHost, m.OriginRealm, m.HostIpAddress, m.VendorId, m.ProductName, m.OriginStateId, m.ErrorMessage, m.FailedAvp, m.SupportedVendorId, m.AuthApplicationId, m.InbandSecurityId, m.AcctApplicationId, m.VendorSpecificApplicationId, m.FirmwareRevision)
 }
 
 // DeviceWatchdogRequest represents the Device-Watchdog-Request (DWR) Diameter command
@@ -567,8 +639,9 @@ func (m *CapabilitiesExchangeAnswer) String() string {
 type DeviceWatchdogRequest struct {
 	Header DiameterHeader
 
-	OriginHost  models_base.DiameterIdentity // Required
-	OriginRealm models_base.DiameterIdentity // Required
+	OriginHost    models_base.DiameterIdentity // Required
+	OriginRealm   models_base.DiameterIdentity // Required
+	OriginStateId *models_base.Unsigned32      // Optional
 }
 
 // NewDeviceWatchdogRequest creates a new DWR message
@@ -620,6 +693,11 @@ func (m *DeviceWatchdogRequest) Marshal() ([]byte, error) {
 
 	// Marshal OriginRealm (required)
 	buf.Write(marshalAVP(296, m.OriginRealm, true, false))
+
+	// Marshal OriginStateId (optional)
+	if m.OriginStateId != nil {
+		buf.Write(marshalAVP(278, *m.OriginStateId, false, false))
+	}
 
 	// Get the final message
 	result := buf.Bytes()
@@ -684,6 +762,12 @@ func (m *DeviceWatchdogRequest) Unmarshal(data []byte) error {
 			if err == nil {
 				m.OriginRealm = val.(models_base.DiameterIdentity)
 			}
+		case 278: // Origin-State-Id
+			val, err := models_base.DecodeUnsigned32(avpValue)
+			if err == nil {
+				v := val.(models_base.Unsigned32)
+				m.OriginStateId = &v
+			}
 		}
 
 		// Move to next AVP (with padding)
@@ -708,7 +792,7 @@ func (m *DeviceWatchdogRequest) Len() int {
 
 // String returns a string representation of DeviceWatchdogRequest
 func (m *DeviceWatchdogRequest) String() string {
-	return fmt.Sprintf("DeviceWatchdogRequest{OriginHost:%v, OriginRealm:%v}", m.OriginHost, m.OriginRealm)
+	return fmt.Sprintf("DeviceWatchdogRequest{OriginHost:%v, OriginRealm:%v, OriginStateId:%v}", m.OriginHost, m.OriginRealm, m.OriginStateId)
 }
 
 // DeviceWatchdogAnswer represents the Device-Watchdog-Answer (DWA) Diameter command
@@ -716,9 +800,12 @@ func (m *DeviceWatchdogRequest) String() string {
 type DeviceWatchdogAnswer struct {
 	Header DiameterHeader
 
-	ResultCode  models_base.Unsigned32       // Required
-	OriginHost  models_base.DiameterIdentity // Required
-	OriginRealm models_base.DiameterIdentity // Required
+	ResultCode    models_base.Unsigned32       // Required
+	OriginHost    models_base.DiameterIdentity // Required
+	OriginRealm   models_base.DiameterIdentity // Required
+	ErrorMessage  *models_base.UTF8String      // Optional
+	FailedAvp     *models_base.Grouped         // Optional
+	OriginStateId *models_base.Unsigned32      // Optional
 }
 
 // NewDeviceWatchdogAnswer creates a new DWA message
@@ -773,6 +860,21 @@ func (m *DeviceWatchdogAnswer) Marshal() ([]byte, error) {
 
 	// Marshal OriginRealm (required)
 	buf.Write(marshalAVP(296, m.OriginRealm, true, false))
+
+	// Marshal ErrorMessage (optional)
+	if m.ErrorMessage != nil {
+		buf.Write(marshalAVP(281, *m.ErrorMessage, false, false))
+	}
+
+	// Marshal FailedAvp (optional)
+	if m.FailedAvp != nil {
+		buf.Write(marshalAVP(279, *m.FailedAvp, false, false))
+	}
+
+	// Marshal OriginStateId (optional)
+	if m.OriginStateId != nil {
+		buf.Write(marshalAVP(278, *m.OriginStateId, false, false))
+	}
 
 	// Get the final message
 	result := buf.Bytes()
@@ -842,6 +944,24 @@ func (m *DeviceWatchdogAnswer) Unmarshal(data []byte) error {
 			if err == nil {
 				m.OriginRealm = val.(models_base.DiameterIdentity)
 			}
+		case 281: // Error-Message
+			val, err := models_base.DecodeUTF8String(avpValue)
+			if err == nil {
+				v := val.(models_base.UTF8String)
+				m.ErrorMessage = &v
+			}
+		case 279: // Failed-AVP
+			val, err := models_base.DecodeGrouped(avpValue)
+			if err == nil {
+				v := val.(models_base.Grouped)
+				m.FailedAvp = &v
+			}
+		case 278: // Origin-State-Id
+			val, err := models_base.DecodeUnsigned32(avpValue)
+			if err == nil {
+				v := val.(models_base.Unsigned32)
+				m.OriginStateId = &v
+			}
 		}
 
 		// Move to next AVP (with padding)
@@ -866,7 +986,7 @@ func (m *DeviceWatchdogAnswer) Len() int {
 
 // String returns a string representation of DeviceWatchdogAnswer
 func (m *DeviceWatchdogAnswer) String() string {
-	return fmt.Sprintf("DeviceWatchdogAnswer{ResultCode:%v, OriginHost:%v, OriginRealm:%v}", m.ResultCode, m.OriginHost, m.OriginRealm)
+	return fmt.Sprintf("DeviceWatchdogAnswer{ResultCode:%v, OriginHost:%v, OriginRealm:%v, ErrorMessage:%v, FailedAvp:%v, OriginStateId:%v}", m.ResultCode, m.OriginHost, m.OriginRealm, m.ErrorMessage, m.FailedAvp, m.OriginStateId)
 }
 
 // DisconnectPeerRequest represents the Disconnect-Peer-Request (DPR) Diameter command
@@ -1032,9 +1152,11 @@ func (m *DisconnectPeerRequest) String() string {
 type DisconnectPeerAnswer struct {
 	Header DiameterHeader
 
-	ResultCode  models_base.Unsigned32       // Required
-	OriginHost  models_base.DiameterIdentity // Required
-	OriginRealm models_base.DiameterIdentity // Required
+	ResultCode   models_base.Unsigned32       // Required
+	OriginHost   models_base.DiameterIdentity // Required
+	OriginRealm  models_base.DiameterIdentity // Required
+	ErrorMessage *models_base.UTF8String      // Optional
+	FailedAvp    *models_base.Grouped         // Optional
 }
 
 // NewDisconnectPeerAnswer creates a new DPA message
@@ -1089,6 +1211,16 @@ func (m *DisconnectPeerAnswer) Marshal() ([]byte, error) {
 
 	// Marshal OriginRealm (required)
 	buf.Write(marshalAVP(296, m.OriginRealm, true, false))
+
+	// Marshal ErrorMessage (optional)
+	if m.ErrorMessage != nil {
+		buf.Write(marshalAVP(281, *m.ErrorMessage, false, false))
+	}
+
+	// Marshal FailedAvp (optional)
+	if m.FailedAvp != nil {
+		buf.Write(marshalAVP(279, *m.FailedAvp, false, false))
+	}
 
 	// Get the final message
 	result := buf.Bytes()
@@ -1158,6 +1290,18 @@ func (m *DisconnectPeerAnswer) Unmarshal(data []byte) error {
 			if err == nil {
 				m.OriginRealm = val.(models_base.DiameterIdentity)
 			}
+		case 281: // Error-Message
+			val, err := models_base.DecodeUTF8String(avpValue)
+			if err == nil {
+				v := val.(models_base.UTF8String)
+				m.ErrorMessage = &v
+			}
+		case 279: // Failed-AVP
+			val, err := models_base.DecodeGrouped(avpValue)
+			if err == nil {
+				v := val.(models_base.Grouped)
+				m.FailedAvp = &v
+			}
 		}
 
 		// Move to next AVP (with padding)
@@ -1182,7 +1326,7 @@ func (m *DisconnectPeerAnswer) Len() int {
 
 // String returns a string representation of DisconnectPeerAnswer
 func (m *DisconnectPeerAnswer) String() string {
-	return fmt.Sprintf("DisconnectPeerAnswer{ResultCode:%v, OriginHost:%v, OriginRealm:%v}", m.ResultCode, m.OriginHost, m.OriginRealm)
+	return fmt.Sprintf("DisconnectPeerAnswer{ResultCode:%v, OriginHost:%v, OriginRealm:%v, ErrorMessage:%v, FailedAvp:%v}", m.ResultCode, m.OriginHost, m.OriginRealm, m.ErrorMessage, m.FailedAvp)
 }
 
 // ReAuthRequest represents the Re-Auth-Request (RAR) Diameter command
@@ -1197,6 +1341,8 @@ type ReAuthRequest struct {
 	DestinationHost   models_base.DiameterIdentity // Required
 	AuthApplicationId models_base.Unsigned32       // Required
 	ReAuthRequestType models_base.Enumerated       // Required
+	UserName          *models_base.UTF8String      // Optional
+	OriginStateId     *models_base.Unsigned32      // Optional
 }
 
 // NewReAuthRequest creates a new RAR message
@@ -1272,6 +1418,16 @@ func (m *ReAuthRequest) Marshal() ([]byte, error) {
 
 	// Marshal ReAuthRequestType (required)
 	buf.Write(marshalAVP(285, m.ReAuthRequestType, true, false))
+
+	// Marshal UserName (optional)
+	if m.UserName != nil {
+		buf.Write(marshalAVP(1, *m.UserName, false, true))
+	}
+
+	// Marshal OriginStateId (optional)
+	if m.OriginStateId != nil {
+		buf.Write(marshalAVP(278, *m.OriginStateId, false, false))
+	}
 
 	// Get the final message
 	result := buf.Bytes()
@@ -1361,6 +1517,18 @@ func (m *ReAuthRequest) Unmarshal(data []byte) error {
 			if err == nil {
 				m.ReAuthRequestType = val.(models_base.Enumerated)
 			}
+		case 1: // User-Name
+			val, err := models_base.DecodeUTF8String(avpValue)
+			if err == nil {
+				v := val.(models_base.UTF8String)
+				m.UserName = &v
+			}
+		case 278: // Origin-State-Id
+			val, err := models_base.DecodeUnsigned32(avpValue)
+			if err == nil {
+				v := val.(models_base.Unsigned32)
+				m.OriginStateId = &v
+			}
 		}
 
 		// Move to next AVP (with padding)
@@ -1385,7 +1553,7 @@ func (m *ReAuthRequest) Len() int {
 
 // String returns a string representation of ReAuthRequest
 func (m *ReAuthRequest) String() string {
-	return fmt.Sprintf("ReAuthRequest{SessionId:%v, OriginHost:%v, OriginRealm:%v, DestinationRealm:%v, DestinationHost:%v, AuthApplicationId:%v, ReAuthRequestType:%v}", m.SessionId, m.OriginHost, m.OriginRealm, m.DestinationRealm, m.DestinationHost, m.AuthApplicationId, m.ReAuthRequestType)
+	return fmt.Sprintf("ReAuthRequest{SessionId:%v, OriginHost:%v, OriginRealm:%v, DestinationRealm:%v, DestinationHost:%v, AuthApplicationId:%v, ReAuthRequestType:%v, UserName:%v, OriginStateId:%v}", m.SessionId, m.OriginHost, m.OriginRealm, m.DestinationRealm, m.DestinationHost, m.AuthApplicationId, m.ReAuthRequestType, m.UserName, m.OriginStateId)
 }
 
 // ReAuthAnswer represents the Re-Auth-Answer (RAA) Diameter command
@@ -1393,10 +1561,14 @@ func (m *ReAuthRequest) String() string {
 type ReAuthAnswer struct {
 	Header DiameterHeader
 
-	SessionId   models_base.UTF8String       // Required
-	ResultCode  models_base.Unsigned32       // Required
-	OriginHost  models_base.DiameterIdentity // Required
-	OriginRealm models_base.DiameterIdentity // Required
+	SessionId     models_base.UTF8String       // Required
+	ResultCode    models_base.Unsigned32       // Required
+	OriginHost    models_base.DiameterIdentity // Required
+	OriginRealm   models_base.DiameterIdentity // Required
+	UserName      *models_base.UTF8String      // Optional
+	OriginStateId *models_base.Unsigned32      // Optional
+	ErrorMessage  *models_base.UTF8String      // Optional
+	FailedAvp     *models_base.Grouped         // Optional
 }
 
 // NewReAuthAnswer creates a new RAA message
@@ -1457,6 +1629,26 @@ func (m *ReAuthAnswer) Marshal() ([]byte, error) {
 
 	// Marshal OriginRealm (required)
 	buf.Write(marshalAVP(296, m.OriginRealm, true, false))
+
+	// Marshal UserName (optional)
+	if m.UserName != nil {
+		buf.Write(marshalAVP(1, *m.UserName, false, true))
+	}
+
+	// Marshal OriginStateId (optional)
+	if m.OriginStateId != nil {
+		buf.Write(marshalAVP(278, *m.OriginStateId, false, false))
+	}
+
+	// Marshal ErrorMessage (optional)
+	if m.ErrorMessage != nil {
+		buf.Write(marshalAVP(281, *m.ErrorMessage, false, false))
+	}
+
+	// Marshal FailedAvp (optional)
+	if m.FailedAvp != nil {
+		buf.Write(marshalAVP(279, *m.FailedAvp, false, false))
+	}
 
 	// Get the final message
 	result := buf.Bytes()
@@ -1531,6 +1723,30 @@ func (m *ReAuthAnswer) Unmarshal(data []byte) error {
 			if err == nil {
 				m.OriginRealm = val.(models_base.DiameterIdentity)
 			}
+		case 1: // User-Name
+			val, err := models_base.DecodeUTF8String(avpValue)
+			if err == nil {
+				v := val.(models_base.UTF8String)
+				m.UserName = &v
+			}
+		case 278: // Origin-State-Id
+			val, err := models_base.DecodeUnsigned32(avpValue)
+			if err == nil {
+				v := val.(models_base.Unsigned32)
+				m.OriginStateId = &v
+			}
+		case 281: // Error-Message
+			val, err := models_base.DecodeUTF8String(avpValue)
+			if err == nil {
+				v := val.(models_base.UTF8String)
+				m.ErrorMessage = &v
+			}
+		case 279: // Failed-AVP
+			val, err := models_base.DecodeGrouped(avpValue)
+			if err == nil {
+				v := val.(models_base.Grouped)
+				m.FailedAvp = &v
+			}
 		}
 
 		// Move to next AVP (with padding)
@@ -1555,7 +1771,7 @@ func (m *ReAuthAnswer) Len() int {
 
 // String returns a string representation of ReAuthAnswer
 func (m *ReAuthAnswer) String() string {
-	return fmt.Sprintf("ReAuthAnswer{SessionId:%v, ResultCode:%v, OriginHost:%v, OriginRealm:%v}", m.SessionId, m.ResultCode, m.OriginHost, m.OriginRealm)
+	return fmt.Sprintf("ReAuthAnswer{SessionId:%v, ResultCode:%v, OriginHost:%v, OriginRealm:%v, UserName:%v, OriginStateId:%v, ErrorMessage:%v, FailedAvp:%v}", m.SessionId, m.ResultCode, m.OriginHost, m.OriginRealm, m.UserName, m.OriginStateId, m.ErrorMessage, m.FailedAvp)
 }
 
 // SessionTerminationRequest represents the Session-Termination-Request (STR) Diameter command
@@ -1563,12 +1779,14 @@ func (m *ReAuthAnswer) String() string {
 type SessionTerminationRequest struct {
 	Header DiameterHeader
 
-	SessionId         models_base.UTF8String       // Required
-	OriginHost        models_base.DiameterIdentity // Required
-	OriginRealm       models_base.DiameterIdentity // Required
-	DestinationRealm  models_base.DiameterIdentity // Required
-	AuthApplicationId models_base.Unsigned32       // Required
-	TerminationCause  models_base.Enumerated       // Required
+	SessionId         models_base.UTF8String        // Required
+	OriginHost        models_base.DiameterIdentity  // Required
+	OriginRealm       models_base.DiameterIdentity  // Required
+	DestinationRealm  models_base.DiameterIdentity  // Required
+	AuthApplicationId models_base.Unsigned32        // Required
+	TerminationCause  models_base.Enumerated        // Required
+	UserName          *models_base.UTF8String       // Optional
+	DestinationHost   *models_base.DiameterIdentity // Optional
 }
 
 // NewSessionTerminationRequest creates a new STR message
@@ -1638,6 +1856,16 @@ func (m *SessionTerminationRequest) Marshal() ([]byte, error) {
 
 	// Marshal TerminationCause (required)
 	buf.Write(marshalAVP(295, m.TerminationCause, true, false))
+
+	// Marshal UserName (optional)
+	if m.UserName != nil {
+		buf.Write(marshalAVP(1, *m.UserName, false, true))
+	}
+
+	// Marshal DestinationHost (optional)
+	if m.DestinationHost != nil {
+		buf.Write(marshalAVP(293, *m.DestinationHost, false, false))
+	}
 
 	// Get the final message
 	result := buf.Bytes()
@@ -1722,6 +1950,18 @@ func (m *SessionTerminationRequest) Unmarshal(data []byte) error {
 			if err == nil {
 				m.TerminationCause = val.(models_base.Enumerated)
 			}
+		case 1: // User-Name
+			val, err := models_base.DecodeUTF8String(avpValue)
+			if err == nil {
+				v := val.(models_base.UTF8String)
+				m.UserName = &v
+			}
+		case 293: // Destination-Host
+			val, err := models_base.DecodeDiameterIdentity(avpValue)
+			if err == nil {
+				v := val.(models_base.DiameterIdentity)
+				m.DestinationHost = &v
+			}
 		}
 
 		// Move to next AVP (with padding)
@@ -1746,7 +1986,7 @@ func (m *SessionTerminationRequest) Len() int {
 
 // String returns a string representation of SessionTerminationRequest
 func (m *SessionTerminationRequest) String() string {
-	return fmt.Sprintf("SessionTerminationRequest{SessionId:%v, OriginHost:%v, OriginRealm:%v, DestinationRealm:%v, AuthApplicationId:%v, TerminationCause:%v}", m.SessionId, m.OriginHost, m.OriginRealm, m.DestinationRealm, m.AuthApplicationId, m.TerminationCause)
+	return fmt.Sprintf("SessionTerminationRequest{SessionId:%v, OriginHost:%v, OriginRealm:%v, DestinationRealm:%v, AuthApplicationId:%v, TerminationCause:%v, UserName:%v, DestinationHost:%v}", m.SessionId, m.OriginHost, m.OriginRealm, m.DestinationRealm, m.AuthApplicationId, m.TerminationCause, m.UserName, m.DestinationHost)
 }
 
 // SessionTerminationAnswer represents the Session-Termination-Answer (STA) Diameter command
@@ -1754,10 +1994,13 @@ func (m *SessionTerminationRequest) String() string {
 type SessionTerminationAnswer struct {
 	Header DiameterHeader
 
-	SessionId   models_base.UTF8String       // Required
-	ResultCode  models_base.Unsigned32       // Required
-	OriginHost  models_base.DiameterIdentity // Required
-	OriginRealm models_base.DiameterIdentity // Required
+	SessionId    models_base.UTF8String       // Required
+	ResultCode   models_base.Unsigned32       // Required
+	OriginHost   models_base.DiameterIdentity // Required
+	OriginRealm  models_base.DiameterIdentity // Required
+	UserName     *models_base.UTF8String      // Optional
+	ErrorMessage *models_base.UTF8String      // Optional
+	FailedAvp    *models_base.Grouped         // Optional
 }
 
 // NewSessionTerminationAnswer creates a new STA message
@@ -1818,6 +2061,21 @@ func (m *SessionTerminationAnswer) Marshal() ([]byte, error) {
 
 	// Marshal OriginRealm (required)
 	buf.Write(marshalAVP(296, m.OriginRealm, true, false))
+
+	// Marshal UserName (optional)
+	if m.UserName != nil {
+		buf.Write(marshalAVP(1, *m.UserName, false, true))
+	}
+
+	// Marshal ErrorMessage (optional)
+	if m.ErrorMessage != nil {
+		buf.Write(marshalAVP(281, *m.ErrorMessage, false, false))
+	}
+
+	// Marshal FailedAvp (optional)
+	if m.FailedAvp != nil {
+		buf.Write(marshalAVP(279, *m.FailedAvp, false, false))
+	}
 
 	// Get the final message
 	result := buf.Bytes()
@@ -1892,6 +2150,24 @@ func (m *SessionTerminationAnswer) Unmarshal(data []byte) error {
 			if err == nil {
 				m.OriginRealm = val.(models_base.DiameterIdentity)
 			}
+		case 1: // User-Name
+			val, err := models_base.DecodeUTF8String(avpValue)
+			if err == nil {
+				v := val.(models_base.UTF8String)
+				m.UserName = &v
+			}
+		case 281: // Error-Message
+			val, err := models_base.DecodeUTF8String(avpValue)
+			if err == nil {
+				v := val.(models_base.UTF8String)
+				m.ErrorMessage = &v
+			}
+		case 279: // Failed-AVP
+			val, err := models_base.DecodeGrouped(avpValue)
+			if err == nil {
+				v := val.(models_base.Grouped)
+				m.FailedAvp = &v
+			}
 		}
 
 		// Move to next AVP (with padding)
@@ -1916,7 +2192,7 @@ func (m *SessionTerminationAnswer) Len() int {
 
 // String returns a string representation of SessionTerminationAnswer
 func (m *SessionTerminationAnswer) String() string {
-	return fmt.Sprintf("SessionTerminationAnswer{SessionId:%v, ResultCode:%v, OriginHost:%v, OriginRealm:%v}", m.SessionId, m.ResultCode, m.OriginHost, m.OriginRealm)
+	return fmt.Sprintf("SessionTerminationAnswer{SessionId:%v, ResultCode:%v, OriginHost:%v, OriginRealm:%v, UserName:%v, ErrorMessage:%v, FailedAvp:%v}", m.SessionId, m.ResultCode, m.OriginHost, m.OriginRealm, m.UserName, m.ErrorMessage, m.FailedAvp)
 }
 
 // AbortSessionRequest represents the Abort-Session-Request (ASR) Diameter command
@@ -1930,6 +2206,8 @@ type AbortSessionRequest struct {
 	DestinationRealm  models_base.DiameterIdentity // Required
 	DestinationHost   models_base.DiameterIdentity // Required
 	AuthApplicationId models_base.Unsigned32       // Required
+	UserName          *models_base.UTF8String      // Optional
+	OriginStateId     *models_base.Unsigned32      // Optional
 }
 
 // NewAbortSessionRequest creates a new ASR message
@@ -2002,6 +2280,16 @@ func (m *AbortSessionRequest) Marshal() ([]byte, error) {
 
 	// Marshal AuthApplicationId (required)
 	buf.Write(marshalAVP(258, m.AuthApplicationId, false, false))
+
+	// Marshal UserName (optional)
+	if m.UserName != nil {
+		buf.Write(marshalAVP(1, *m.UserName, false, true))
+	}
+
+	// Marshal OriginStateId (optional)
+	if m.OriginStateId != nil {
+		buf.Write(marshalAVP(278, *m.OriginStateId, false, false))
+	}
 
 	// Get the final message
 	result := buf.Bytes()
@@ -2086,6 +2374,18 @@ func (m *AbortSessionRequest) Unmarshal(data []byte) error {
 			if err == nil {
 				m.AuthApplicationId = val.(models_base.Unsigned32)
 			}
+		case 1: // User-Name
+			val, err := models_base.DecodeUTF8String(avpValue)
+			if err == nil {
+				v := val.(models_base.UTF8String)
+				m.UserName = &v
+			}
+		case 278: // Origin-State-Id
+			val, err := models_base.DecodeUnsigned32(avpValue)
+			if err == nil {
+				v := val.(models_base.Unsigned32)
+				m.OriginStateId = &v
+			}
 		}
 
 		// Move to next AVP (with padding)
@@ -2110,7 +2410,7 @@ func (m *AbortSessionRequest) Len() int {
 
 // String returns a string representation of AbortSessionRequest
 func (m *AbortSessionRequest) String() string {
-	return fmt.Sprintf("AbortSessionRequest{SessionId:%v, OriginHost:%v, OriginRealm:%v, DestinationRealm:%v, DestinationHost:%v, AuthApplicationId:%v}", m.SessionId, m.OriginHost, m.OriginRealm, m.DestinationRealm, m.DestinationHost, m.AuthApplicationId)
+	return fmt.Sprintf("AbortSessionRequest{SessionId:%v, OriginHost:%v, OriginRealm:%v, DestinationRealm:%v, DestinationHost:%v, AuthApplicationId:%v, UserName:%v, OriginStateId:%v}", m.SessionId, m.OriginHost, m.OriginRealm, m.DestinationRealm, m.DestinationHost, m.AuthApplicationId, m.UserName, m.OriginStateId)
 }
 
 // AbortSessionAnswer represents the Abort-Session-Answer (ASA) Diameter command
@@ -2118,10 +2418,14 @@ func (m *AbortSessionRequest) String() string {
 type AbortSessionAnswer struct {
 	Header DiameterHeader
 
-	SessionId   models_base.UTF8String       // Required
-	ResultCode  models_base.Unsigned32       // Required
-	OriginHost  models_base.DiameterIdentity // Required
-	OriginRealm models_base.DiameterIdentity // Required
+	SessionId     models_base.UTF8String       // Required
+	ResultCode    models_base.Unsigned32       // Required
+	OriginHost    models_base.DiameterIdentity // Required
+	OriginRealm   models_base.DiameterIdentity // Required
+	UserName      *models_base.UTF8String      // Optional
+	OriginStateId *models_base.Unsigned32      // Optional
+	ErrorMessage  *models_base.UTF8String      // Optional
+	FailedAvp     *models_base.Grouped         // Optional
 }
 
 // NewAbortSessionAnswer creates a new ASA message
@@ -2182,6 +2486,26 @@ func (m *AbortSessionAnswer) Marshal() ([]byte, error) {
 
 	// Marshal OriginRealm (required)
 	buf.Write(marshalAVP(296, m.OriginRealm, true, false))
+
+	// Marshal UserName (optional)
+	if m.UserName != nil {
+		buf.Write(marshalAVP(1, *m.UserName, false, true))
+	}
+
+	// Marshal OriginStateId (optional)
+	if m.OriginStateId != nil {
+		buf.Write(marshalAVP(278, *m.OriginStateId, false, false))
+	}
+
+	// Marshal ErrorMessage (optional)
+	if m.ErrorMessage != nil {
+		buf.Write(marshalAVP(281, *m.ErrorMessage, false, false))
+	}
+
+	// Marshal FailedAvp (optional)
+	if m.FailedAvp != nil {
+		buf.Write(marshalAVP(279, *m.FailedAvp, false, false))
+	}
 
 	// Get the final message
 	result := buf.Bytes()
@@ -2256,6 +2580,30 @@ func (m *AbortSessionAnswer) Unmarshal(data []byte) error {
 			if err == nil {
 				m.OriginRealm = val.(models_base.DiameterIdentity)
 			}
+		case 1: // User-Name
+			val, err := models_base.DecodeUTF8String(avpValue)
+			if err == nil {
+				v := val.(models_base.UTF8String)
+				m.UserName = &v
+			}
+		case 278: // Origin-State-Id
+			val, err := models_base.DecodeUnsigned32(avpValue)
+			if err == nil {
+				v := val.(models_base.Unsigned32)
+				m.OriginStateId = &v
+			}
+		case 281: // Error-Message
+			val, err := models_base.DecodeUTF8String(avpValue)
+			if err == nil {
+				v := val.(models_base.UTF8String)
+				m.ErrorMessage = &v
+			}
+		case 279: // Failed-AVP
+			val, err := models_base.DecodeGrouped(avpValue)
+			if err == nil {
+				v := val.(models_base.Grouped)
+				m.FailedAvp = &v
+			}
 		}
 
 		// Move to next AVP (with padding)
@@ -2280,7 +2628,7 @@ func (m *AbortSessionAnswer) Len() int {
 
 // String returns a string representation of AbortSessionAnswer
 func (m *AbortSessionAnswer) String() string {
-	return fmt.Sprintf("AbortSessionAnswer{SessionId:%v, ResultCode:%v, OriginHost:%v, OriginRealm:%v}", m.SessionId, m.ResultCode, m.OriginHost, m.OriginRealm)
+	return fmt.Sprintf("AbortSessionAnswer{SessionId:%v, ResultCode:%v, OriginHost:%v, OriginRealm:%v, UserName:%v, OriginStateId:%v, ErrorMessage:%v, FailedAvp:%v}", m.SessionId, m.ResultCode, m.OriginHost, m.OriginRealm, m.UserName, m.OriginStateId, m.ErrorMessage, m.FailedAvp)
 }
 
 // AccountingRequest represents the Accounting-Request (AR) Diameter command
@@ -2288,12 +2636,15 @@ func (m *AbortSessionAnswer) String() string {
 type AccountingRequest struct {
 	Header DiameterHeader
 
-	SessionId              models_base.UTF8String       // Required
-	OriginHost             models_base.DiameterIdentity // Required
-	OriginRealm            models_base.DiameterIdentity // Required
-	DestinationRealm       models_base.DiameterIdentity // Required
-	AccountingRecordType   models_base.Enumerated       // Required
-	AccountingRecordNumber models_base.Unsigned32       // Required
+	SessionId              models_base.UTF8String        // Required
+	OriginHost             models_base.DiameterIdentity  // Required
+	OriginRealm            models_base.DiameterIdentity  // Required
+	DestinationRealm       models_base.DiameterIdentity  // Required
+	AccountingRecordType   models_base.Enumerated        // Required
+	AccountingRecordNumber models_base.Unsigned32        // Required
+	AcctApplicationId      *models_base.Unsigned32       // Optional
+	UserName               *models_base.UTF8String       // Optional
+	DestinationHost        *models_base.DiameterIdentity // Optional
 }
 
 // NewAccountingRequest creates a new AR message
@@ -2363,6 +2714,21 @@ func (m *AccountingRequest) Marshal() ([]byte, error) {
 
 	// Marshal AccountingRecordNumber (required)
 	buf.Write(marshalAVP(485, m.AccountingRecordNumber, true, false))
+
+	// Marshal AcctApplicationId (optional)
+	if m.AcctApplicationId != nil {
+		buf.Write(marshalAVP(259, *m.AcctApplicationId, false, false))
+	}
+
+	// Marshal UserName (optional)
+	if m.UserName != nil {
+		buf.Write(marshalAVP(1, *m.UserName, false, true))
+	}
+
+	// Marshal DestinationHost (optional)
+	if m.DestinationHost != nil {
+		buf.Write(marshalAVP(293, *m.DestinationHost, false, false))
+	}
 
 	// Get the final message
 	result := buf.Bytes()
@@ -2447,6 +2813,24 @@ func (m *AccountingRequest) Unmarshal(data []byte) error {
 			if err == nil {
 				m.AccountingRecordNumber = val.(models_base.Unsigned32)
 			}
+		case 259: // Acct-Application-Id
+			val, err := models_base.DecodeUnsigned32(avpValue)
+			if err == nil {
+				v := val.(models_base.Unsigned32)
+				m.AcctApplicationId = &v
+			}
+		case 1: // User-Name
+			val, err := models_base.DecodeUTF8String(avpValue)
+			if err == nil {
+				v := val.(models_base.UTF8String)
+				m.UserName = &v
+			}
+		case 293: // Destination-Host
+			val, err := models_base.DecodeDiameterIdentity(avpValue)
+			if err == nil {
+				v := val.(models_base.DiameterIdentity)
+				m.DestinationHost = &v
+			}
 		}
 
 		// Move to next AVP (with padding)
@@ -2471,7 +2855,7 @@ func (m *AccountingRequest) Len() int {
 
 // String returns a string representation of AccountingRequest
 func (m *AccountingRequest) String() string {
-	return fmt.Sprintf("AccountingRequest{SessionId:%v, OriginHost:%v, OriginRealm:%v, DestinationRealm:%v, AccountingRecordType:%v, AccountingRecordNumber:%v}", m.SessionId, m.OriginHost, m.OriginRealm, m.DestinationRealm, m.AccountingRecordType, m.AccountingRecordNumber)
+	return fmt.Sprintf("AccountingRequest{SessionId:%v, OriginHost:%v, OriginRealm:%v, DestinationRealm:%v, AccountingRecordType:%v, AccountingRecordNumber:%v, AcctApplicationId:%v, UserName:%v, DestinationHost:%v}", m.SessionId, m.OriginHost, m.OriginRealm, m.DestinationRealm, m.AccountingRecordType, m.AccountingRecordNumber, m.AcctApplicationId, m.UserName, m.DestinationHost)
 }
 
 // AccountingAnswer represents the Accounting-Answer (AA) Diameter command
@@ -2485,6 +2869,8 @@ type AccountingAnswer struct {
 	OriginRealm            models_base.DiameterIdentity // Required
 	AccountingRecordType   models_base.Enumerated       // Required
 	AccountingRecordNumber models_base.Unsigned32       // Required
+	AcctApplicationId      *models_base.Unsigned32      // Optional
+	UserName               *models_base.UTF8String      // Optional
 }
 
 // NewAccountingAnswer creates a new AA message
@@ -2551,6 +2937,16 @@ func (m *AccountingAnswer) Marshal() ([]byte, error) {
 
 	// Marshal AccountingRecordNumber (required)
 	buf.Write(marshalAVP(485, m.AccountingRecordNumber, true, false))
+
+	// Marshal AcctApplicationId (optional)
+	if m.AcctApplicationId != nil {
+		buf.Write(marshalAVP(259, *m.AcctApplicationId, false, false))
+	}
+
+	// Marshal UserName (optional)
+	if m.UserName != nil {
+		buf.Write(marshalAVP(1, *m.UserName, false, true))
+	}
 
 	// Get the final message
 	result := buf.Bytes()
@@ -2635,6 +3031,18 @@ func (m *AccountingAnswer) Unmarshal(data []byte) error {
 			if err == nil {
 				m.AccountingRecordNumber = val.(models_base.Unsigned32)
 			}
+		case 259: // Acct-Application-Id
+			val, err := models_base.DecodeUnsigned32(avpValue)
+			if err == nil {
+				v := val.(models_base.Unsigned32)
+				m.AcctApplicationId = &v
+			}
+		case 1: // User-Name
+			val, err := models_base.DecodeUTF8String(avpValue)
+			if err == nil {
+				v := val.(models_base.UTF8String)
+				m.UserName = &v
+			}
 		}
 
 		// Move to next AVP (with padding)
@@ -2659,7 +3067,7 @@ func (m *AccountingAnswer) Len() int {
 
 // String returns a string representation of AccountingAnswer
 func (m *AccountingAnswer) String() string {
-	return fmt.Sprintf("AccountingAnswer{SessionId:%v, ResultCode:%v, OriginHost:%v, OriginRealm:%v, AccountingRecordType:%v, AccountingRecordNumber:%v}", m.SessionId, m.ResultCode, m.OriginHost, m.OriginRealm, m.AccountingRecordType, m.AccountingRecordNumber)
+	return fmt.Sprintf("AccountingAnswer{SessionId:%v, ResultCode:%v, OriginHost:%v, OriginRealm:%v, AccountingRecordType:%v, AccountingRecordNumber:%v, AcctApplicationId:%v, UserName:%v}", m.SessionId, m.ResultCode, m.OriginHost, m.OriginRealm, m.AccountingRecordType, m.AccountingRecordNumber, m.AcctApplicationId, m.UserName)
 }
 
 // Helper functions
