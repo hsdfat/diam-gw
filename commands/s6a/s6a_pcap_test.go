@@ -231,18 +231,8 @@ func writeDiameterPairToPcap(filename string, requestData, responseData []byte, 
 	return nil
 }
 
-// TestUpdateLocationRequest_PCAP tests PCAP file generation for Request message
-func TestUpdateLocationRequest_PCAP(t *testing.T) {
-	// Create testdata directory
-	if err := os.MkdirAll("testdata", 0755); err != nil {
-		t.Fatalf("Failed to create testdata directory: %v", err)
-	}
-
-	// Create pcap file path
-	pcapFile := filepath.Join("testdata", "test_ulr.pcap")
-	// PCAP files are kept for Wireshark analysis
-
-	// Create Request message with ALL fields populated
+// createUpdateLocationRequestForTest creates a UpdateLocationRequest message with ALL fields populated for testing
+func createUpdateLocationRequestForTest() *UpdateLocationRequest {
 	msg := NewUpdateLocationRequest()
 
 	// Required fields
@@ -292,47 +282,11 @@ func TestUpdateLocationRequest_PCAP(t *testing.T) {
 	}
 	msg.RouteRecord = []models_base.DiameterIdentity{models_base.DiameterIdentity("client.example.com")}
 
-	// Set header identifiers
-	msg.Header.HopByHopID = 0x12345678
-	msg.Header.EndToEndID = 0x87654321
-
-	// Marshal message
-	data, err := msg.Marshal()
-	if err != nil {
-		t.Fatalf("Failed to marshal message: %v", err)
-	}
-
-	// Write to PCAP
-	err = writeDiameterToPcap(pcapFile, data, net.ParseIP("192.168.1.100"), net.ParseIP("192.168.1.1"), 3868)
-	if err != nil {
-		t.Fatalf("Failed to write PCAP: %v", err)
-	}
-
-	// Verify PCAP file
-	info, err := os.Stat(pcapFile)
-	if err != nil {
-		t.Fatalf("PCAP file not created: %v", err)
-	}
-	if info.Size() == 0 {
-		t.Fatal("PCAP file is empty")
-	}
-
-	t.Logf("PCAP file created: %s (%d bytes)", pcapFile, info.Size())
-	t.Logf("Open in Wireshark to view the Request message")
+	return msg
 }
 
-// TestUpdateLocationAnswer_PCAP tests PCAP file generation for Answer message
-func TestUpdateLocationAnswer_PCAP(t *testing.T) {
-	// Create testdata directory
-	if err := os.MkdirAll("testdata", 0755); err != nil {
-		t.Fatalf("Failed to create testdata directory: %v", err)
-	}
-
-	// Create pcap file path
-	pcapFile := filepath.Join("testdata", "test_ula.pcap")
-	// PCAP files are kept for Wireshark analysis
-
-	// Create Answer message with ALL fields populated
+// createUpdateLocationAnswerForTest creates a UpdateLocationAnswer message with ALL fields populated for testing
+func createUpdateLocationAnswerForTest() *UpdateLocationAnswer {
 	msg := NewUpdateLocationAnswer()
 
 	// Required fields
@@ -419,47 +373,11 @@ func TestUpdateLocationAnswer_PCAP(t *testing.T) {
 	}
 	msg.RouteRecord = []models_base.DiameterIdentity{models_base.DiameterIdentity("server.example.com")}
 
-	// Set header identifiers
-	msg.Header.HopByHopID = 0x12345678
-	msg.Header.EndToEndID = 0x87654321
-
-	// Marshal message
-	data, err := msg.Marshal()
-	if err != nil {
-		t.Fatalf("Failed to marshal message: %v", err)
-	}
-
-	// Write to PCAP
-	err = writeDiameterToPcap(pcapFile, data, net.ParseIP("192.168.1.1"), net.ParseIP("192.168.1.100"), 3868)
-	if err != nil {
-		t.Fatalf("Failed to write PCAP: %v", err)
-	}
-
-	// Verify PCAP file
-	info, err := os.Stat(pcapFile)
-	if err != nil {
-		t.Fatalf("PCAP file not created: %v", err)
-	}
-	if info.Size() == 0 {
-		t.Fatal("PCAP file is empty")
-	}
-
-	t.Logf("PCAP file created: %s (%d bytes)", pcapFile, info.Size())
-	t.Logf("Open in Wireshark to view the Answer message")
+	return msg
 }
 
-// TestAuthenticationInformationRequest_PCAP tests PCAP file generation for Request message
-func TestAuthenticationInformationRequest_PCAP(t *testing.T) {
-	// Create testdata directory
-	if err := os.MkdirAll("testdata", 0755); err != nil {
-		t.Fatalf("Failed to create testdata directory: %v", err)
-	}
-
-	// Create pcap file path
-	pcapFile := filepath.Join("testdata", "test_air.pcap")
-	// PCAP files are kept for Wireshark analysis
-
-	// Create Request message with ALL fields populated
+// createAuthenticationInformationRequestForTest creates a AuthenticationInformationRequest message with ALL fields populated for testing
+func createAuthenticationInformationRequestForTest() *AuthenticationInformationRequest {
 	msg := NewAuthenticationInformationRequest()
 
 	// Required fields
@@ -501,47 +419,11 @@ func TestAuthenticationInformationRequest_PCAP(t *testing.T) {
 	}
 	msg.RouteRecord = []models_base.DiameterIdentity{models_base.DiameterIdentity("client.example.com")}
 
-	// Set header identifiers
-	msg.Header.HopByHopID = 0x12345678
-	msg.Header.EndToEndID = 0x87654321
-
-	// Marshal message
-	data, err := msg.Marshal()
-	if err != nil {
-		t.Fatalf("Failed to marshal message: %v", err)
-	}
-
-	// Write to PCAP
-	err = writeDiameterToPcap(pcapFile, data, net.ParseIP("192.168.1.100"), net.ParseIP("192.168.1.1"), 3868)
-	if err != nil {
-		t.Fatalf("Failed to write PCAP: %v", err)
-	}
-
-	// Verify PCAP file
-	info, err := os.Stat(pcapFile)
-	if err != nil {
-		t.Fatalf("PCAP file not created: %v", err)
-	}
-	if info.Size() == 0 {
-		t.Fatal("PCAP file is empty")
-	}
-
-	t.Logf("PCAP file created: %s (%d bytes)", pcapFile, info.Size())
-	t.Logf("Open in Wireshark to view the Request message")
+	return msg
 }
 
-// TestAuthenticationInformationAnswer_PCAP tests PCAP file generation for Answer message
-func TestAuthenticationInformationAnswer_PCAP(t *testing.T) {
-	// Create testdata directory
-	if err := os.MkdirAll("testdata", 0755); err != nil {
-		t.Fatalf("Failed to create testdata directory: %v", err)
-	}
-
-	// Create pcap file path
-	pcapFile := filepath.Join("testdata", "test_aia.pcap")
-	// PCAP files are kept for Wireshark analysis
-
-	// Create Answer message with ALL fields populated
+// createAuthenticationInformationAnswerForTest creates a AuthenticationInformationAnswer message with ALL fields populated for testing
+func createAuthenticationInformationAnswerForTest() *AuthenticationInformationAnswer {
 	msg := NewAuthenticationInformationAnswer()
 
 	// Required fields
@@ -585,47 +467,11 @@ func TestAuthenticationInformationAnswer_PCAP(t *testing.T) {
 	}
 	msg.RouteRecord = []models_base.DiameterIdentity{models_base.DiameterIdentity("server.example.com")}
 
-	// Set header identifiers
-	msg.Header.HopByHopID = 0x12345678
-	msg.Header.EndToEndID = 0x87654321
-
-	// Marshal message
-	data, err := msg.Marshal()
-	if err != nil {
-		t.Fatalf("Failed to marshal message: %v", err)
-	}
-
-	// Write to PCAP
-	err = writeDiameterToPcap(pcapFile, data, net.ParseIP("192.168.1.1"), net.ParseIP("192.168.1.100"), 3868)
-	if err != nil {
-		t.Fatalf("Failed to write PCAP: %v", err)
-	}
-
-	// Verify PCAP file
-	info, err := os.Stat(pcapFile)
-	if err != nil {
-		t.Fatalf("PCAP file not created: %v", err)
-	}
-	if info.Size() == 0 {
-		t.Fatal("PCAP file is empty")
-	}
-
-	t.Logf("PCAP file created: %s (%d bytes)", pcapFile, info.Size())
-	t.Logf("Open in Wireshark to view the Answer message")
+	return msg
 }
 
-// TestCancelLocationRequest_PCAP tests PCAP file generation for Request message
-func TestCancelLocationRequest_PCAP(t *testing.T) {
-	// Create testdata directory
-	if err := os.MkdirAll("testdata", 0755); err != nil {
-		t.Fatalf("Failed to create testdata directory: %v", err)
-	}
-
-	// Create pcap file path
-	pcapFile := filepath.Join("testdata", "test_clr.pcap")
-	// PCAP files are kept for Wireshark analysis
-
-	// Create Request message with ALL fields populated
+// createCancelLocationRequestForTest creates a CancelLocationRequest message with ALL fields populated for testing
+func createCancelLocationRequestForTest() *CancelLocationRequest {
 	msg := NewCancelLocationRequest()
 
 	// Required fields
@@ -656,47 +502,11 @@ func TestCancelLocationRequest_PCAP(t *testing.T) {
 	}
 	msg.RouteRecord = []models_base.DiameterIdentity{models_base.DiameterIdentity("client.example.com")}
 
-	// Set header identifiers
-	msg.Header.HopByHopID = 0x12345678
-	msg.Header.EndToEndID = 0x87654321
-
-	// Marshal message
-	data, err := msg.Marshal()
-	if err != nil {
-		t.Fatalf("Failed to marshal message: %v", err)
-	}
-
-	// Write to PCAP
-	err = writeDiameterToPcap(pcapFile, data, net.ParseIP("192.168.1.100"), net.ParseIP("192.168.1.1"), 3868)
-	if err != nil {
-		t.Fatalf("Failed to write PCAP: %v", err)
-	}
-
-	// Verify PCAP file
-	info, err := os.Stat(pcapFile)
-	if err != nil {
-		t.Fatalf("PCAP file not created: %v", err)
-	}
-	if info.Size() == 0 {
-		t.Fatal("PCAP file is empty")
-	}
-
-	t.Logf("PCAP file created: %s (%d bytes)", pcapFile, info.Size())
-	t.Logf("Open in Wireshark to view the Request message")
+	return msg
 }
 
-// TestCancelLocationAnswer_PCAP tests PCAP file generation for Answer message
-func TestCancelLocationAnswer_PCAP(t *testing.T) {
-	// Create testdata directory
-	if err := os.MkdirAll("testdata", 0755); err != nil {
-		t.Fatalf("Failed to create testdata directory: %v", err)
-	}
-
-	// Create pcap file path
-	pcapFile := filepath.Join("testdata", "test_cla.pcap")
-	// PCAP files are kept for Wireshark analysis
-
-	// Create Answer message with ALL fields populated
+// createCancelLocationAnswerForTest creates a CancelLocationAnswer message with ALL fields populated for testing
+func createCancelLocationAnswerForTest() *CancelLocationAnswer {
 	msg := NewCancelLocationAnswer()
 
 	// Required fields
@@ -730,47 +540,11 @@ func TestCancelLocationAnswer_PCAP(t *testing.T) {
 	}
 	msg.RouteRecord = []models_base.DiameterIdentity{models_base.DiameterIdentity("server.example.com")}
 
-	// Set header identifiers
-	msg.Header.HopByHopID = 0x12345678
-	msg.Header.EndToEndID = 0x87654321
-
-	// Marshal message
-	data, err := msg.Marshal()
-	if err != nil {
-		t.Fatalf("Failed to marshal message: %v", err)
-	}
-
-	// Write to PCAP
-	err = writeDiameterToPcap(pcapFile, data, net.ParseIP("192.168.1.1"), net.ParseIP("192.168.1.100"), 3868)
-	if err != nil {
-		t.Fatalf("Failed to write PCAP: %v", err)
-	}
-
-	// Verify PCAP file
-	info, err := os.Stat(pcapFile)
-	if err != nil {
-		t.Fatalf("PCAP file not created: %v", err)
-	}
-	if info.Size() == 0 {
-		t.Fatal("PCAP file is empty")
-	}
-
-	t.Logf("PCAP file created: %s (%d bytes)", pcapFile, info.Size())
-	t.Logf("Open in Wireshark to view the Answer message")
+	return msg
 }
 
-// TestInsertSubscriberDataRequest_PCAP tests PCAP file generation for Request message
-func TestInsertSubscriberDataRequest_PCAP(t *testing.T) {
-	// Create testdata directory
-	if err := os.MkdirAll("testdata", 0755); err != nil {
-		t.Fatalf("Failed to create testdata directory: %v", err)
-	}
-
-	// Create pcap file path
-	pcapFile := filepath.Join("testdata", "test_isdr.pcap")
-	// PCAP files are kept for Wireshark analysis
-
-	// Create Request message with ALL fields populated
+// createInsertSubscriberDataRequestForTest creates a InsertSubscriberDataRequest message with ALL fields populated for testing
+func createInsertSubscriberDataRequestForTest() *InsertSubscriberDataRequest {
 	msg := NewInsertSubscriberDataRequest()
 
 	// Required fields
@@ -848,47 +622,11 @@ func TestInsertSubscriberDataRequest_PCAP(t *testing.T) {
 	}
 	msg.RouteRecord = []models_base.DiameterIdentity{models_base.DiameterIdentity("client.example.com")}
 
-	// Set header identifiers
-	msg.Header.HopByHopID = 0x12345678
-	msg.Header.EndToEndID = 0x87654321
-
-	// Marshal message
-	data, err := msg.Marshal()
-	if err != nil {
-		t.Fatalf("Failed to marshal message: %v", err)
-	}
-
-	// Write to PCAP
-	err = writeDiameterToPcap(pcapFile, data, net.ParseIP("192.168.1.100"), net.ParseIP("192.168.1.1"), 3868)
-	if err != nil {
-		t.Fatalf("Failed to write PCAP: %v", err)
-	}
-
-	// Verify PCAP file
-	info, err := os.Stat(pcapFile)
-	if err != nil {
-		t.Fatalf("PCAP file not created: %v", err)
-	}
-	if info.Size() == 0 {
-		t.Fatal("PCAP file is empty")
-	}
-
-	t.Logf("PCAP file created: %s (%d bytes)", pcapFile, info.Size())
-	t.Logf("Open in Wireshark to view the Request message")
+	return msg
 }
 
-// TestInsertSubscriberDataAnswer_PCAP tests PCAP file generation for Answer message
-func TestInsertSubscriberDataAnswer_PCAP(t *testing.T) {
-	// Create testdata directory
-	if err := os.MkdirAll("testdata", 0755); err != nil {
-		t.Fatalf("Failed to create testdata directory: %v", err)
-	}
-
-	// Create pcap file path
-	pcapFile := filepath.Join("testdata", "test_isda.pcap")
-	// PCAP files are kept for Wireshark analysis
-
-	// Create Answer message with ALL fields populated
+// createInsertSubscriberDataAnswerForTest creates a InsertSubscriberDataAnswer message with ALL fields populated for testing
+func createInsertSubscriberDataAnswerForTest() *InsertSubscriberDataAnswer {
 	msg := NewInsertSubscriberDataAnswer()
 
 	// Required fields
@@ -932,47 +670,11 @@ func TestInsertSubscriberDataAnswer_PCAP(t *testing.T) {
 	}
 	msg.RouteRecord = []models_base.DiameterIdentity{models_base.DiameterIdentity("server.example.com")}
 
-	// Set header identifiers
-	msg.Header.HopByHopID = 0x12345678
-	msg.Header.EndToEndID = 0x87654321
-
-	// Marshal message
-	data, err := msg.Marshal()
-	if err != nil {
-		t.Fatalf("Failed to marshal message: %v", err)
-	}
-
-	// Write to PCAP
-	err = writeDiameterToPcap(pcapFile, data, net.ParseIP("192.168.1.1"), net.ParseIP("192.168.1.100"), 3868)
-	if err != nil {
-		t.Fatalf("Failed to write PCAP: %v", err)
-	}
-
-	// Verify PCAP file
-	info, err := os.Stat(pcapFile)
-	if err != nil {
-		t.Fatalf("PCAP file not created: %v", err)
-	}
-	if info.Size() == 0 {
-		t.Fatal("PCAP file is empty")
-	}
-
-	t.Logf("PCAP file created: %s (%d bytes)", pcapFile, info.Size())
-	t.Logf("Open in Wireshark to view the Answer message")
+	return msg
 }
 
-// TestDeleteSubscriberDataRequest_PCAP tests PCAP file generation for Request message
-func TestDeleteSubscriberDataRequest_PCAP(t *testing.T) {
-	// Create testdata directory
-	if err := os.MkdirAll("testdata", 0755); err != nil {
-		t.Fatalf("Failed to create testdata directory: %v", err)
-	}
-
-	// Create pcap file path
-	pcapFile := filepath.Join("testdata", "test_dsdr.pcap")
-	// PCAP files are kept for Wireshark analysis
-
-	// Create Request message with ALL fields populated
+// createDeleteSubscriberDataRequestForTest creates a DeleteSubscriberDataRequest message with ALL fields populated for testing
+func createDeleteSubscriberDataRequestForTest() *DeleteSubscriberDataRequest {
 	msg := NewDeleteSubscriberDataRequest()
 
 	// Required fields
@@ -1009,47 +711,11 @@ func TestDeleteSubscriberDataRequest_PCAP(t *testing.T) {
 	}
 	msg.RouteRecord = []models_base.DiameterIdentity{models_base.DiameterIdentity("client.example.com")}
 
-	// Set header identifiers
-	msg.Header.HopByHopID = 0x12345678
-	msg.Header.EndToEndID = 0x87654321
-
-	// Marshal message
-	data, err := msg.Marshal()
-	if err != nil {
-		t.Fatalf("Failed to marshal message: %v", err)
-	}
-
-	// Write to PCAP
-	err = writeDiameterToPcap(pcapFile, data, net.ParseIP("192.168.1.100"), net.ParseIP("192.168.1.1"), 3868)
-	if err != nil {
-		t.Fatalf("Failed to write PCAP: %v", err)
-	}
-
-	// Verify PCAP file
-	info, err := os.Stat(pcapFile)
-	if err != nil {
-		t.Fatalf("PCAP file not created: %v", err)
-	}
-	if info.Size() == 0 {
-		t.Fatal("PCAP file is empty")
-	}
-
-	t.Logf("PCAP file created: %s (%d bytes)", pcapFile, info.Size())
-	t.Logf("Open in Wireshark to view the Request message")
+	return msg
 }
 
-// TestDeleteSubscriberDataAnswer_PCAP tests PCAP file generation for Answer message
-func TestDeleteSubscriberDataAnswer_PCAP(t *testing.T) {
-	// Create testdata directory
-	if err := os.MkdirAll("testdata", 0755); err != nil {
-		t.Fatalf("Failed to create testdata directory: %v", err)
-	}
-
-	// Create pcap file path
-	pcapFile := filepath.Join("testdata", "test_dsda.pcap")
-	// PCAP files are kept for Wireshark analysis
-
-	// Create Answer message with ALL fields populated
+// createDeleteSubscriberDataAnswerForTest creates a DeleteSubscriberDataAnswer message with ALL fields populated for testing
+func createDeleteSubscriberDataAnswerForTest() *DeleteSubscriberDataAnswer {
 	msg := NewDeleteSubscriberDataAnswer()
 
 	// Required fields
@@ -1084,47 +750,11 @@ func TestDeleteSubscriberDataAnswer_PCAP(t *testing.T) {
 	}
 	msg.RouteRecord = []models_base.DiameterIdentity{models_base.DiameterIdentity("server.example.com")}
 
-	// Set header identifiers
-	msg.Header.HopByHopID = 0x12345678
-	msg.Header.EndToEndID = 0x87654321
-
-	// Marshal message
-	data, err := msg.Marshal()
-	if err != nil {
-		t.Fatalf("Failed to marshal message: %v", err)
-	}
-
-	// Write to PCAP
-	err = writeDiameterToPcap(pcapFile, data, net.ParseIP("192.168.1.1"), net.ParseIP("192.168.1.100"), 3868)
-	if err != nil {
-		t.Fatalf("Failed to write PCAP: %v", err)
-	}
-
-	// Verify PCAP file
-	info, err := os.Stat(pcapFile)
-	if err != nil {
-		t.Fatalf("PCAP file not created: %v", err)
-	}
-	if info.Size() == 0 {
-		t.Fatal("PCAP file is empty")
-	}
-
-	t.Logf("PCAP file created: %s (%d bytes)", pcapFile, info.Size())
-	t.Logf("Open in Wireshark to view the Answer message")
+	return msg
 }
 
-// TestPurgeUERequest_PCAP tests PCAP file generation for Request message
-func TestPurgeUERequest_PCAP(t *testing.T) {
-	// Create testdata directory
-	if err := os.MkdirAll("testdata", 0755); err != nil {
-		t.Fatalf("Failed to create testdata directory: %v", err)
-	}
-
-	// Create pcap file path
-	pcapFile := filepath.Join("testdata", "test_pur.pcap")
-	// PCAP files are kept for Wireshark analysis
-
-	// Create Request message with ALL fields populated
+// createPurgeUERequestForTest creates a PurgeUERequest message with ALL fields populated for testing
+func createPurgeUERequestForTest() *PurgeUERequest {
 	msg := NewPurgeUERequest()
 
 	// Required fields
@@ -1156,47 +786,11 @@ func TestPurgeUERequest_PCAP(t *testing.T) {
 	}
 	msg.RouteRecord = []models_base.DiameterIdentity{models_base.DiameterIdentity("client.example.com")}
 
-	// Set header identifiers
-	msg.Header.HopByHopID = 0x12345678
-	msg.Header.EndToEndID = 0x87654321
-
-	// Marshal message
-	data, err := msg.Marshal()
-	if err != nil {
-		t.Fatalf("Failed to marshal message: %v", err)
-	}
-
-	// Write to PCAP
-	err = writeDiameterToPcap(pcapFile, data, net.ParseIP("192.168.1.100"), net.ParseIP("192.168.1.1"), 3868)
-	if err != nil {
-		t.Fatalf("Failed to write PCAP: %v", err)
-	}
-
-	// Verify PCAP file
-	info, err := os.Stat(pcapFile)
-	if err != nil {
-		t.Fatalf("PCAP file not created: %v", err)
-	}
-	if info.Size() == 0 {
-		t.Fatal("PCAP file is empty")
-	}
-
-	t.Logf("PCAP file created: %s (%d bytes)", pcapFile, info.Size())
-	t.Logf("Open in Wireshark to view the Request message")
+	return msg
 }
 
-// TestPurgeUEAnswer_PCAP tests PCAP file generation for Answer message
-func TestPurgeUEAnswer_PCAP(t *testing.T) {
-	// Create testdata directory
-	if err := os.MkdirAll("testdata", 0755); err != nil {
-		t.Fatalf("Failed to create testdata directory: %v", err)
-	}
-
-	// Create pcap file path
-	pcapFile := filepath.Join("testdata", "test_pua.pcap")
-	// PCAP files are kept for Wireshark analysis
-
-	// Create Answer message with ALL fields populated
+// createPurgeUEAnswerForTest creates a PurgeUEAnswer message with ALL fields populated for testing
+func createPurgeUEAnswerForTest() *PurgeUEAnswer {
 	msg := NewPurgeUEAnswer()
 
 	// Required fields
@@ -1234,47 +828,11 @@ func TestPurgeUEAnswer_PCAP(t *testing.T) {
 	}
 	msg.RouteRecord = []models_base.DiameterIdentity{models_base.DiameterIdentity("server.example.com")}
 
-	// Set header identifiers
-	msg.Header.HopByHopID = 0x12345678
-	msg.Header.EndToEndID = 0x87654321
-
-	// Marshal message
-	data, err := msg.Marshal()
-	if err != nil {
-		t.Fatalf("Failed to marshal message: %v", err)
-	}
-
-	// Write to PCAP
-	err = writeDiameterToPcap(pcapFile, data, net.ParseIP("192.168.1.1"), net.ParseIP("192.168.1.100"), 3868)
-	if err != nil {
-		t.Fatalf("Failed to write PCAP: %v", err)
-	}
-
-	// Verify PCAP file
-	info, err := os.Stat(pcapFile)
-	if err != nil {
-		t.Fatalf("PCAP file not created: %v", err)
-	}
-	if info.Size() == 0 {
-		t.Fatal("PCAP file is empty")
-	}
-
-	t.Logf("PCAP file created: %s (%d bytes)", pcapFile, info.Size())
-	t.Logf("Open in Wireshark to view the Answer message")
+	return msg
 }
 
-// TestResetRequest_PCAP tests PCAP file generation for Request message
-func TestResetRequest_PCAP(t *testing.T) {
-	// Create testdata directory
-	if err := os.MkdirAll("testdata", 0755); err != nil {
-		t.Fatalf("Failed to create testdata directory: %v", err)
-	}
-
-	// Create pcap file path
-	pcapFile := filepath.Join("testdata", "test_rr.pcap")
-	// PCAP files are kept for Wireshark analysis
-
-	// Create Request message with ALL fields populated
+// createResetRequestForTest creates a ResetRequest message with ALL fields populated for testing
+func createResetRequestForTest() *ResetRequest {
 	msg := NewResetRequest()
 
 	// Required fields
@@ -1352,47 +910,11 @@ func TestResetRequest_PCAP(t *testing.T) {
 	}
 	msg.RouteRecord = []models_base.DiameterIdentity{models_base.DiameterIdentity("client.example.com")}
 
-	// Set header identifiers
-	msg.Header.HopByHopID = 0x12345678
-	msg.Header.EndToEndID = 0x87654321
-
-	// Marshal message
-	data, err := msg.Marshal()
-	if err != nil {
-		t.Fatalf("Failed to marshal message: %v", err)
-	}
-
-	// Write to PCAP
-	err = writeDiameterToPcap(pcapFile, data, net.ParseIP("192.168.1.100"), net.ParseIP("192.168.1.1"), 3868)
-	if err != nil {
-		t.Fatalf("Failed to write PCAP: %v", err)
-	}
-
-	// Verify PCAP file
-	info, err := os.Stat(pcapFile)
-	if err != nil {
-		t.Fatalf("PCAP file not created: %v", err)
-	}
-	if info.Size() == 0 {
-		t.Fatal("PCAP file is empty")
-	}
-
-	t.Logf("PCAP file created: %s (%d bytes)", pcapFile, info.Size())
-	t.Logf("Open in Wireshark to view the Request message")
+	return msg
 }
 
-// TestResetAnswer_PCAP tests PCAP file generation for Answer message
-func TestResetAnswer_PCAP(t *testing.T) {
-	// Create testdata directory
-	if err := os.MkdirAll("testdata", 0755); err != nil {
-		t.Fatalf("Failed to create testdata directory: %v", err)
-	}
-
-	// Create pcap file path
-	pcapFile := filepath.Join("testdata", "test_ra.pcap")
-	// PCAP files are kept for Wireshark analysis
-
-	// Create Answer message with ALL fields populated
+// createResetAnswerForTest creates a ResetAnswer message with ALL fields populated for testing
+func createResetAnswerForTest() *ResetAnswer {
 	msg := NewResetAnswer()
 
 	// Required fields
@@ -1426,47 +948,11 @@ func TestResetAnswer_PCAP(t *testing.T) {
 	}
 	msg.RouteRecord = []models_base.DiameterIdentity{models_base.DiameterIdentity("server.example.com")}
 
-	// Set header identifiers
-	msg.Header.HopByHopID = 0x12345678
-	msg.Header.EndToEndID = 0x87654321
-
-	// Marshal message
-	data, err := msg.Marshal()
-	if err != nil {
-		t.Fatalf("Failed to marshal message: %v", err)
-	}
-
-	// Write to PCAP
-	err = writeDiameterToPcap(pcapFile, data, net.ParseIP("192.168.1.1"), net.ParseIP("192.168.1.100"), 3868)
-	if err != nil {
-		t.Fatalf("Failed to write PCAP: %v", err)
-	}
-
-	// Verify PCAP file
-	info, err := os.Stat(pcapFile)
-	if err != nil {
-		t.Fatalf("PCAP file not created: %v", err)
-	}
-	if info.Size() == 0 {
-		t.Fatal("PCAP file is empty")
-	}
-
-	t.Logf("PCAP file created: %s (%d bytes)", pcapFile, info.Size())
-	t.Logf("Open in Wireshark to view the Answer message")
+	return msg
 }
 
-// TestNotifyRequest_PCAP tests PCAP file generation for Request message
-func TestNotifyRequest_PCAP(t *testing.T) {
-	// Create testdata directory
-	if err := os.MkdirAll("testdata", 0755); err != nil {
-		t.Fatalf("Failed to create testdata directory: %v", err)
-	}
-
-	// Create pcap file path
-	pcapFile := filepath.Join("testdata", "test_nr.pcap")
-	// PCAP files are kept for Wireshark analysis
-
-	// Create Request message with ALL fields populated
+// createNotifyRequestForTest creates a NotifyRequest message with ALL fields populated for testing
+func createNotifyRequestForTest() *NotifyRequest {
 	msg := NewNotifyRequest()
 
 	// Required fields
@@ -1516,6 +1002,666 @@ func TestNotifyRequest_PCAP(t *testing.T) {
 	}
 	msg.RouteRecord = []models_base.DiameterIdentity{models_base.DiameterIdentity("client.example.com")}
 
+	return msg
+}
+
+// createNotifyAnswerForTest creates a NotifyAnswer message with ALL fields populated for testing
+func createNotifyAnswerForTest() *NotifyAnswer {
+	msg := NewNotifyAnswer()
+
+	// Required fields
+	msg.SessionId = models_base.UTF8String("client.example.com;1234567890;1")
+	msg.AuthSessionState = models_base.Enumerated(1)
+	msg.OriginHost = models_base.DiameterIdentity("server.example.com")
+	msg.OriginRealm = models_base.DiameterIdentity("server.example.com")
+
+	// Optional fields (for complete PCAP examples)
+	msg.Drmp = ptrOctetString([]byte{0x01, 0x02, 0x03})
+	msg.VendorSpecificApplicationId = &VendorSpecificApplicationId{
+		VendorId:          ptrUnsigned32(10415),
+		AuthApplicationId: ptrUnsigned32(16777252),
+		AcctApplicationId: ptrUnsigned32(1),
+	}
+	msg.ResultCode = ptrUnsigned32(2001) // DIAMETER_SUCCESS
+	msg.ExperimentalResult = &ExperimentalResult{
+		VendorId:               models_base.Unsigned32(10415),
+		ExperimentalResultCode: models_base.Unsigned32(1),
+	}
+	msg.OcSupportedFeatures = ptrOctetString([]byte{0x01, 0x02, 0x03})
+	msg.OcOlr = ptrOctetString([]byte{0x01, 0x02, 0x03})
+	msg.Load = []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})}
+	msg.SupportedFeatures = []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})}
+	msg.Avp = []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})}
+	msg.FailedAvp = &FailedAVP{
+		Avp: []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})},
+	}
+	msg.ProxyInfo = []*ProxyInfo{
+		&ProxyInfo{
+			ProxyHost:  models_base.DiameterIdentity("client.example.com"),
+			ProxyState: models_base.OctetString([]byte{0x01, 0x02, 0x03}),
+		},
+	}
+	msg.RouteRecord = []models_base.DiameterIdentity{models_base.DiameterIdentity("server.example.com")}
+
+	return msg
+}
+
+// TestUpdateLocationRequest_PCAP tests PCAP file generation for Request message
+func TestUpdateLocationRequest_PCAP(t *testing.T) {
+	// Create testdata directory
+	if err := os.MkdirAll("testdata", 0755); err != nil {
+		t.Fatalf("Failed to create testdata directory: %v", err)
+	}
+
+	// Create pcap file path
+	pcapFile := filepath.Join("testdata", "test_ulr.pcap")
+	// PCAP files are kept for Wireshark analysis
+
+	// Create Request message with ALL fields populated
+	msg := createUpdateLocationRequestForTest()
+
+	// Set header identifiers
+	msg.Header.HopByHopID = 0x12345678
+	msg.Header.EndToEndID = 0x87654321
+
+	// Marshal message
+	data, err := msg.Marshal()
+	if err != nil {
+		t.Fatalf("Failed to marshal message: %v", err)
+	}
+
+	// Write to PCAP
+	err = writeDiameterToPcap(pcapFile, data, net.ParseIP("192.168.1.100"), net.ParseIP("192.168.1.1"), 3868)
+	if err != nil {
+		t.Fatalf("Failed to write PCAP: %v", err)
+	}
+
+	// Verify PCAP file
+	info, err := os.Stat(pcapFile)
+	if err != nil {
+		t.Fatalf("PCAP file not created: %v", err)
+	}
+	if info.Size() == 0 {
+		t.Fatal("PCAP file is empty")
+	}
+
+	t.Logf("PCAP file created: %s (%d bytes)", pcapFile, info.Size())
+	t.Logf("Open in Wireshark to view the Request message")
+}
+
+// TestUpdateLocationAnswer_PCAP tests PCAP file generation for Answer message
+func TestUpdateLocationAnswer_PCAP(t *testing.T) {
+	// Create testdata directory
+	if err := os.MkdirAll("testdata", 0755); err != nil {
+		t.Fatalf("Failed to create testdata directory: %v", err)
+	}
+
+	// Create pcap file path
+	pcapFile := filepath.Join("testdata", "test_ula.pcap")
+	// PCAP files are kept for Wireshark analysis
+
+	// Create Answer message with ALL fields populated
+	msg := createUpdateLocationAnswerForTest()
+
+	// Set header identifiers
+	msg.Header.HopByHopID = 0x12345678
+	msg.Header.EndToEndID = 0x87654321
+
+	// Marshal message
+	data, err := msg.Marshal()
+	if err != nil {
+		t.Fatalf("Failed to marshal message: %v", err)
+	}
+
+	// Write to PCAP
+	err = writeDiameterToPcap(pcapFile, data, net.ParseIP("192.168.1.1"), net.ParseIP("192.168.1.100"), 3868)
+	if err != nil {
+		t.Fatalf("Failed to write PCAP: %v", err)
+	}
+
+	// Verify PCAP file
+	info, err := os.Stat(pcapFile)
+	if err != nil {
+		t.Fatalf("PCAP file not created: %v", err)
+	}
+	if info.Size() == 0 {
+		t.Fatal("PCAP file is empty")
+	}
+
+	t.Logf("PCAP file created: %s (%d bytes)", pcapFile, info.Size())
+	t.Logf("Open in Wireshark to view the Answer message")
+}
+
+// TestAuthenticationInformationRequest_PCAP tests PCAP file generation for Request message
+func TestAuthenticationInformationRequest_PCAP(t *testing.T) {
+	// Create testdata directory
+	if err := os.MkdirAll("testdata", 0755); err != nil {
+		t.Fatalf("Failed to create testdata directory: %v", err)
+	}
+
+	// Create pcap file path
+	pcapFile := filepath.Join("testdata", "test_air.pcap")
+	// PCAP files are kept for Wireshark analysis
+
+	// Create Request message with ALL fields populated
+	msg := createAuthenticationInformationRequestForTest()
+
+	// Set header identifiers
+	msg.Header.HopByHopID = 0x12345678
+	msg.Header.EndToEndID = 0x87654321
+
+	// Marshal message
+	data, err := msg.Marshal()
+	if err != nil {
+		t.Fatalf("Failed to marshal message: %v", err)
+	}
+
+	// Write to PCAP
+	err = writeDiameterToPcap(pcapFile, data, net.ParseIP("192.168.1.100"), net.ParseIP("192.168.1.1"), 3868)
+	if err != nil {
+		t.Fatalf("Failed to write PCAP: %v", err)
+	}
+
+	// Verify PCAP file
+	info, err := os.Stat(pcapFile)
+	if err != nil {
+		t.Fatalf("PCAP file not created: %v", err)
+	}
+	if info.Size() == 0 {
+		t.Fatal("PCAP file is empty")
+	}
+
+	t.Logf("PCAP file created: %s (%d bytes)", pcapFile, info.Size())
+	t.Logf("Open in Wireshark to view the Request message")
+}
+
+// TestAuthenticationInformationAnswer_PCAP tests PCAP file generation for Answer message
+func TestAuthenticationInformationAnswer_PCAP(t *testing.T) {
+	// Create testdata directory
+	if err := os.MkdirAll("testdata", 0755); err != nil {
+		t.Fatalf("Failed to create testdata directory: %v", err)
+	}
+
+	// Create pcap file path
+	pcapFile := filepath.Join("testdata", "test_aia.pcap")
+	// PCAP files are kept for Wireshark analysis
+
+	// Create Answer message with ALL fields populated
+	msg := createAuthenticationInformationAnswerForTest()
+
+	// Set header identifiers
+	msg.Header.HopByHopID = 0x12345678
+	msg.Header.EndToEndID = 0x87654321
+
+	// Marshal message
+	data, err := msg.Marshal()
+	if err != nil {
+		t.Fatalf("Failed to marshal message: %v", err)
+	}
+
+	// Write to PCAP
+	err = writeDiameterToPcap(pcapFile, data, net.ParseIP("192.168.1.1"), net.ParseIP("192.168.1.100"), 3868)
+	if err != nil {
+		t.Fatalf("Failed to write PCAP: %v", err)
+	}
+
+	// Verify PCAP file
+	info, err := os.Stat(pcapFile)
+	if err != nil {
+		t.Fatalf("PCAP file not created: %v", err)
+	}
+	if info.Size() == 0 {
+		t.Fatal("PCAP file is empty")
+	}
+
+	t.Logf("PCAP file created: %s (%d bytes)", pcapFile, info.Size())
+	t.Logf("Open in Wireshark to view the Answer message")
+}
+
+// TestCancelLocationRequest_PCAP tests PCAP file generation for Request message
+func TestCancelLocationRequest_PCAP(t *testing.T) {
+	// Create testdata directory
+	if err := os.MkdirAll("testdata", 0755); err != nil {
+		t.Fatalf("Failed to create testdata directory: %v", err)
+	}
+
+	// Create pcap file path
+	pcapFile := filepath.Join("testdata", "test_clr.pcap")
+	// PCAP files are kept for Wireshark analysis
+
+	// Create Request message with ALL fields populated
+	msg := createCancelLocationRequestForTest()
+
+	// Set header identifiers
+	msg.Header.HopByHopID = 0x12345678
+	msg.Header.EndToEndID = 0x87654321
+
+	// Marshal message
+	data, err := msg.Marshal()
+	if err != nil {
+		t.Fatalf("Failed to marshal message: %v", err)
+	}
+
+	// Write to PCAP
+	err = writeDiameterToPcap(pcapFile, data, net.ParseIP("192.168.1.100"), net.ParseIP("192.168.1.1"), 3868)
+	if err != nil {
+		t.Fatalf("Failed to write PCAP: %v", err)
+	}
+
+	// Verify PCAP file
+	info, err := os.Stat(pcapFile)
+	if err != nil {
+		t.Fatalf("PCAP file not created: %v", err)
+	}
+	if info.Size() == 0 {
+		t.Fatal("PCAP file is empty")
+	}
+
+	t.Logf("PCAP file created: %s (%d bytes)", pcapFile, info.Size())
+	t.Logf("Open in Wireshark to view the Request message")
+}
+
+// TestCancelLocationAnswer_PCAP tests PCAP file generation for Answer message
+func TestCancelLocationAnswer_PCAP(t *testing.T) {
+	// Create testdata directory
+	if err := os.MkdirAll("testdata", 0755); err != nil {
+		t.Fatalf("Failed to create testdata directory: %v", err)
+	}
+
+	// Create pcap file path
+	pcapFile := filepath.Join("testdata", "test_cla.pcap")
+	// PCAP files are kept for Wireshark analysis
+
+	// Create Answer message with ALL fields populated
+	msg := createCancelLocationAnswerForTest()
+
+	// Set header identifiers
+	msg.Header.HopByHopID = 0x12345678
+	msg.Header.EndToEndID = 0x87654321
+
+	// Marshal message
+	data, err := msg.Marshal()
+	if err != nil {
+		t.Fatalf("Failed to marshal message: %v", err)
+	}
+
+	// Write to PCAP
+	err = writeDiameterToPcap(pcapFile, data, net.ParseIP("192.168.1.1"), net.ParseIP("192.168.1.100"), 3868)
+	if err != nil {
+		t.Fatalf("Failed to write PCAP: %v", err)
+	}
+
+	// Verify PCAP file
+	info, err := os.Stat(pcapFile)
+	if err != nil {
+		t.Fatalf("PCAP file not created: %v", err)
+	}
+	if info.Size() == 0 {
+		t.Fatal("PCAP file is empty")
+	}
+
+	t.Logf("PCAP file created: %s (%d bytes)", pcapFile, info.Size())
+	t.Logf("Open in Wireshark to view the Answer message")
+}
+
+// TestInsertSubscriberDataRequest_PCAP tests PCAP file generation for Request message
+func TestInsertSubscriberDataRequest_PCAP(t *testing.T) {
+	// Create testdata directory
+	if err := os.MkdirAll("testdata", 0755); err != nil {
+		t.Fatalf("Failed to create testdata directory: %v", err)
+	}
+
+	// Create pcap file path
+	pcapFile := filepath.Join("testdata", "test_isdr.pcap")
+	// PCAP files are kept for Wireshark analysis
+
+	// Create Request message with ALL fields populated
+	msg := createInsertSubscriberDataRequestForTest()
+
+	// Set header identifiers
+	msg.Header.HopByHopID = 0x12345678
+	msg.Header.EndToEndID = 0x87654321
+
+	// Marshal message
+	data, err := msg.Marshal()
+	if err != nil {
+		t.Fatalf("Failed to marshal message: %v", err)
+	}
+
+	// Write to PCAP
+	err = writeDiameterToPcap(pcapFile, data, net.ParseIP("192.168.1.100"), net.ParseIP("192.168.1.1"), 3868)
+	if err != nil {
+		t.Fatalf("Failed to write PCAP: %v", err)
+	}
+
+	// Verify PCAP file
+	info, err := os.Stat(pcapFile)
+	if err != nil {
+		t.Fatalf("PCAP file not created: %v", err)
+	}
+	if info.Size() == 0 {
+		t.Fatal("PCAP file is empty")
+	}
+
+	t.Logf("PCAP file created: %s (%d bytes)", pcapFile, info.Size())
+	t.Logf("Open in Wireshark to view the Request message")
+}
+
+// TestInsertSubscriberDataAnswer_PCAP tests PCAP file generation for Answer message
+func TestInsertSubscriberDataAnswer_PCAP(t *testing.T) {
+	// Create testdata directory
+	if err := os.MkdirAll("testdata", 0755); err != nil {
+		t.Fatalf("Failed to create testdata directory: %v", err)
+	}
+
+	// Create pcap file path
+	pcapFile := filepath.Join("testdata", "test_isda.pcap")
+	// PCAP files are kept for Wireshark analysis
+
+	// Create Answer message with ALL fields populated
+	msg := createInsertSubscriberDataAnswerForTest()
+
+	// Set header identifiers
+	msg.Header.HopByHopID = 0x12345678
+	msg.Header.EndToEndID = 0x87654321
+
+	// Marshal message
+	data, err := msg.Marshal()
+	if err != nil {
+		t.Fatalf("Failed to marshal message: %v", err)
+	}
+
+	// Write to PCAP
+	err = writeDiameterToPcap(pcapFile, data, net.ParseIP("192.168.1.1"), net.ParseIP("192.168.1.100"), 3868)
+	if err != nil {
+		t.Fatalf("Failed to write PCAP: %v", err)
+	}
+
+	// Verify PCAP file
+	info, err := os.Stat(pcapFile)
+	if err != nil {
+		t.Fatalf("PCAP file not created: %v", err)
+	}
+	if info.Size() == 0 {
+		t.Fatal("PCAP file is empty")
+	}
+
+	t.Logf("PCAP file created: %s (%d bytes)", pcapFile, info.Size())
+	t.Logf("Open in Wireshark to view the Answer message")
+}
+
+// TestDeleteSubscriberDataRequest_PCAP tests PCAP file generation for Request message
+func TestDeleteSubscriberDataRequest_PCAP(t *testing.T) {
+	// Create testdata directory
+	if err := os.MkdirAll("testdata", 0755); err != nil {
+		t.Fatalf("Failed to create testdata directory: %v", err)
+	}
+
+	// Create pcap file path
+	pcapFile := filepath.Join("testdata", "test_dsdr.pcap")
+	// PCAP files are kept for Wireshark analysis
+
+	// Create Request message with ALL fields populated
+	msg := createDeleteSubscriberDataRequestForTest()
+
+	// Set header identifiers
+	msg.Header.HopByHopID = 0x12345678
+	msg.Header.EndToEndID = 0x87654321
+
+	// Marshal message
+	data, err := msg.Marshal()
+	if err != nil {
+		t.Fatalf("Failed to marshal message: %v", err)
+	}
+
+	// Write to PCAP
+	err = writeDiameterToPcap(pcapFile, data, net.ParseIP("192.168.1.100"), net.ParseIP("192.168.1.1"), 3868)
+	if err != nil {
+		t.Fatalf("Failed to write PCAP: %v", err)
+	}
+
+	// Verify PCAP file
+	info, err := os.Stat(pcapFile)
+	if err != nil {
+		t.Fatalf("PCAP file not created: %v", err)
+	}
+	if info.Size() == 0 {
+		t.Fatal("PCAP file is empty")
+	}
+
+	t.Logf("PCAP file created: %s (%d bytes)", pcapFile, info.Size())
+	t.Logf("Open in Wireshark to view the Request message")
+}
+
+// TestDeleteSubscriberDataAnswer_PCAP tests PCAP file generation for Answer message
+func TestDeleteSubscriberDataAnswer_PCAP(t *testing.T) {
+	// Create testdata directory
+	if err := os.MkdirAll("testdata", 0755); err != nil {
+		t.Fatalf("Failed to create testdata directory: %v", err)
+	}
+
+	// Create pcap file path
+	pcapFile := filepath.Join("testdata", "test_dsda.pcap")
+	// PCAP files are kept for Wireshark analysis
+
+	// Create Answer message with ALL fields populated
+	msg := createDeleteSubscriberDataAnswerForTest()
+
+	// Set header identifiers
+	msg.Header.HopByHopID = 0x12345678
+	msg.Header.EndToEndID = 0x87654321
+
+	// Marshal message
+	data, err := msg.Marshal()
+	if err != nil {
+		t.Fatalf("Failed to marshal message: %v", err)
+	}
+
+	// Write to PCAP
+	err = writeDiameterToPcap(pcapFile, data, net.ParseIP("192.168.1.1"), net.ParseIP("192.168.1.100"), 3868)
+	if err != nil {
+		t.Fatalf("Failed to write PCAP: %v", err)
+	}
+
+	// Verify PCAP file
+	info, err := os.Stat(pcapFile)
+	if err != nil {
+		t.Fatalf("PCAP file not created: %v", err)
+	}
+	if info.Size() == 0 {
+		t.Fatal("PCAP file is empty")
+	}
+
+	t.Logf("PCAP file created: %s (%d bytes)", pcapFile, info.Size())
+	t.Logf("Open in Wireshark to view the Answer message")
+}
+
+// TestPurgeUERequest_PCAP tests PCAP file generation for Request message
+func TestPurgeUERequest_PCAP(t *testing.T) {
+	// Create testdata directory
+	if err := os.MkdirAll("testdata", 0755); err != nil {
+		t.Fatalf("Failed to create testdata directory: %v", err)
+	}
+
+	// Create pcap file path
+	pcapFile := filepath.Join("testdata", "test_pur.pcap")
+	// PCAP files are kept for Wireshark analysis
+
+	// Create Request message with ALL fields populated
+	msg := createPurgeUERequestForTest()
+
+	// Set header identifiers
+	msg.Header.HopByHopID = 0x12345678
+	msg.Header.EndToEndID = 0x87654321
+
+	// Marshal message
+	data, err := msg.Marshal()
+	if err != nil {
+		t.Fatalf("Failed to marshal message: %v", err)
+	}
+
+	// Write to PCAP
+	err = writeDiameterToPcap(pcapFile, data, net.ParseIP("192.168.1.100"), net.ParseIP("192.168.1.1"), 3868)
+	if err != nil {
+		t.Fatalf("Failed to write PCAP: %v", err)
+	}
+
+	// Verify PCAP file
+	info, err := os.Stat(pcapFile)
+	if err != nil {
+		t.Fatalf("PCAP file not created: %v", err)
+	}
+	if info.Size() == 0 {
+		t.Fatal("PCAP file is empty")
+	}
+
+	t.Logf("PCAP file created: %s (%d bytes)", pcapFile, info.Size())
+	t.Logf("Open in Wireshark to view the Request message")
+}
+
+// TestPurgeUEAnswer_PCAP tests PCAP file generation for Answer message
+func TestPurgeUEAnswer_PCAP(t *testing.T) {
+	// Create testdata directory
+	if err := os.MkdirAll("testdata", 0755); err != nil {
+		t.Fatalf("Failed to create testdata directory: %v", err)
+	}
+
+	// Create pcap file path
+	pcapFile := filepath.Join("testdata", "test_pua.pcap")
+	// PCAP files are kept for Wireshark analysis
+
+	// Create Answer message with ALL fields populated
+	msg := createPurgeUEAnswerForTest()
+
+	// Set header identifiers
+	msg.Header.HopByHopID = 0x12345678
+	msg.Header.EndToEndID = 0x87654321
+
+	// Marshal message
+	data, err := msg.Marshal()
+	if err != nil {
+		t.Fatalf("Failed to marshal message: %v", err)
+	}
+
+	// Write to PCAP
+	err = writeDiameterToPcap(pcapFile, data, net.ParseIP("192.168.1.1"), net.ParseIP("192.168.1.100"), 3868)
+	if err != nil {
+		t.Fatalf("Failed to write PCAP: %v", err)
+	}
+
+	// Verify PCAP file
+	info, err := os.Stat(pcapFile)
+	if err != nil {
+		t.Fatalf("PCAP file not created: %v", err)
+	}
+	if info.Size() == 0 {
+		t.Fatal("PCAP file is empty")
+	}
+
+	t.Logf("PCAP file created: %s (%d bytes)", pcapFile, info.Size())
+	t.Logf("Open in Wireshark to view the Answer message")
+}
+
+// TestResetRequest_PCAP tests PCAP file generation for Request message
+func TestResetRequest_PCAP(t *testing.T) {
+	// Create testdata directory
+	if err := os.MkdirAll("testdata", 0755); err != nil {
+		t.Fatalf("Failed to create testdata directory: %v", err)
+	}
+
+	// Create pcap file path
+	pcapFile := filepath.Join("testdata", "test_rr.pcap")
+	// PCAP files are kept for Wireshark analysis
+
+	// Create Request message with ALL fields populated
+	msg := createResetRequestForTest()
+
+	// Set header identifiers
+	msg.Header.HopByHopID = 0x12345678
+	msg.Header.EndToEndID = 0x87654321
+
+	// Marshal message
+	data, err := msg.Marshal()
+	if err != nil {
+		t.Fatalf("Failed to marshal message: %v", err)
+	}
+
+	// Write to PCAP
+	err = writeDiameterToPcap(pcapFile, data, net.ParseIP("192.168.1.100"), net.ParseIP("192.168.1.1"), 3868)
+	if err != nil {
+		t.Fatalf("Failed to write PCAP: %v", err)
+	}
+
+	// Verify PCAP file
+	info, err := os.Stat(pcapFile)
+	if err != nil {
+		t.Fatalf("PCAP file not created: %v", err)
+	}
+	if info.Size() == 0 {
+		t.Fatal("PCAP file is empty")
+	}
+
+	t.Logf("PCAP file created: %s (%d bytes)", pcapFile, info.Size())
+	t.Logf("Open in Wireshark to view the Request message")
+}
+
+// TestResetAnswer_PCAP tests PCAP file generation for Answer message
+func TestResetAnswer_PCAP(t *testing.T) {
+	// Create testdata directory
+	if err := os.MkdirAll("testdata", 0755); err != nil {
+		t.Fatalf("Failed to create testdata directory: %v", err)
+	}
+
+	// Create pcap file path
+	pcapFile := filepath.Join("testdata", "test_ra.pcap")
+	// PCAP files are kept for Wireshark analysis
+
+	// Create Answer message with ALL fields populated
+	msg := createResetAnswerForTest()
+
+	// Set header identifiers
+	msg.Header.HopByHopID = 0x12345678
+	msg.Header.EndToEndID = 0x87654321
+
+	// Marshal message
+	data, err := msg.Marshal()
+	if err != nil {
+		t.Fatalf("Failed to marshal message: %v", err)
+	}
+
+	// Write to PCAP
+	err = writeDiameterToPcap(pcapFile, data, net.ParseIP("192.168.1.1"), net.ParseIP("192.168.1.100"), 3868)
+	if err != nil {
+		t.Fatalf("Failed to write PCAP: %v", err)
+	}
+
+	// Verify PCAP file
+	info, err := os.Stat(pcapFile)
+	if err != nil {
+		t.Fatalf("PCAP file not created: %v", err)
+	}
+	if info.Size() == 0 {
+		t.Fatal("PCAP file is empty")
+	}
+
+	t.Logf("PCAP file created: %s (%d bytes)", pcapFile, info.Size())
+	t.Logf("Open in Wireshark to view the Answer message")
+}
+
+// TestNotifyRequest_PCAP tests PCAP file generation for Request message
+func TestNotifyRequest_PCAP(t *testing.T) {
+	// Create testdata directory
+	if err := os.MkdirAll("testdata", 0755); err != nil {
+		t.Fatalf("Failed to create testdata directory: %v", err)
+	}
+
+	// Create pcap file path
+	pcapFile := filepath.Join("testdata", "test_nr.pcap")
+	// PCAP files are kept for Wireshark analysis
+
+	// Create Request message with ALL fields populated
+	msg := createNotifyRequestForTest()
+
 	// Set header identifiers
 	msg.Header.HopByHopID = 0x12345678
 	msg.Header.EndToEndID = 0x87654321
@@ -1557,41 +1703,7 @@ func TestNotifyAnswer_PCAP(t *testing.T) {
 	// PCAP files are kept for Wireshark analysis
 
 	// Create Answer message with ALL fields populated
-	msg := NewNotifyAnswer()
-
-	// Required fields
-	msg.SessionId = models_base.UTF8String("client.example.com;1234567890;1")
-	msg.AuthSessionState = models_base.Enumerated(1)
-	msg.OriginHost = models_base.DiameterIdentity("server.example.com")
-	msg.OriginRealm = models_base.DiameterIdentity("server.example.com")
-
-	// Optional fields (for complete PCAP examples)
-	msg.Drmp = ptrOctetString([]byte{0x01, 0x02, 0x03})
-	msg.VendorSpecificApplicationId = &VendorSpecificApplicationId{
-		VendorId:          ptrUnsigned32(10415),
-		AuthApplicationId: ptrUnsigned32(16777252),
-		AcctApplicationId: ptrUnsigned32(1),
-	}
-	msg.ResultCode = ptrUnsigned32(2001) // DIAMETER_SUCCESS
-	msg.ExperimentalResult = &ExperimentalResult{
-		VendorId:               models_base.Unsigned32(10415),
-		ExperimentalResultCode: models_base.Unsigned32(1),
-	}
-	msg.OcSupportedFeatures = ptrOctetString([]byte{0x01, 0x02, 0x03})
-	msg.OcOlr = ptrOctetString([]byte{0x01, 0x02, 0x03})
-	msg.Load = []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})}
-	msg.SupportedFeatures = []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})}
-	msg.Avp = []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})}
-	msg.FailedAvp = &FailedAVP{
-		Avp: []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})},
-	}
-	msg.ProxyInfo = []*ProxyInfo{
-		&ProxyInfo{
-			ProxyHost:  models_base.DiameterIdentity("client.example.com"),
-			ProxyState: models_base.OctetString([]byte{0x01, 0x02, 0x03}),
-		},
-	}
-	msg.RouteRecord = []models_base.DiameterIdentity{models_base.DiameterIdentity("server.example.com")}
+	msg := createNotifyAnswerForTest()
 
 	// Set header identifiers
 	msg.Header.HopByHopID = 0x12345678
@@ -1622,40 +1734,26 @@ func TestNotifyAnswer_PCAP(t *testing.T) {
 	t.Logf("Open in Wireshark to view the Answer message")
 }
 
-// TestPU_Pair_PCAP tests PCAP file generation for PU request-response pair
-func TestPU_Pair_PCAP(t *testing.T) {
+// TestAI_Pair_PCAP tests PCAP file generation for AI request-response pair
+func TestAI_Pair_PCAP(t *testing.T) {
 	// Create testdata directory
 	if err := os.MkdirAll("testdata", 0755); err != nil {
 		t.Fatalf("Failed to create testdata directory: %v", err)
 	}
 
 	// Create pcap file path
-	pcapFile := filepath.Join("testdata", "test_pu_pair.pcap")
+	pcapFile := filepath.Join("testdata", "test_ai_pair.pcap")
 	// PCAP files are kept for Wireshark analysis
 
-	// Create Request message
-	request := NewPurgeUERequest()
-	request.SessionId = models_base.UTF8String("client.example.com;1234567890;1")
-	request.AuthSessionState = models_base.Enumerated(1)
-	request.OriginHost = models_base.DiameterIdentity("client.example.com")
-	request.OriginRealm = models_base.DiameterIdentity("client.example.com")
-	request.DestinationRealm = models_base.DiameterIdentity("server.example.com")
-	request.UserName = models_base.UTF8String("test")
-
-	// Set header identifiers for request
+	// Create Request message with ALL fields populated (using helper function)
+	request := createAuthenticationInformationRequestForTest()
 	request.Header.HopByHopID = 0x12345678
 	request.Header.EndToEndID = 0x87654321
 
-	// Create Answer message
-	answer := NewPurgeUEAnswer()
-	answer.SessionId = models_base.UTF8String("client.example.com;1234567890;1")
-	answer.AuthSessionState = models_base.Enumerated(1)
-	answer.OriginHost = models_base.DiameterIdentity("server.example.com")
-	answer.OriginRealm = models_base.DiameterIdentity("server.example.com")
-
-	// Set header identifiers for answer (must match request)
-	answer.Header.HopByHopID = 0x12345678
-	answer.Header.EndToEndID = 0x87654321
+	// Create Answer message with ALL fields populated (using helper function)
+	answer := createAuthenticationInformationAnswerForTest()
+	answer.Header.HopByHopID = 0x12345678 // Must match request
+	answer.Header.EndToEndID = 0x87654321 // Must match request
 
 	// Marshal request
 	requestData, err := request.Marshal()
@@ -1699,29 +1797,15 @@ func TestR_Pair_PCAP(t *testing.T) {
 	pcapFile := filepath.Join("testdata", "test_r_pair.pcap")
 	// PCAP files are kept for Wireshark analysis
 
-	// Create Request message
-	request := NewResetRequest()
-	request.SessionId = models_base.UTF8String("client.example.com;1234567890;1")
-	request.AuthSessionState = models_base.Enumerated(1)
-	request.OriginHost = models_base.DiameterIdentity("client.example.com")
-	request.OriginRealm = models_base.DiameterIdentity("client.example.com")
-	request.DestinationHost = models_base.DiameterIdentity("server.example.com")
-	request.DestinationRealm = models_base.DiameterIdentity("server.example.com")
-
-	// Set header identifiers for request
+	// Create Request message with ALL fields populated (using helper function)
+	request := createResetRequestForTest()
 	request.Header.HopByHopID = 0x12345678
 	request.Header.EndToEndID = 0x87654321
 
-	// Create Answer message
-	answer := NewResetAnswer()
-	answer.SessionId = models_base.UTF8String("client.example.com;1234567890;1")
-	answer.AuthSessionState = models_base.Enumerated(1)
-	answer.OriginHost = models_base.DiameterIdentity("server.example.com")
-	answer.OriginRealm = models_base.DiameterIdentity("server.example.com")
-
-	// Set header identifiers for answer (must match request)
-	answer.Header.HopByHopID = 0x12345678
-	answer.Header.EndToEndID = 0x87654321
+	// Create Answer message with ALL fields populated (using helper function)
+	answer := createResetAnswerForTest()
+	answer.Header.HopByHopID = 0x12345678 // Must match request
+	answer.Header.EndToEndID = 0x87654321 // Must match request
 
 	// Marshal request
 	requestData, err := request.Marshal()
@@ -1765,29 +1849,15 @@ func TestN_Pair_PCAP(t *testing.T) {
 	pcapFile := filepath.Join("testdata", "test_n_pair.pcap")
 	// PCAP files are kept for Wireshark analysis
 
-	// Create Request message
-	request := NewNotifyRequest()
-	request.SessionId = models_base.UTF8String("client.example.com;1234567890;1")
-	request.AuthSessionState = models_base.Enumerated(1)
-	request.OriginHost = models_base.DiameterIdentity("client.example.com")
-	request.OriginRealm = models_base.DiameterIdentity("client.example.com")
-	request.DestinationRealm = models_base.DiameterIdentity("server.example.com")
-	request.UserName = models_base.UTF8String("test")
-
-	// Set header identifiers for request
+	// Create Request message with ALL fields populated (using helper function)
+	request := createNotifyRequestForTest()
 	request.Header.HopByHopID = 0x12345678
 	request.Header.EndToEndID = 0x87654321
 
-	// Create Answer message
-	answer := NewNotifyAnswer()
-	answer.SessionId = models_base.UTF8String("client.example.com;1234567890;1")
-	answer.AuthSessionState = models_base.Enumerated(1)
-	answer.OriginHost = models_base.DiameterIdentity("server.example.com")
-	answer.OriginRealm = models_base.DiameterIdentity("server.example.com")
-
-	// Set header identifiers for answer (must match request)
-	answer.Header.HopByHopID = 0x12345678
-	answer.Header.EndToEndID = 0x87654321
+	// Create Answer message with ALL fields populated (using helper function)
+	answer := createNotifyAnswerForTest()
+	answer.Header.HopByHopID = 0x12345678 // Must match request
+	answer.Header.EndToEndID = 0x87654321 // Must match request
 
 	// Marshal request
 	requestData, err := request.Marshal()
@@ -1831,172 +1901,15 @@ func TestUL_Pair_PCAP(t *testing.T) {
 	pcapFile := filepath.Join("testdata", "test_ul_pair.pcap")
 	// PCAP files are kept for Wireshark analysis
 
-	// Create Request message
-	request := NewUpdateLocationRequest()
-	request.SessionId = models_base.UTF8String("client.example.com;1234567890;1")
-	request.AuthSessionState = models_base.Enumerated(1)
-	request.OriginHost = models_base.DiameterIdentity("client.example.com")
-	request.OriginRealm = models_base.DiameterIdentity("client.example.com")
-	request.DestinationRealm = models_base.DiameterIdentity("server.example.com")
-	request.UserName = models_base.UTF8String("test")
-	request.RatType = models_base.Enumerated(1)
-	request.UlrFlags = models_base.Unsigned32(1)
-	request.VisitedPlmnId = models_base.OctetString([]byte{0x00, 0xF1, 0x10})
-
-	// Set header identifiers for request
+	// Create Request message with ALL fields populated (using helper function)
+	request := createUpdateLocationRequestForTest()
 	request.Header.HopByHopID = 0x12345678
 	request.Header.EndToEndID = 0x87654321
 
-	// Create Answer message
-	answer := NewUpdateLocationAnswer()
-	answer.SessionId = models_base.UTF8String("client.example.com;1234567890;1")
-	answer.AuthSessionState = models_base.Enumerated(1)
-	answer.OriginHost = models_base.DiameterIdentity("server.example.com")
-	answer.OriginRealm = models_base.DiameterIdentity("server.example.com")
-
-	// Set header identifiers for answer (must match request)
-	answer.Header.HopByHopID = 0x12345678
-	answer.Header.EndToEndID = 0x87654321
-
-	// Marshal request
-	requestData, err := request.Marshal()
-	if err != nil {
-		t.Fatalf("Failed to marshal request: %v", err)
-	}
-
-	// Marshal answer
-	answerData, err := answer.Marshal()
-	if err != nil {
-		t.Fatalf("Failed to marshal answer: %v", err)
-	}
-
-	// Write request-response pair to PCAP
-	err = writeDiameterPairToPcap(pcapFile, requestData, answerData, net.ParseIP("192.168.1.100"), net.ParseIP("192.168.1.1"))
-	if err != nil {
-		t.Fatalf("Failed to write PCAP: %v", err)
-	}
-
-	// Verify PCAP file
-	info, err := os.Stat(pcapFile)
-	if err != nil {
-		t.Fatalf("PCAP file not created: %v", err)
-	}
-	if info.Size() == 0 {
-		t.Fatal("PCAP file is empty")
-	}
-
-	t.Logf("PCAP file created: %s (%d bytes)", pcapFile, info.Size())
-	t.Logf("Open in Wireshark to view the request-response pair")
-}
-
-// TestAI_Pair_PCAP tests PCAP file generation for AI request-response pair
-func TestAI_Pair_PCAP(t *testing.T) {
-	// Create testdata directory
-	if err := os.MkdirAll("testdata", 0755); err != nil {
-		t.Fatalf("Failed to create testdata directory: %v", err)
-	}
-
-	// Create pcap file path
-	pcapFile := filepath.Join("testdata", "test_ai_pair.pcap")
-	// PCAP files are kept for Wireshark analysis
-
-	// Create Request message
-	request := NewAuthenticationInformationRequest()
-	request.SessionId = models_base.UTF8String("client.example.com;1234567890;1")
-	request.AuthSessionState = models_base.Enumerated(1)
-	request.OriginHost = models_base.DiameterIdentity("client.example.com")
-	request.OriginRealm = models_base.DiameterIdentity("client.example.com")
-	request.DestinationRealm = models_base.DiameterIdentity("server.example.com")
-	request.UserName = models_base.UTF8String("test")
-	request.VisitedPlmnId = models_base.OctetString([]byte{0x00, 0xF1, 0x10})
-
-	// Set header identifiers for request
-	request.Header.HopByHopID = 0x12345678
-	request.Header.EndToEndID = 0x87654321
-
-	// Create Answer message
-	answer := NewAuthenticationInformationAnswer()
-	answer.SessionId = models_base.UTF8String("client.example.com;1234567890;1")
-	answer.AuthSessionState = models_base.Enumerated(1)
-	answer.OriginHost = models_base.DiameterIdentity("server.example.com")
-	answer.OriginRealm = models_base.DiameterIdentity("server.example.com")
-
-	// Set header identifiers for answer (must match request)
-	answer.Header.HopByHopID = 0x12345678
-	answer.Header.EndToEndID = 0x87654321
-
-	// Marshal request
-	requestData, err := request.Marshal()
-	if err != nil {
-		t.Fatalf("Failed to marshal request: %v", err)
-	}
-
-	// Marshal answer
-	answerData, err := answer.Marshal()
-	if err != nil {
-		t.Fatalf("Failed to marshal answer: %v", err)
-	}
-
-	// Write request-response pair to PCAP
-	err = writeDiameterPairToPcap(pcapFile, requestData, answerData, net.ParseIP("192.168.1.100"), net.ParseIP("192.168.1.1"))
-	if err != nil {
-		t.Fatalf("Failed to write PCAP: %v", err)
-	}
-
-	// Verify PCAP file
-	info, err := os.Stat(pcapFile)
-	if err != nil {
-		t.Fatalf("PCAP file not created: %v", err)
-	}
-	if info.Size() == 0 {
-		t.Fatal("PCAP file is empty")
-	}
-
-	t.Logf("PCAP file created: %s (%d bytes)", pcapFile, info.Size())
-	t.Logf("Open in Wireshark to view the request-response pair")
-}
-
-// TestISD_Pair_PCAP tests PCAP file generation for ISD request-response pair
-func TestISD_Pair_PCAP(t *testing.T) {
-	// Create testdata directory
-	if err := os.MkdirAll("testdata", 0755); err != nil {
-		t.Fatalf("Failed to create testdata directory: %v", err)
-	}
-
-	// Create pcap file path
-	pcapFile := filepath.Join("testdata", "test_isd_pair.pcap")
-	// PCAP files are kept for Wireshark analysis
-
-	// Create Request message
-	request := NewInsertSubscriberDataRequest()
-	request.SessionId = models_base.UTF8String("client.example.com;1234567890;1")
-	request.AuthSessionState = models_base.Enumerated(1)
-	request.OriginHost = models_base.DiameterIdentity("client.example.com")
-	request.OriginRealm = models_base.DiameterIdentity("client.example.com")
-	request.DestinationHost = models_base.DiameterIdentity("server.example.com")
-	request.DestinationRealm = models_base.DiameterIdentity("server.example.com")
-	request.UserName = models_base.UTF8String("test")
-	request.SubscriptionData = &SubscriptionData{
-		SubscriberStatus: ptrEnumerated(1),
-		Msisdn:           ptrOctetString([]byte{0x01, 0x02, 0x03}),
-		AMsisdn:          ptrOctetString([]byte{0x01, 0x02, 0x03}),
-		// ... and 42 more fields
-	}
-
-	// Set header identifiers for request
-	request.Header.HopByHopID = 0x12345678
-	request.Header.EndToEndID = 0x87654321
-
-	// Create Answer message
-	answer := NewInsertSubscriberDataAnswer()
-	answer.SessionId = models_base.UTF8String("client.example.com;1234567890;1")
-	answer.AuthSessionState = models_base.Enumerated(1)
-	answer.OriginHost = models_base.DiameterIdentity("server.example.com")
-	answer.OriginRealm = models_base.DiameterIdentity("server.example.com")
-
-	// Set header identifiers for answer (must match request)
-	answer.Header.HopByHopID = 0x12345678
-	answer.Header.EndToEndID = 0x87654321
+	// Create Answer message with ALL fields populated (using helper function)
+	answer := createUpdateLocationAnswerForTest()
+	answer.Header.HopByHopID = 0x12345678 // Must match request
+	answer.Header.EndToEndID = 0x87654321 // Must match request
 
 	// Marshal request
 	requestData, err := request.Marshal()
@@ -2040,31 +1953,67 @@ func TestCL_Pair_PCAP(t *testing.T) {
 	pcapFile := filepath.Join("testdata", "test_cl_pair.pcap")
 	// PCAP files are kept for Wireshark analysis
 
-	// Create Request message
-	request := NewCancelLocationRequest()
-	request.SessionId = models_base.UTF8String("client.example.com;1234567890;1")
-	request.AuthSessionState = models_base.Enumerated(1)
-	request.OriginHost = models_base.DiameterIdentity("client.example.com")
-	request.OriginRealm = models_base.DiameterIdentity("client.example.com")
-	request.DestinationHost = models_base.DiameterIdentity("server.example.com")
-	request.DestinationRealm = models_base.DiameterIdentity("server.example.com")
-	request.UserName = models_base.UTF8String("test")
-	request.CancellationType = models_base.Enumerated(1)
-
-	// Set header identifiers for request
+	// Create Request message with ALL fields populated (using helper function)
+	request := createCancelLocationRequestForTest()
 	request.Header.HopByHopID = 0x12345678
 	request.Header.EndToEndID = 0x87654321
 
-	// Create Answer message
-	answer := NewCancelLocationAnswer()
-	answer.SessionId = models_base.UTF8String("client.example.com;1234567890;1")
-	answer.AuthSessionState = models_base.Enumerated(1)
-	answer.OriginHost = models_base.DiameterIdentity("server.example.com")
-	answer.OriginRealm = models_base.DiameterIdentity("server.example.com")
+	// Create Answer message with ALL fields populated (using helper function)
+	answer := createCancelLocationAnswerForTest()
+	answer.Header.HopByHopID = 0x12345678 // Must match request
+	answer.Header.EndToEndID = 0x87654321 // Must match request
 
-	// Set header identifiers for answer (must match request)
-	answer.Header.HopByHopID = 0x12345678
-	answer.Header.EndToEndID = 0x87654321
+	// Marshal request
+	requestData, err := request.Marshal()
+	if err != nil {
+		t.Fatalf("Failed to marshal request: %v", err)
+	}
+
+	// Marshal answer
+	answerData, err := answer.Marshal()
+	if err != nil {
+		t.Fatalf("Failed to marshal answer: %v", err)
+	}
+
+	// Write request-response pair to PCAP
+	err = writeDiameterPairToPcap(pcapFile, requestData, answerData, net.ParseIP("192.168.1.100"), net.ParseIP("192.168.1.1"))
+	if err != nil {
+		t.Fatalf("Failed to write PCAP: %v", err)
+	}
+
+	// Verify PCAP file
+	info, err := os.Stat(pcapFile)
+	if err != nil {
+		t.Fatalf("PCAP file not created: %v", err)
+	}
+	if info.Size() == 0 {
+		t.Fatal("PCAP file is empty")
+	}
+
+	t.Logf("PCAP file created: %s (%d bytes)", pcapFile, info.Size())
+	t.Logf("Open in Wireshark to view the request-response pair")
+}
+
+// TestISD_Pair_PCAP tests PCAP file generation for ISD request-response pair
+func TestISD_Pair_PCAP(t *testing.T) {
+	// Create testdata directory
+	if err := os.MkdirAll("testdata", 0755); err != nil {
+		t.Fatalf("Failed to create testdata directory: %v", err)
+	}
+
+	// Create pcap file path
+	pcapFile := filepath.Join("testdata", "test_isd_pair.pcap")
+	// PCAP files are kept for Wireshark analysis
+
+	// Create Request message with ALL fields populated (using helper function)
+	request := createInsertSubscriberDataRequestForTest()
+	request.Header.HopByHopID = 0x12345678
+	request.Header.EndToEndID = 0x87654321
+
+	// Create Answer message with ALL fields populated (using helper function)
+	answer := createInsertSubscriberDataAnswerForTest()
+	answer.Header.HopByHopID = 0x12345678 // Must match request
+	answer.Header.EndToEndID = 0x87654321 // Must match request
 
 	// Marshal request
 	requestData, err := request.Marshal()
@@ -2108,31 +2057,67 @@ func TestDSD_Pair_PCAP(t *testing.T) {
 	pcapFile := filepath.Join("testdata", "test_dsd_pair.pcap")
 	// PCAP files are kept for Wireshark analysis
 
-	// Create Request message
-	request := NewDeleteSubscriberDataRequest()
-	request.SessionId = models_base.UTF8String("client.example.com;1234567890;1")
-	request.AuthSessionState = models_base.Enumerated(1)
-	request.OriginHost = models_base.DiameterIdentity("client.example.com")
-	request.OriginRealm = models_base.DiameterIdentity("client.example.com")
-	request.DestinationHost = models_base.DiameterIdentity("server.example.com")
-	request.DestinationRealm = models_base.DiameterIdentity("server.example.com")
-	request.UserName = models_base.UTF8String("test")
-	request.DsrFlags = models_base.Unsigned32(1)
-
-	// Set header identifiers for request
+	// Create Request message with ALL fields populated (using helper function)
+	request := createDeleteSubscriberDataRequestForTest()
 	request.Header.HopByHopID = 0x12345678
 	request.Header.EndToEndID = 0x87654321
 
-	// Create Answer message
-	answer := NewDeleteSubscriberDataAnswer()
-	answer.SessionId = models_base.UTF8String("client.example.com;1234567890;1")
-	answer.AuthSessionState = models_base.Enumerated(1)
-	answer.OriginHost = models_base.DiameterIdentity("server.example.com")
-	answer.OriginRealm = models_base.DiameterIdentity("server.example.com")
+	// Create Answer message with ALL fields populated (using helper function)
+	answer := createDeleteSubscriberDataAnswerForTest()
+	answer.Header.HopByHopID = 0x12345678 // Must match request
+	answer.Header.EndToEndID = 0x87654321 // Must match request
 
-	// Set header identifiers for answer (must match request)
-	answer.Header.HopByHopID = 0x12345678
-	answer.Header.EndToEndID = 0x87654321
+	// Marshal request
+	requestData, err := request.Marshal()
+	if err != nil {
+		t.Fatalf("Failed to marshal request: %v", err)
+	}
+
+	// Marshal answer
+	answerData, err := answer.Marshal()
+	if err != nil {
+		t.Fatalf("Failed to marshal answer: %v", err)
+	}
+
+	// Write request-response pair to PCAP
+	err = writeDiameterPairToPcap(pcapFile, requestData, answerData, net.ParseIP("192.168.1.100"), net.ParseIP("192.168.1.1"))
+	if err != nil {
+		t.Fatalf("Failed to write PCAP: %v", err)
+	}
+
+	// Verify PCAP file
+	info, err := os.Stat(pcapFile)
+	if err != nil {
+		t.Fatalf("PCAP file not created: %v", err)
+	}
+	if info.Size() == 0 {
+		t.Fatal("PCAP file is empty")
+	}
+
+	t.Logf("PCAP file created: %s (%d bytes)", pcapFile, info.Size())
+	t.Logf("Open in Wireshark to view the request-response pair")
+}
+
+// TestPU_Pair_PCAP tests PCAP file generation for PU request-response pair
+func TestPU_Pair_PCAP(t *testing.T) {
+	// Create testdata directory
+	if err := os.MkdirAll("testdata", 0755); err != nil {
+		t.Fatalf("Failed to create testdata directory: %v", err)
+	}
+
+	// Create pcap file path
+	pcapFile := filepath.Join("testdata", "test_pu_pair.pcap")
+	// PCAP files are kept for Wireshark analysis
+
+	// Create Request message with ALL fields populated (using helper function)
+	request := createPurgeUERequestForTest()
+	request.Header.HopByHopID = 0x12345678
+	request.Header.EndToEndID = 0x87654321
+
+	// Create Answer message with ALL fields populated (using helper function)
+	answer := createPurgeUEAnswerForTest()
+	answer.Header.HopByHopID = 0x12345678 // Must match request
+	answer.Header.EndToEndID = 0x87654321 // Must match request
 
 	// Marshal request
 	requestData, err := request.Marshal()

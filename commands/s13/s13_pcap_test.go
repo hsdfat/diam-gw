@@ -231,18 +231,8 @@ func writeDiameterPairToPcap(filename string, requestData, responseData []byte, 
 	return nil
 }
 
-// TestMEIdentityCheckRequest_PCAP tests PCAP file generation for Request message
-func TestMEIdentityCheckRequest_PCAP(t *testing.T) {
-	// Create testdata directory
-	if err := os.MkdirAll("testdata", 0755); err != nil {
-		t.Fatalf("Failed to create testdata directory: %v", err)
-	}
-
-	// Create pcap file path
-	pcapFile := filepath.Join("testdata", "test_micr.pcap")
-	// PCAP files are kept for Wireshark analysis
-
-	// Create Request message with ALL fields populated
+// createMEIdentityCheckRequestForTest creates a MEIdentityCheckRequest message with ALL fields populated for testing
+func createMEIdentityCheckRequestForTest() *MEIdentityCheckRequest {
 	msg := NewMEIdentityCheckRequest()
 
 	// Required fields
@@ -274,6 +264,61 @@ func TestMEIdentityCheckRequest_PCAP(t *testing.T) {
 		},
 	}
 	msg.RouteRecord = []models_base.DiameterIdentity{models_base.DiameterIdentity("client.example.com")}
+
+	return msg
+}
+
+// createMEIdentityCheckAnswerForTest creates a MEIdentityCheckAnswer message with ALL fields populated for testing
+func createMEIdentityCheckAnswerForTest() *MEIdentityCheckAnswer {
+	msg := NewMEIdentityCheckAnswer()
+
+	// Required fields
+	msg.SessionId = models_base.UTF8String("client.example.com;1234567890;1")
+	msg.AuthSessionState = models_base.Enumerated(1)
+	msg.OriginHost = models_base.DiameterIdentity("server.example.com")
+	msg.OriginRealm = models_base.DiameterIdentity("server.example.com")
+
+	// Optional fields (for complete PCAP examples)
+	msg.ResultCode = ptrUnsigned32(2001) // DIAMETER_SUCCESS
+	msg.ExperimentalResult = &ExperimentalResult{
+		VendorId:               models_base.Unsigned32(10415),
+		ExperimentalResultCode: models_base.Unsigned32(1),
+	}
+	msg.EquipmentStatus = ptrEnumerated(1)
+	msg.Drmp = ptrOctetString([]byte{0x01, 0x02, 0x03})
+	msg.VendorSpecificApplicationId = &VendorSpecificApplicationId{
+		VendorId:          ptrUnsigned32(10415),
+		AuthApplicationId: ptrUnsigned32(16777252),
+		AcctApplicationId: ptrUnsigned32(1),
+	}
+	msg.Avp = []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})}
+	msg.FailedAvp = &FailedAVP{
+		Avp: []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})},
+	}
+	msg.ProxyInfo = []*ProxyInfo{
+		&ProxyInfo{
+			ProxyHost:  models_base.DiameterIdentity("client.example.com"),
+			ProxyState: models_base.OctetString([]byte{0x01, 0x02, 0x03}),
+		},
+	}
+	msg.RouteRecord = []models_base.DiameterIdentity{models_base.DiameterIdentity("server.example.com")}
+
+	return msg
+}
+
+// TestMEIdentityCheckRequest_PCAP tests PCAP file generation for Request message
+func TestMEIdentityCheckRequest_PCAP(t *testing.T) {
+	// Create testdata directory
+	if err := os.MkdirAll("testdata", 0755); err != nil {
+		t.Fatalf("Failed to create testdata directory: %v", err)
+	}
+
+	// Create pcap file path
+	pcapFile := filepath.Join("testdata", "test_micr.pcap")
+	// PCAP files are kept for Wireshark analysis
+
+	// Create Request message with ALL fields populated
+	msg := createMEIdentityCheckRequestForTest()
 
 	// Set header identifiers
 	msg.Header.HopByHopID = 0x12345678
@@ -316,38 +361,7 @@ func TestMEIdentityCheckAnswer_PCAP(t *testing.T) {
 	// PCAP files are kept for Wireshark analysis
 
 	// Create Answer message with ALL fields populated
-	msg := NewMEIdentityCheckAnswer()
-
-	// Required fields
-	msg.SessionId = models_base.UTF8String("client.example.com;1234567890;1")
-	msg.AuthSessionState = models_base.Enumerated(1)
-	msg.OriginHost = models_base.DiameterIdentity("server.example.com")
-	msg.OriginRealm = models_base.DiameterIdentity("server.example.com")
-
-	// Optional fields (for complete PCAP examples)
-	msg.ResultCode = ptrUnsigned32(2001) // DIAMETER_SUCCESS
-	msg.ExperimentalResult = &ExperimentalResult{
-		VendorId:               models_base.Unsigned32(10415),
-		ExperimentalResultCode: models_base.Unsigned32(1),
-	}
-	msg.EquipmentStatus = ptrEnumerated(1)
-	msg.Drmp = ptrOctetString([]byte{0x01, 0x02, 0x03})
-	msg.VendorSpecificApplicationId = &VendorSpecificApplicationId{
-		VendorId:          ptrUnsigned32(10415),
-		AuthApplicationId: ptrUnsigned32(16777252),
-		AcctApplicationId: ptrUnsigned32(1),
-	}
-	msg.Avp = []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})}
-	msg.FailedAvp = &FailedAVP{
-		Avp: []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})},
-	}
-	msg.ProxyInfo = []*ProxyInfo{
-		&ProxyInfo{
-			ProxyHost:  models_base.DiameterIdentity("client.example.com"),
-			ProxyState: models_base.OctetString([]byte{0x01, 0x02, 0x03}),
-		},
-	}
-	msg.RouteRecord = []models_base.DiameterIdentity{models_base.DiameterIdentity("server.example.com")}
+	msg := createMEIdentityCheckAnswerForTest()
 
 	// Set header identifiers
 	msg.Header.HopByHopID = 0x12345678
@@ -389,33 +403,15 @@ func TestMIC_Pair_PCAP(t *testing.T) {
 	pcapFile := filepath.Join("testdata", "test_mic_pair.pcap")
 	// PCAP files are kept for Wireshark analysis
 
-	// Create Request message
-	request := NewMEIdentityCheckRequest()
-	request.SessionId = models_base.UTF8String("client.example.com;1234567890;1")
-	request.AuthSessionState = models_base.Enumerated(1)
-	request.OriginHost = models_base.DiameterIdentity("client.example.com")
-	request.OriginRealm = models_base.DiameterIdentity("client.example.com")
-	request.DestinationRealm = models_base.DiameterIdentity("server.example.com")
-	request.TerminalInformation = &TerminalInformation{
-		Imei:            ptrUTF8String("123456789012345"),
-		Meid:            ptrOctetString([]byte{0x01, 0x02, 0x03}),
-		SoftwareVersion: ptrUTF8String("01"),
-	}
-
-	// Set header identifiers for request
+	// Create Request message with ALL fields populated (using helper function)
+	request := createMEIdentityCheckRequestForTest()
 	request.Header.HopByHopID = 0x12345678
 	request.Header.EndToEndID = 0x87654321
 
-	// Create Answer message
-	answer := NewMEIdentityCheckAnswer()
-	answer.SessionId = models_base.UTF8String("client.example.com;1234567890;1")
-	answer.AuthSessionState = models_base.Enumerated(1)
-	answer.OriginHost = models_base.DiameterIdentity("server.example.com")
-	answer.OriginRealm = models_base.DiameterIdentity("server.example.com")
-
-	// Set header identifiers for answer (must match request)
-	answer.Header.HopByHopID = 0x12345678
-	answer.Header.EndToEndID = 0x87654321
+	// Create Answer message with ALL fields populated (using helper function)
+	answer := createMEIdentityCheckAnswerForTest()
+	answer.Header.HopByHopID = 0x12345678 // Must match request
+	answer.Header.EndToEndID = 0x87654321 // Must match request
 
 	// Marshal request
 	requestData, err := request.Marshal()
