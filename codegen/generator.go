@@ -2035,6 +2035,18 @@ func (g *Generator) generateCommandBenchmarkTest(buf *bytes.Buffer, cmd *Command
 	buf.WriteString("}\n\n")
 }
 
+// hasAddressFields checks if any command uses Address type fields
+func (g *Generator) hasAddressFields() bool {
+	for _, cmd := range g.Parser.Commands {
+		for _, field := range cmd.Fields {
+			if field.AVP != nil && field.AVP.TypeName == "Address" {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 // GenerateUnitTests generates only unit tests (creation, validation, roundtrip)
 func (g *Generator) GenerateUnitTests() (string, error) {
 	var buf bytes.Buffer
@@ -2046,6 +2058,9 @@ func (g *Generator) GenerateUnitTests() (string, error) {
 	// Write imports
 	buf.WriteString("import (\n")
 	buf.WriteString("\t\"bytes\"\n")
+	if g.hasAddressFields() {
+		buf.WriteString("\t\"net\"\n")
+	}
 	buf.WriteString("\t\"testing\"\n")
 	buf.WriteString("\n")
 	buf.WriteString("\t\"github.com/hsdfat8/diam-gw/models_base\"\n")
@@ -2112,6 +2127,9 @@ func (g *Generator) GenerateBenchmarkTests() (string, error) {
 
 	// Write imports
 	buf.WriteString("import (\n")
+	if g.hasAddressFields() {
+		buf.WriteString("\t\"net\"\n")
+	}
 	buf.WriteString("\t\"testing\"\n")
 	buf.WriteString("\n")
 	buf.WriteString("\t\"github.com/hsdfat8/diam-gw/models_base\"\n")

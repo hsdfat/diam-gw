@@ -96,13 +96,30 @@ func processProtoFile(protoFile, outputFile, packageName, outputDir string, genT
 
 	fmt.Printf("Generated code written to %s\n", finalOutputFile)
 
-	// Generate test file if requested
+	// Generate test files if requested
 	if genTests {
-		testFile := strings.TrimSuffix(finalOutputFile, ".pb.go") + "_pcap_test.go"
-		if err := generator.GenerateTestFile(testFile); err != nil {
-			return fmt.Errorf("generating test file: %w", err)
+		baseFile := strings.TrimSuffix(finalOutputFile, ".pb.go")
+
+		// Generate unit test file
+		unitTestFile := baseFile + "_test.go"
+		if err := generator.GenerateUnitTestFile(unitTestFile); err != nil {
+			return fmt.Errorf("generating unit test file: %w", err)
 		}
-		fmt.Printf("Generated test file written to %s\n", testFile)
+		fmt.Printf("Generated unit test file written to %s\n", unitTestFile)
+
+		// Generate benchmark test file
+		benchmarkTestFile := baseFile + "_benchmark_test.go"
+		if err := generator.GenerateBenchmarkTestFile(benchmarkTestFile); err != nil {
+			return fmt.Errorf("generating benchmark test file: %w", err)
+		}
+		fmt.Printf("Generated benchmark test file written to %s\n", benchmarkTestFile)
+
+		// Generate pcap test file
+		pcapTestFile := baseFile + "_pcap_test.go"
+		if err := generator.GeneratePcapTestFile(pcapTestFile); err != nil {
+			return fmt.Errorf("generating pcap test file: %w", err)
+		}
+		fmt.Printf("Generated pcap test file written to %s\n", pcapTestFile)
 	}
 
 	return nil
@@ -181,13 +198,30 @@ func processProtoDirectory(protoDir, outputDir string, genTests bool) error {
 
 		fmt.Printf("Generated code written to %s\n", finalOutputFile)
 
-		// Generate test file if requested
+		// Generate test files if requested
 		if genTests {
-			testFile := strings.TrimSuffix(finalOutputFile, ".pb.go") + "_pcap_test.go"
-			if err := generator.GenerateTestFile(testFile); err != nil {
-				return fmt.Errorf("generating test file: %w", err)
+			baseFile := strings.TrimSuffix(finalOutputFile, ".pb.go")
+
+			// Generate unit test file
+			unitTestFile := baseFile + "_test.go"
+			if err := generator.GenerateUnitTestFile(unitTestFile); err != nil {
+				return fmt.Errorf("generating unit test file: %w", err)
 			}
-			fmt.Printf("Generated test file written to %s\n", testFile)
+			fmt.Printf("Generated unit test file written to %s\n", unitTestFile)
+
+			// Generate benchmark test file
+			benchmarkTestFile := baseFile + "_benchmark_test.go"
+			if err := generator.GenerateBenchmarkTestFile(benchmarkTestFile); err != nil {
+				return fmt.Errorf("generating benchmark test file: %w", err)
+			}
+			fmt.Printf("Generated benchmark test file written to %s\n", benchmarkTestFile)
+
+			// Generate pcap test file
+			pcapTestFile := baseFile + "_pcap_test.go"
+			if err := generator.GeneratePcapTestFile(pcapTestFile); err != nil {
+				return fmt.Errorf("generating pcap test file: %w", err)
+			}
+			fmt.Printf("Generated pcap test file written to %s\n", pcapTestFile)
 		}
 	}
 
