@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/hsdfat8/diam-gw/codegen"
 )
@@ -14,6 +15,7 @@ func main() {
 		protoFile   = flag.String("proto", "", "Path to the .proto file")
 		outputFile  = flag.String("output", "", "Path to the output .go file")
 		packageName = flag.String("package", "base", "Go package name for generated code")
+		genTests    = flag.Bool("tests", false, "Generate test files with pcap writing capabilities")
 	)
 
 	flag.Parse()
@@ -50,4 +52,14 @@ func main() {
 	}
 
 	fmt.Printf("Generated code written to %s\n", *outputFile)
+
+	// Generate test file if requested
+	if *genTests {
+		testFile := strings.TrimSuffix(*outputFile, ".pb.go") + "_pcap_test.go"
+		if err := generator.GenerateTestFile(testFile); err != nil {
+			fmt.Fprintf(os.Stderr, "Error generating test file: %v\n", err)
+			os.Exit(1)
+		}
+		fmt.Printf("Generated test file written to %s\n", testFile)
+	}
 }

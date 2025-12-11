@@ -42,6 +42,8 @@ clean:
 	rm -f commands/base/diameter.pb.go
 	rm -f bin/diameter-codegen
 	rm -f coverage.out coverage.html
+	rm -rf testdata
+	rm -rf **/testdata
 	@echo "Clean complete!"
 
 # Format code

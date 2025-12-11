@@ -31,30 +31,30 @@ type DiameterHeader struct {
 
 // AVP Codes
 const (
+	AVPCodeORIGINSTATEID               uint32 = 278
+	AVPCodeSUPPORTEDVENDORID           uint32 = 265
+	AVPCodeFAILEDAVP                   uint32 = 279
 	AVPCodeDISCONNECTCAUSE             uint32 = 273
-	AVPCodeREAUTHREQUESTTYPE           uint32 = 285
-	AVPCodeVENDORID                    uint32 = 266
+	AVPCodeTERMINATIONCAUSE            uint32 = 295
+	AVPCodeINBANDSECURITYID            uint32 = 299
+	AVPCodeFIRMWAREREVISION            uint32 = 267
+	AVPCodeUSERNAME                    uint32 = 1
 	AVPCodeERRORMESSAGE                uint32 = 281
+	AVPCodeHOSTIPADDRESS               uint32 = 257
+	AVPCodeVENDORID                    uint32 = 266
+	AVPCodePRODUCTNAME                 uint32 = 269
+	AVPCodeAUTHAPPLICATIONID           uint32 = 258
+	AVPCodeACCTAPPLICATIONID           uint32 = 259
+	AVPCodeVENDORSPECIFICAPPLICATIONID uint32 = 260
 	AVPCodeSESSIONID                   uint32 = 263
-	AVPCodeACCOUNTINGRECORDTYPE        uint32 = 480
-	AVPCodeRESULTCODE                  uint32 = 268
 	AVPCodeORIGINHOST                  uint32 = 264
 	AVPCodeORIGINREALM                 uint32 = 296
-	AVPCodeHOSTIPADDRESS               uint32 = 257
-	AVPCodePRODUCTNAME                 uint32 = 269
-	AVPCodeVENDORSPECIFICAPPLICATIONID uint32 = 260
 	AVPCodeDESTINATIONREALM            uint32 = 283
-	AVPCodeUSERNAME                    uint32 = 1
-	AVPCodeSUPPORTEDVENDORID           uint32 = 265
-	AVPCodeINBANDSECURITYID            uint32 = 299
-	AVPCodeACCTAPPLICATIONID           uint32 = 259
-	AVPCodeFAILEDAVP                   uint32 = 279
-	AVPCodeTERMINATIONCAUSE            uint32 = 295
-	AVPCodeACCOUNTINGRECORDNUMBER      uint32 = 485
-	AVPCodeORIGINSTATEID               uint32 = 278
-	AVPCodeAUTHAPPLICATIONID           uint32 = 258
-	AVPCodeFIRMWAREREVISION            uint32 = 267
 	AVPCodeDESTINATIONHOST             uint32 = 293
+	AVPCodeREAUTHREQUESTTYPE           uint32 = 285
+	AVPCodeACCOUNTINGRECORDTYPE        uint32 = 480
+	AVPCodeACCOUNTINGRECORDNUMBER      uint32 = 485
+	AVPCodeRESULTCODE                  uint32 = 268
 )
 
 // Command Codes
@@ -107,8 +107,32 @@ func NewCapabilitiesExchangeRequest() *CapabilitiesExchangeRequest {
 	}
 }
 
+// Validate checks if all required fields are set in CapabilitiesExchangeRequest
+func (m *CapabilitiesExchangeRequest) Validate() error {
+	// Validate required fields
+	if m.OriginHost == "" {
+		return fmt.Errorf("required field Origin-Host is empty")
+	}
+	if m.OriginRealm == "" {
+		return fmt.Errorf("required field Origin-Realm is empty")
+	}
+	if len(m.HostIpAddress) == 0 {
+		return fmt.Errorf("required repeated field Host-IP-Address is empty")
+	}
+	if m.ProductName == "" {
+		return fmt.Errorf("required field Product-Name is empty")
+	}
+
+	return nil
+}
+
 // Marshal serializes the CapabilitiesExchangeRequest to bytes using a buffer for optimal performance
 func (m *CapabilitiesExchangeRequest) Marshal() ([]byte, error) {
+	// Validate required fields before marshaling
+	if err := m.Validate(); err != nil {
+		return nil, fmt.Errorf("validation failed: %w", err)
+	}
+
 	// Use a buffer to avoid multiple allocations
 	var buf bytes.Buffer
 	buf.Grow(256) // Pre-allocate reasonable size
@@ -323,8 +347,32 @@ func NewCapabilitiesExchangeAnswer() *CapabilitiesExchangeAnswer {
 	}
 }
 
+// Validate checks if all required fields are set in CapabilitiesExchangeAnswer
+func (m *CapabilitiesExchangeAnswer) Validate() error {
+	// Validate required fields
+	if m.OriginHost == "" {
+		return fmt.Errorf("required field Origin-Host is empty")
+	}
+	if m.OriginRealm == "" {
+		return fmt.Errorf("required field Origin-Realm is empty")
+	}
+	if len(m.HostIpAddress) == 0 {
+		return fmt.Errorf("required repeated field Host-IP-Address is empty")
+	}
+	if m.ProductName == "" {
+		return fmt.Errorf("required field Product-Name is empty")
+	}
+
+	return nil
+}
+
 // Marshal serializes the CapabilitiesExchangeAnswer to bytes using a buffer for optimal performance
 func (m *CapabilitiesExchangeAnswer) Marshal() ([]byte, error) {
+	// Validate required fields before marshaling
+	if err := m.Validate(); err != nil {
+		return nil, fmt.Errorf("validation failed: %w", err)
+	}
+
 	// Use a buffer to avoid multiple allocations
 	var buf bytes.Buffer
 	buf.Grow(256) // Pre-allocate reasonable size
@@ -538,8 +586,26 @@ func NewDeviceWatchdogRequest() *DeviceWatchdogRequest {
 	}
 }
 
+// Validate checks if all required fields are set in DeviceWatchdogRequest
+func (m *DeviceWatchdogRequest) Validate() error {
+	// Validate required fields
+	if m.OriginHost == "" {
+		return fmt.Errorf("required field Origin-Host is empty")
+	}
+	if m.OriginRealm == "" {
+		return fmt.Errorf("required field Origin-Realm is empty")
+	}
+
+	return nil
+}
+
 // Marshal serializes the DeviceWatchdogRequest to bytes using a buffer for optimal performance
 func (m *DeviceWatchdogRequest) Marshal() ([]byte, error) {
+	// Validate required fields before marshaling
+	if err := m.Validate(); err != nil {
+		return nil, fmt.Errorf("validation failed: %w", err)
+	}
+
 	// Use a buffer to avoid multiple allocations
 	var buf bytes.Buffer
 	buf.Grow(256) // Pre-allocate reasonable size
@@ -670,8 +736,26 @@ func NewDeviceWatchdogAnswer() *DeviceWatchdogAnswer {
 	}
 }
 
+// Validate checks if all required fields are set in DeviceWatchdogAnswer
+func (m *DeviceWatchdogAnswer) Validate() error {
+	// Validate required fields
+	if m.OriginHost == "" {
+		return fmt.Errorf("required field Origin-Host is empty")
+	}
+	if m.OriginRealm == "" {
+		return fmt.Errorf("required field Origin-Realm is empty")
+	}
+
+	return nil
+}
+
 // Marshal serializes the DeviceWatchdogAnswer to bytes using a buffer for optimal performance
 func (m *DeviceWatchdogAnswer) Marshal() ([]byte, error) {
+	// Validate required fields before marshaling
+	if err := m.Validate(); err != nil {
+		return nil, fmt.Errorf("validation failed: %w", err)
+	}
+
 	// Use a buffer to avoid multiple allocations
 	var buf bytes.Buffer
 	buf.Grow(256) // Pre-allocate reasonable size
@@ -810,8 +894,26 @@ func NewDisconnectPeerRequest() *DisconnectPeerRequest {
 	}
 }
 
+// Validate checks if all required fields are set in DisconnectPeerRequest
+func (m *DisconnectPeerRequest) Validate() error {
+	// Validate required fields
+	if m.OriginHost == "" {
+		return fmt.Errorf("required field Origin-Host is empty")
+	}
+	if m.OriginRealm == "" {
+		return fmt.Errorf("required field Origin-Realm is empty")
+	}
+
+	return nil
+}
+
 // Marshal serializes the DisconnectPeerRequest to bytes using a buffer for optimal performance
 func (m *DisconnectPeerRequest) Marshal() ([]byte, error) {
+	// Validate required fields before marshaling
+	if err := m.Validate(); err != nil {
+		return nil, fmt.Errorf("validation failed: %w", err)
+	}
+
 	// Use a buffer to avoid multiple allocations
 	var buf bytes.Buffer
 	buf.Grow(256) // Pre-allocate reasonable size
@@ -950,8 +1052,26 @@ func NewDisconnectPeerAnswer() *DisconnectPeerAnswer {
 	}
 }
 
+// Validate checks if all required fields are set in DisconnectPeerAnswer
+func (m *DisconnectPeerAnswer) Validate() error {
+	// Validate required fields
+	if m.OriginHost == "" {
+		return fmt.Errorf("required field Origin-Host is empty")
+	}
+	if m.OriginRealm == "" {
+		return fmt.Errorf("required field Origin-Realm is empty")
+	}
+
+	return nil
+}
+
 // Marshal serializes the DisconnectPeerAnswer to bytes using a buffer for optimal performance
 func (m *DisconnectPeerAnswer) Marshal() ([]byte, error) {
+	// Validate required fields before marshaling
+	if err := m.Validate(); err != nil {
+		return nil, fmt.Errorf("validation failed: %w", err)
+	}
+
 	// Use a buffer to avoid multiple allocations
 	var buf bytes.Buffer
 	buf.Grow(256) // Pre-allocate reasonable size
@@ -1094,8 +1214,35 @@ func NewReAuthRequest() *ReAuthRequest {
 	}
 }
 
+// Validate checks if all required fields are set in ReAuthRequest
+func (m *ReAuthRequest) Validate() error {
+	// Validate required fields
+	if m.SessionId == "" {
+		return fmt.Errorf("required field Session-Id is empty")
+	}
+	if m.OriginHost == "" {
+		return fmt.Errorf("required field Origin-Host is empty")
+	}
+	if m.OriginRealm == "" {
+		return fmt.Errorf("required field Origin-Realm is empty")
+	}
+	if m.DestinationRealm == "" {
+		return fmt.Errorf("required field Destination-Realm is empty")
+	}
+	if m.DestinationHost == "" {
+		return fmt.Errorf("required field Destination-Host is empty")
+	}
+
+	return nil
+}
+
 // Marshal serializes the ReAuthRequest to bytes using a buffer for optimal performance
 func (m *ReAuthRequest) Marshal() ([]byte, error) {
+	// Validate required fields before marshaling
+	if err := m.Validate(); err != nil {
+		return nil, fmt.Errorf("validation failed: %w", err)
+	}
+
 	// Use a buffer to avoid multiple allocations
 	var buf bytes.Buffer
 	buf.Grow(256) // Pre-allocate reasonable size
@@ -1267,8 +1414,29 @@ func NewReAuthAnswer() *ReAuthAnswer {
 	}
 }
 
+// Validate checks if all required fields are set in ReAuthAnswer
+func (m *ReAuthAnswer) Validate() error {
+	// Validate required fields
+	if m.SessionId == "" {
+		return fmt.Errorf("required field Session-Id is empty")
+	}
+	if m.OriginHost == "" {
+		return fmt.Errorf("required field Origin-Host is empty")
+	}
+	if m.OriginRealm == "" {
+		return fmt.Errorf("required field Origin-Realm is empty")
+	}
+
+	return nil
+}
+
 // Marshal serializes the ReAuthAnswer to bytes using a buffer for optimal performance
 func (m *ReAuthAnswer) Marshal() ([]byte, error) {
+	// Validate required fields before marshaling
+	if err := m.Validate(); err != nil {
+		return nil, fmt.Errorf("validation failed: %w", err)
+	}
+
 	// Use a buffer to avoid multiple allocations
 	var buf bytes.Buffer
 	buf.Grow(256) // Pre-allocate reasonable size
@@ -1418,8 +1586,32 @@ func NewSessionTerminationRequest() *SessionTerminationRequest {
 	}
 }
 
+// Validate checks if all required fields are set in SessionTerminationRequest
+func (m *SessionTerminationRequest) Validate() error {
+	// Validate required fields
+	if m.SessionId == "" {
+		return fmt.Errorf("required field Session-Id is empty")
+	}
+	if m.OriginHost == "" {
+		return fmt.Errorf("required field Origin-Host is empty")
+	}
+	if m.OriginRealm == "" {
+		return fmt.Errorf("required field Origin-Realm is empty")
+	}
+	if m.DestinationRealm == "" {
+		return fmt.Errorf("required field Destination-Realm is empty")
+	}
+
+	return nil
+}
+
 // Marshal serializes the SessionTerminationRequest to bytes using a buffer for optimal performance
 func (m *SessionTerminationRequest) Marshal() ([]byte, error) {
+	// Validate required fields before marshaling
+	if err := m.Validate(); err != nil {
+		return nil, fmt.Errorf("validation failed: %w", err)
+	}
+
 	// Use a buffer to avoid multiple allocations
 	var buf bytes.Buffer
 	buf.Grow(256) // Pre-allocate reasonable size
@@ -1583,8 +1775,29 @@ func NewSessionTerminationAnswer() *SessionTerminationAnswer {
 	}
 }
 
+// Validate checks if all required fields are set in SessionTerminationAnswer
+func (m *SessionTerminationAnswer) Validate() error {
+	// Validate required fields
+	if m.SessionId == "" {
+		return fmt.Errorf("required field Session-Id is empty")
+	}
+	if m.OriginHost == "" {
+		return fmt.Errorf("required field Origin-Host is empty")
+	}
+	if m.OriginRealm == "" {
+		return fmt.Errorf("required field Origin-Realm is empty")
+	}
+
+	return nil
+}
+
 // Marshal serializes the SessionTerminationAnswer to bytes using a buffer for optimal performance
 func (m *SessionTerminationAnswer) Marshal() ([]byte, error) {
+	// Validate required fields before marshaling
+	if err := m.Validate(); err != nil {
+		return nil, fmt.Errorf("validation failed: %w", err)
+	}
+
 	// Use a buffer to avoid multiple allocations
 	var buf bytes.Buffer
 	buf.Grow(256) // Pre-allocate reasonable size
@@ -1734,8 +1947,35 @@ func NewAbortSessionRequest() *AbortSessionRequest {
 	}
 }
 
+// Validate checks if all required fields are set in AbortSessionRequest
+func (m *AbortSessionRequest) Validate() error {
+	// Validate required fields
+	if m.SessionId == "" {
+		return fmt.Errorf("required field Session-Id is empty")
+	}
+	if m.OriginHost == "" {
+		return fmt.Errorf("required field Origin-Host is empty")
+	}
+	if m.OriginRealm == "" {
+		return fmt.Errorf("required field Origin-Realm is empty")
+	}
+	if m.DestinationRealm == "" {
+		return fmt.Errorf("required field Destination-Realm is empty")
+	}
+	if m.DestinationHost == "" {
+		return fmt.Errorf("required field Destination-Host is empty")
+	}
+
+	return nil
+}
+
 // Marshal serializes the AbortSessionRequest to bytes using a buffer for optimal performance
 func (m *AbortSessionRequest) Marshal() ([]byte, error) {
+	// Validate required fields before marshaling
+	if err := m.Validate(); err != nil {
+		return nil, fmt.Errorf("validation failed: %w", err)
+	}
+
 	// Use a buffer to avoid multiple allocations
 	var buf bytes.Buffer
 	buf.Grow(256) // Pre-allocate reasonable size
@@ -1899,8 +2139,29 @@ func NewAbortSessionAnswer() *AbortSessionAnswer {
 	}
 }
 
+// Validate checks if all required fields are set in AbortSessionAnswer
+func (m *AbortSessionAnswer) Validate() error {
+	// Validate required fields
+	if m.SessionId == "" {
+		return fmt.Errorf("required field Session-Id is empty")
+	}
+	if m.OriginHost == "" {
+		return fmt.Errorf("required field Origin-Host is empty")
+	}
+	if m.OriginRealm == "" {
+		return fmt.Errorf("required field Origin-Realm is empty")
+	}
+
+	return nil
+}
+
 // Marshal serializes the AbortSessionAnswer to bytes using a buffer for optimal performance
 func (m *AbortSessionAnswer) Marshal() ([]byte, error) {
+	// Validate required fields before marshaling
+	if err := m.Validate(); err != nil {
+		return nil, fmt.Errorf("validation failed: %w", err)
+	}
+
 	// Use a buffer to avoid multiple allocations
 	var buf bytes.Buffer
 	buf.Grow(256) // Pre-allocate reasonable size
@@ -2050,8 +2311,32 @@ func NewAccountingRequest() *AccountingRequest {
 	}
 }
 
+// Validate checks if all required fields are set in AccountingRequest
+func (m *AccountingRequest) Validate() error {
+	// Validate required fields
+	if m.SessionId == "" {
+		return fmt.Errorf("required field Session-Id is empty")
+	}
+	if m.OriginHost == "" {
+		return fmt.Errorf("required field Origin-Host is empty")
+	}
+	if m.OriginRealm == "" {
+		return fmt.Errorf("required field Origin-Realm is empty")
+	}
+	if m.DestinationRealm == "" {
+		return fmt.Errorf("required field Destination-Realm is empty")
+	}
+
+	return nil
+}
+
 // Marshal serializes the AccountingRequest to bytes using a buffer for optimal performance
 func (m *AccountingRequest) Marshal() ([]byte, error) {
+	// Validate required fields before marshaling
+	if err := m.Validate(); err != nil {
+		return nil, fmt.Errorf("validation failed: %w", err)
+	}
+
 	// Use a buffer to avoid multiple allocations
 	var buf bytes.Buffer
 	buf.Grow(256) // Pre-allocate reasonable size
@@ -2217,8 +2502,29 @@ func NewAccountingAnswer() *AccountingAnswer {
 	}
 }
 
+// Validate checks if all required fields are set in AccountingAnswer
+func (m *AccountingAnswer) Validate() error {
+	// Validate required fields
+	if m.SessionId == "" {
+		return fmt.Errorf("required field Session-Id is empty")
+	}
+	if m.OriginHost == "" {
+		return fmt.Errorf("required field Origin-Host is empty")
+	}
+	if m.OriginRealm == "" {
+		return fmt.Errorf("required field Origin-Realm is empty")
+	}
+
+	return nil
+}
+
 // Marshal serializes the AccountingAnswer to bytes using a buffer for optimal performance
 func (m *AccountingAnswer) Marshal() ([]byte, error) {
+	// Validate required fields before marshaling
+	if err := m.Validate(); err != nil {
+		return nil, fmt.Errorf("validation failed: %w", err)
+	}
+
 	// Use a buffer to avoid multiple allocations
 	var buf bytes.Buffer
 	buf.Grow(256) // Pre-allocate reasonable size

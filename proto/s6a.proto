@@ -1,0 +1,1622 @@
+// S6a/S6d Interface Diameter Protocol Definition
+// Based on 3GPP TS 29.272 v16.5.0
+// Interface between MME/SGSN and HSS
+
+syntax = "diameter1";
+
+package diameter.s6a;
+
+option go_package = "github.com/hsdfat8/diam-gw/commands/s6a";
+
+// Application ID for S6a/S6d
+const S6A_APPLICATION_ID = 16777251;
+const VENDOR_ID_3GPP = 10415;
+
+// ============================================================================
+// AVP Definitions - 3GPP Vendor Specific (Vendor-Id: 10415)
+// ============================================================================
+
+// --- Basic AVPs ---
+
+avp Subscription-Data {
+  code = 1400;
+  vendor_id = 10415;
+  type = Grouped;
+  must = true;
+  may_encrypt = false;
+}
+
+avp Terminal-Information {
+  code = 1401;
+  vendor_id = 10415;
+  type = Grouped;
+  must = true;
+  may_encrypt = false;
+}
+
+avp IMEI {
+  code = 1402;
+  vendor_id = 10415;
+  type = UTF8String;
+  must = true;
+  may_encrypt = false;
+}
+
+avp Software-Version {
+  code = 1403;
+  vendor_id = 10415;
+  type = UTF8String;
+  must = true;
+  may_encrypt = false;
+}
+
+avp 3GPP2-MEID {
+  code = 1471;
+  vendor_id = 10415;
+  type = OctetString;
+  must = true;
+  may_encrypt = false;
+}
+
+// --- ULR/ULA AVPs ---
+
+avp ULR-Flags {
+  code = 1405;
+  vendor_id = 10415;
+  type = Unsigned32;
+  must = true;
+  may_encrypt = false;
+  // Bit 0: Single-Registration-Indication
+  // Bit 1: S6a/S6d-Indicator
+  // Bit 2: Skip-Subscriber-Data
+  // Bit 3: GPRS-Subscription-Data-Indicator
+  // Bit 4: Node-Type-Indicator
+  // Bit 5: Initial-Attach-Indicator
+  // Bit 6: PS-LCS-Not-Supported-By-UE
+  // Bit 7: SMS-Only-Indication
+}
+
+avp ULA-Flags {
+  code = 1406;
+  vendor_id = 10415;
+  type = Unsigned32;
+  must = true;
+  may_encrypt = false;
+  // Bit 0: Separation Indication
+  // Bit 1: MME Registered for SMS
+}
+
+avp Visited-PLMN-Id {
+  code = 1407;
+  vendor_id = 10415;
+  type = OctetString;
+  must = true;
+  may_encrypt = false;
+}
+
+// --- Authentication AVPs ---
+
+avp Requested-EUTRAN-Authentication-Info {
+  code = 1408;
+  vendor_id = 10415;
+  type = Grouped;
+  must = true;
+  may_encrypt = false;
+}
+
+avp Requested-UTRAN-GERAN-Authentication-Info {
+  code = 1409;
+  vendor_id = 10415;
+  type = Grouped;
+  must = true;
+  may_encrypt = false;
+}
+
+avp Number-Of-Requested-Vectors {
+  code = 1410;
+  vendor_id = 10415;
+  type = Unsigned32;
+  must = true;
+  may_encrypt = false;
+}
+
+avp Re-Synchronization-Info {
+  code = 1411;
+  vendor_id = 10415;
+  type = OctetString;
+  must = true;
+  may_encrypt = false;
+}
+
+avp Immediate-Response-Preferred {
+  code = 1412;
+  vendor_id = 10415;
+  type = Unsigned32;
+  must = true;
+  may_encrypt = false;
+}
+
+avp Authentication-Info {
+  code = 1413;
+  vendor_id = 10415;
+  type = Grouped;
+  must = true;
+  may_encrypt = false;
+}
+
+avp E-UTRAN-Vector {
+  code = 1414;
+  vendor_id = 10415;
+  type = Grouped;
+  must = true;
+  may_encrypt = false;
+}
+
+avp UTRAN-Vector {
+  code = 1415;
+  vendor_id = 10415;
+  type = Grouped;
+  must = true;
+  may_encrypt = false;
+}
+
+avp GERAN-Vector {
+  code = 1416;
+  vendor_id = 10415;
+  type = Grouped;
+  must = true;
+  may_encrypt = false;
+}
+
+avp RAND {
+  code = 1447;
+  vendor_id = 10415;
+  type = OctetString;
+  must = true;
+  may_encrypt = false;
+}
+
+avp XRES {
+  code = 1448;
+  vendor_id = 10415;
+  type = OctetString;
+  must = true;
+  may_encrypt = false;
+}
+
+avp AUTN {
+  code = 1449;
+  vendor_id = 10415;
+  type = OctetString;
+  must = true;
+  may_encrypt = false;
+}
+
+avp KASME {
+  code = 1450;
+  vendor_id = 10415;
+  type = OctetString;
+  must = true;
+  may_encrypt = false;
+}
+
+avp Kc {
+  code = 1453;
+  vendor_id = 10415;
+  type = OctetString;
+  must = true;
+  may_encrypt = false;
+}
+
+avp SRES {
+  code = 1454;
+  vendor_id = 10415;
+  type = OctetString;
+  must = true;
+  may_encrypt = false;
+}
+
+avp Item-Number {
+  code = 1419;
+  vendor_id = 10415;
+  type = Unsigned32;
+  must = true;
+  may_encrypt = false;
+}
+
+avp AIR-Flags {
+  code = 1679;
+  vendor_id = 10415;
+  type = Unsigned32;
+  must = false;
+  may_encrypt = false;
+}
+
+// --- Network/Subscription AVPs ---
+
+avp Network-Access-Mode {
+  code = 1417;
+  vendor_id = 10415;
+  type = Enumerated;
+  must = true;
+  may_encrypt = false;
+  // 0: PACKET_AND_CIRCUIT
+  // 1: Reserved
+  // 2: ONLY_PACKET
+}
+
+avp HPLMN-ODB {
+  code = 1418;
+  vendor_id = 10415;
+  type = Unsigned32;
+  must = true;
+  may_encrypt = false;
+}
+
+avp Cancellation-Type {
+  code = 1420;
+  vendor_id = 10415;
+  type = Enumerated;
+  must = true;
+  may_encrypt = false;
+  // 0: MME_UPDATE_PROCEDURE
+  // 1: SGSN_UPDATE_PROCEDURE
+  // 2: SUBSCRIPTION_WITHDRAWAL
+  // 3: UPDATE_PROCEDURE_IWF
+  // 4: INITIAL_ATTACH_PROCEDURE
+}
+
+avp CLR-Flags {
+  code = 1638;
+  vendor_id = 10415;
+  type = Unsigned32;
+  must = false;
+  may_encrypt = false;
+}
+
+avp DSR-Flags {
+  code = 1421;
+  vendor_id = 10415;
+  type = Unsigned32;
+  must = true;
+  may_encrypt = false;
+}
+
+avp DSA-Flags {
+  code = 1422;
+  vendor_id = 10415;
+  type = Unsigned32;
+  must = true;
+  may_encrypt = false;
+}
+
+avp Context-Identifier {
+  code = 1423;
+  vendor_id = 10415;
+  type = Unsigned32;
+  must = true;
+  may_encrypt = false;
+}
+
+avp Subscriber-Status {
+  code = 1424;
+  vendor_id = 10415;
+  type = Enumerated;
+  must = true;
+  may_encrypt = false;
+  // 0: SERVICE_GRANTED
+  // 1: OPERATOR_DETERMINED_BARRING
+}
+
+avp Operator-Determined-Barring {
+  code = 1425;
+  vendor_id = 10415;
+  type = Unsigned32;
+  must = true;
+  may_encrypt = false;
+}
+
+avp Access-Restriction-Data {
+  code = 1426;
+  vendor_id = 10415;
+  type = Unsigned32;
+  must = true;
+  may_encrypt = false;
+}
+
+avp APN-OI-Replacement {
+  code = 1427;
+  vendor_id = 10415;
+  type = UTF8String;
+  must = true;
+  may_encrypt = false;
+}
+
+avp All-APN-Configurations-Included-Indicator {
+  code = 1428;
+  vendor_id = 10415;
+  type = Enumerated;
+  must = true;
+  may_encrypt = false;
+  // 0: All_APN_CONFIGURATIONS_INCLUDED
+  // 1: MODIFIED/ADDED_APN_CONFIGURATIONS_INCLUDED
+}
+
+avp APN-Configuration-Profile {
+  code = 1429;
+  vendor_id = 10415;
+  type = Grouped;
+  must = true;
+  may_encrypt = false;
+}
+
+avp APN-Configuration {
+  code = 1430;
+  vendor_id = 10415;
+  type = Grouped;
+  must = true;
+  may_encrypt = false;
+}
+
+avp EPS-Subscribed-QoS-Profile {
+  code = 1431;
+  vendor_id = 10415;
+  type = Grouped;
+  must = true;
+  may_encrypt = false;
+}
+
+avp VPLMN-Dynamic-Address-Allowed {
+  code = 1432;
+  vendor_id = 10415;
+  type = Enumerated;
+  must = true;
+  may_encrypt = false;
+  // 0: NOTALLOWED
+  // 1: ALLOWED
+}
+
+avp STN-SR {
+  code = 1433;
+  vendor_id = 10415;
+  type = OctetString;
+  must = true;
+  may_encrypt = false;
+}
+
+avp Alert-Reason {
+  code = 1434;
+  vendor_id = 10415;
+  type = Enumerated;
+  must = true;
+  may_encrypt = false;
+  // 0: UE_PRESENT
+  // 1: UE_MEMORY_AVAILABLE
+}
+
+avp AMBR {
+  code = 1435;
+  vendor_id = 10415;
+  type = Grouped;
+  must = true;
+  may_encrypt = false;
+}
+
+avp Max-Requested-Bandwidth-UL {
+  code = 516;
+  vendor_id = 10415;
+  type = Unsigned32;
+  must = true;
+  may_encrypt = false;
+}
+
+avp Max-Requested-Bandwidth-DL {
+  code = 515;
+  vendor_id = 10415;
+  type = Unsigned32;
+  must = true;
+  may_encrypt = false;
+}
+
+avp CSG-Subscription-Data {
+  code = 1436;
+  vendor_id = 10415;
+  type = Grouped;
+  must = true;
+  may_encrypt = false;
+}
+
+avp CSG-Id {
+  code = 1437;
+  vendor_id = 10415;
+  type = Unsigned32;
+  must = true;
+  may_encrypt = false;
+}
+
+avp PDN-GW-Allocation-Type {
+  code = 1438;
+  vendor_id = 10415;
+  type = Enumerated;
+  must = true;
+  may_encrypt = false;
+  // 0: STATIC
+  // 1: DYNAMIC
+}
+
+avp Expiration-Date {
+  code = 1439;
+  vendor_id = 10415;
+  type = Time;
+  must = true;
+  may_encrypt = false;
+}
+
+avp RAT-Frequency-Selection-Priority-ID {
+  code = 1440;
+  vendor_id = 10415;
+  type = Unsigned32;
+  must = true;
+  may_encrypt = false;
+}
+
+avp IDA-Flags {
+  code = 1441;
+  vendor_id = 10415;
+  type = Unsigned32;
+  must = true;
+  may_encrypt = false;
+}
+
+avp PUA-Flags {
+  code = 1442;
+  vendor_id = 10415;
+  type = Unsigned32;
+  must = true;
+  may_encrypt = false;
+}
+
+avp NOR-Flags {
+  code = 1443;
+  vendor_id = 10415;
+  type = Unsigned32;
+  must = true;
+  may_encrypt = false;
+}
+
+avp User-Id {
+  code = 1444;
+  vendor_id = 10415;
+  type = UTF8String;
+  must = false;
+  may_encrypt = false;
+}
+
+avp Equipment-Status {
+  code = 1445;
+  vendor_id = 10415;
+  type = Enumerated;
+  must = true;
+  may_encrypt = false;
+  // 0: WHITELISTED
+  // 1: BLACKLISTED
+  // 2: GREYLISTED
+}
+
+avp Regional-Subscription-Zone-Code {
+  code = 1446;
+  vendor_id = 10415;
+  type = OctetString;
+  must = true;
+  may_encrypt = false;
+}
+
+avp PDN-Type {
+  code = 1456;
+  vendor_id = 10415;
+  type = Enumerated;
+  must = true;
+  may_encrypt = false;
+  // 0: IPv4
+  // 1: IPv6
+  // 2: IPv4v6
+  // 3: IPv4_OR_IPv6
+}
+
+avp Roaming-Restricted-Due-To-Unsupported-Feature {
+  code = 1457;
+  vendor_id = 10415;
+  type = Enumerated;
+  must = true;
+  may_encrypt = false;
+  // 0: Roaming-Restricted-Due-To-Unsupported-Feature
+}
+
+avp Trace-Data {
+  code = 1458;
+  vendor_id = 10415;
+  type = Grouped;
+  must = true;
+  may_encrypt = false;
+}
+
+avp Trace-Reference {
+  code = 1459;
+  vendor_id = 10415;
+  type = OctetString;
+  must = true;
+  may_encrypt = false;
+}
+
+avp Trace-Depth {
+  code = 1462;
+  vendor_id = 10415;
+  type = Enumerated;
+  must = true;
+  may_encrypt = false;
+}
+
+avp Trace-NE-Type-List {
+  code = 1463;
+  vendor_id = 10415;
+  type = OctetString;
+  must = true;
+  may_encrypt = false;
+}
+
+avp Trace-Interface-List {
+  code = 1464;
+  vendor_id = 10415;
+  type = OctetString;
+  must = true;
+  may_encrypt = false;
+}
+
+avp Trace-Event-List {
+  code = 1465;
+  vendor_id = 10415;
+  type = OctetString;
+  must = true;
+  may_encrypt = false;
+}
+
+avp OMC-Id {
+  code = 1466;
+  vendor_id = 10415;
+  type = OctetString;
+  must = true;
+  may_encrypt = false;
+}
+
+avp Trace-Collection-Entity {
+  code = 1452;
+  vendor_id = 10415;
+  type = Address;
+  must = true;
+  may_encrypt = false;
+}
+
+avp GPRS-Subscription-Data {
+  code = 1467;
+  vendor_id = 10415;
+  type = Grouped;
+  must = true;
+  may_encrypt = false;
+}
+
+avp Complete-Data-List-Included-Indicator {
+  code = 1468;
+  vendor_id = 10415;
+  type = Enumerated;
+  must = true;
+  may_encrypt = false;
+  // 0: All_PDP_CONTEXTS_INCLUDED
+  // 1: MODIFIED/ADDED_PDP_CONTEXTS_INCLUDED
+}
+
+avp PDP-Context {
+  code = 1469;
+  vendor_id = 10415;
+  type = Grouped;
+  must = true;
+  may_encrypt = false;
+}
+
+avp PDP-Type {
+  code = 1470;
+  vendor_id = 10415;
+  type = OctetString;
+  must = true;
+  may_encrypt = false;
+}
+
+avp QoS-Subscribed {
+  code = 1404;
+  vendor_id = 10415;
+  type = OctetString;
+  must = true;
+  may_encrypt = false;
+}
+
+avp Specific-APN-Info {
+  code = 1472;
+  vendor_id = 10415;
+  type = Grouped;
+  must = true;
+  may_encrypt = false;
+}
+
+avp LCS-Info {
+  code = 1473;
+  vendor_id = 10415;
+  type = Grouped;
+  must = true;
+  may_encrypt = false;
+}
+
+avp GMLC-Number {
+  code = 1474;
+  vendor_id = 10415;
+  type = OctetString;
+  must = true;
+  may_encrypt = false;
+}
+
+avp LCS-PrivacyException {
+  code = 1475;
+  vendor_id = 10415;
+  type = Grouped;
+  must = true;
+  may_encrypt = false;
+}
+
+avp SS-Code {
+  code = 1476;
+  vendor_id = 10415;
+  type = OctetString;
+  must = true;
+  may_encrypt = false;
+}
+
+avp SS-Status {
+  code = 1477;
+  vendor_id = 10415;
+  type = OctetString;
+  must = true;
+  may_encrypt = false;
+}
+
+avp Notification-To-UE-User {
+  code = 1478;
+  vendor_id = 10415;
+  type = Enumerated;
+  must = true;
+  may_encrypt = false;
+}
+
+avp External-Client {
+  code = 1479;
+  vendor_id = 10415;
+  type = Grouped;
+  must = true;
+  may_encrypt = false;
+}
+
+avp Client-Identity {
+  code = 1480;
+  vendor_id = 10415;
+  type = OctetString;
+  must = true;
+  may_encrypt = false;
+}
+
+avp GMLC-Restriction {
+  code = 1481;
+  vendor_id = 10415;
+  type = Enumerated;
+  must = true;
+  may_encrypt = false;
+}
+
+avp PLMN-Client {
+  code = 1482;
+  vendor_id = 10415;
+  type = Enumerated;
+  must = true;
+  may_encrypt = false;
+}
+
+avp Service-Type {
+  code = 1483;
+  vendor_id = 10415;
+  type = Grouped;
+  must = true;
+  may_encrypt = false;
+}
+
+avp ServiceTypeIdentity {
+  code = 1484;
+  vendor_id = 10415;
+  type = Unsigned32;
+  must = true;
+  may_encrypt = false;
+}
+
+avp MO-LR {
+  code = 1485;
+  vendor_id = 10415;
+  type = Grouped;
+  must = true;
+  may_encrypt = false;
+}
+
+avp Teleservice-List {
+  code = 1486;
+  vendor_id = 10415;
+  type = Grouped;
+  must = true;
+  may_encrypt = false;
+}
+
+avp TS-Code {
+  code = 1487;
+  vendor_id = 10415;
+  type = OctetString;
+  must = true;
+  may_encrypt = false;
+}
+
+avp Call-Barring-Info {
+  code = 1488;
+  vendor_id = 10415;
+  type = Grouped;
+  must = true;
+  may_encrypt = false;
+}
+
+avp SGSN-Number {
+  code = 1489;
+  vendor_id = 10415;
+  type = OctetString;
+  must = true;
+  may_encrypt = false;
+}
+
+avp IDR-Flags {
+  code = 1490;
+  vendor_id = 10415;
+  type = Unsigned32;
+  must = true;
+  may_encrypt = false;
+}
+
+avp ICS-Indicator {
+  code = 1491;
+  vendor_id = 10415;
+  type = Enumerated;
+  must = true;
+  may_encrypt = false;
+}
+
+avp IMS-Voice-Over-PS-Sessions-Supported {
+  code = 1492;
+  vendor_id = 10415;
+  type = Enumerated;
+  must = true;
+  may_encrypt = false;
+  // 0: NOT_SUPPORTED
+  // 1: SUPPORTED
+}
+
+avp Homogeneous-Support-of-IMS-Voice-Over-PS-Sessions {
+  code = 1493;
+  vendor_id = 10415;
+  type = Enumerated;
+  must = true;
+  may_encrypt = false;
+  // 0: NOT_SUPPORTED
+  // 1: SUPPORTED
+}
+
+avp Last-UE-Activity-Time {
+  code = 1494;
+  vendor_id = 10415;
+  type = Time;
+  must = true;
+  may_encrypt = false;
+}
+
+avp EPS-User-State {
+  code = 1495;
+  vendor_id = 10415;
+  type = Grouped;
+  must = true;
+  may_encrypt = false;
+}
+
+avp EPS-Location-Information {
+  code = 1496;
+  vendor_id = 10415;
+  type = Grouped;
+  must = true;
+  may_encrypt = false;
+}
+
+avp MME-User-State {
+  code = 1497;
+  vendor_id = 10415;
+  type = Grouped;
+  must = true;
+  may_encrypt = false;
+}
+
+avp SGSN-User-State {
+  code = 1498;
+  vendor_id = 10415;
+  type = Grouped;
+  must = true;
+  may_encrypt = false;
+}
+
+avp User-State {
+  code = 1499;
+  vendor_id = 10415;
+  type = Enumerated;
+  must = true;
+  may_encrypt = false;
+}
+
+avp MME-Location-Information {
+  code = 1600;
+  vendor_id = 10415;
+  type = Grouped;
+  must = true;
+  may_encrypt = false;
+}
+
+avp SGSN-Location-Information {
+  code = 1601;
+  vendor_id = 10415;
+  type = Grouped;
+  must = true;
+  may_encrypt = false;
+}
+
+avp E-UTRAN-Cell-Global-Identity {
+  code = 1602;
+  vendor_id = 10415;
+  type = OctetString;
+  must = true;
+  may_encrypt = false;
+}
+
+avp Tracking-Area-Identity {
+  code = 1603;
+  vendor_id = 10415;
+  type = OctetString;
+  must = true;
+  may_encrypt = false;
+}
+
+avp Cell-Global-Identity {
+  code = 1604;
+  vendor_id = 10415;
+  type = OctetString;
+  must = true;
+  may_encrypt = false;
+}
+
+avp Routing-Area-Identity {
+  code = 1605;
+  vendor_id = 10415;
+  type = OctetString;
+  must = true;
+  may_encrypt = false;
+}
+
+avp Location-Area-Identity {
+  code = 1606;
+  vendor_id = 10415;
+  type = OctetString;
+  must = true;
+  may_encrypt = false;
+}
+
+avp Service-Area-Identity {
+  code = 1607;
+  vendor_id = 10415;
+  type = OctetString;
+  must = true;
+  may_encrypt = false;
+}
+
+avp Geographical-Information {
+  code = 1608;
+  vendor_id = 10415;
+  type = OctetString;
+  must = true;
+  may_encrypt = false;
+}
+
+avp Geodetic-Information {
+  code = 1609;
+  vendor_id = 10415;
+  type = OctetString;
+  must = true;
+  may_encrypt = false;
+}
+
+avp Current-Location-Retrieved {
+  code = 1610;
+  vendor_id = 10415;
+  type = Enumerated;
+  must = true;
+  may_encrypt = false;
+}
+
+avp Age-Of-Location-Information {
+  code = 1611;
+  vendor_id = 10415;
+  type = Unsigned32;
+  must = true;
+  may_encrypt = false;
+}
+
+avp Active-APN {
+  code = 1612;
+  vendor_id = 10415;
+  type = Grouped;
+  must = true;
+  may_encrypt = false;
+}
+
+avp Error-Diagnostic {
+  code = 1614;
+  vendor_id = 10415;
+  type = Enumerated;
+  must = false;
+  may_encrypt = false;
+}
+
+avp UE-SRVCC-Capability {
+  code = 1615;
+  vendor_id = 10415;
+  type = Enumerated;
+  must = true;
+  may_encrypt = false;
+  // 0: UE-SRVCC-NOT-SUPPORTED
+  // 1: UE-SRVCC-SUPPORTED
+}
+
+avp MPS-Priority {
+  code = 1616;
+  vendor_id = 10415;
+  type = Unsigned32;
+  must = true;
+  may_encrypt = false;
+}
+
+avp VPLMN-LIPA-Allowed {
+  code = 1617;
+  vendor_id = 10415;
+  type = Enumerated;
+  must = true;
+  may_encrypt = false;
+}
+
+avp LIPA-Permission {
+  code = 1618;
+  vendor_id = 10415;
+  type = Enumerated;
+  must = true;
+  may_encrypt = false;
+}
+
+avp Subscribed-Periodic-RAU-TAU-Timer {
+  code = 1619;
+  vendor_id = 10415;
+  type = Unsigned32;
+  must = true;
+  may_encrypt = false;
+}
+
+avp Ext-PDP-Type {
+  code = 1620;
+  vendor_id = 10415;
+  type = OctetString;
+  must = true;
+  may_encrypt = false;
+}
+
+avp PUR-Flags {
+  code = 1635;
+  vendor_id = 10415;
+  type = Unsigned32;
+  must = false;
+  may_encrypt = false;
+}
+
+avp GMLC-Address {
+  code = 2405;
+  vendor_id = 10415;
+  type = Address;
+  must = true;
+  may_encrypt = false;
+}
+
+avp MME-Number-for-MT-SMS {
+  code = 1645;
+  vendor_id = 10415;
+  type = OctetString;
+  must = false;
+  may_encrypt = false;
+}
+
+avp SMS-Register-Request {
+  code = 1648;
+  vendor_id = 10415;
+  type = Enumerated;
+  must = false;
+  may_encrypt = false;
+}
+
+avp Local-Time-Zone {
+  code = 1649;
+  vendor_id = 10415;
+  type = Grouped;
+  must = false;
+  may_encrypt = false;
+}
+
+avp Reset-ID {
+  code = 1670;
+  vendor_id = 10415;
+  type = OctetString;
+  must = false;
+  may_encrypt = false;
+}
+
+avp RAT-Type {
+  code = 1032;
+  vendor_id = 10415;
+  type = Enumerated;
+  must = true;
+  may_encrypt = false;
+  // 0: WLAN
+  // 1: VIRTUAL
+  // 1000: UTRAN
+  // 1001: GERAN
+  // 1002: GAN
+  // 1003: HSPA_EVOLUTION
+  // 1004: EUTRAN
+  // 1005: EUTRAN_NB_IoT
+  // 2000: CDMA2000_1X
+  // 2001: HRPD
+  // 2002: UMB
+  // 2003: EHRPD
+}
+
+avp MIP6-Agent-Info {
+  code = 486;
+  type = Grouped;
+  must = true;
+  may_encrypt = false;
+}
+
+avp Equivalent-PLMN-List {
+  code = 1637;
+  vendor_id = 10415;
+  type = Grouped;
+  must = false;
+  may_encrypt = false;
+}
+
+// --- Common AVPs from RFC 6733 / 3GPP TS 29.229 ---
+
+avp Supported-Features {
+  code = 628;
+  vendor_id = 10415;
+  type = Grouped;
+  must = false;
+  may_encrypt = false;
+}
+
+avp Feature-List-ID {
+  code = 629;
+  vendor_id = 10415;
+  type = Unsigned32;
+  must = false;
+  may_encrypt = false;
+}
+
+avp Feature-List {
+  code = 630;
+  vendor_id = 10415;
+  type = Unsigned32;
+  must = false;
+  may_encrypt = false;
+}
+
+avp DRMP {
+  code = 301;
+  type = Enumerated;
+  must = false;
+  may_encrypt = false;
+}
+
+avp OC-Supported-Features {
+  code = 621;
+  type = Grouped;
+  must = false;
+  may_encrypt = false;
+}
+
+avp OC-OLR {
+  code = 623;
+  type = Grouped;
+  must = false;
+  may_encrypt = false;
+}
+
+avp Load {
+  code = 650;
+  type = Grouped;
+  must = false;
+  may_encrypt = false;
+}
+
+avp Experimental-Result {
+  code = 297;
+  type = Grouped;
+  must = true;
+  may_encrypt = false;
+}
+
+avp Experimental-Result-Code {
+  code = 298;
+  type = Unsigned32;
+  must = true;
+  may_encrypt = false;
+}
+
+avp Service-Selection {
+  code = 493;
+  type = UTF8String;
+  must = true;
+  may_encrypt = false;
+}
+
+avp Visited-Network-Identifier {
+  code = 600;
+  vendor_id = 10415;
+  type = OctetString;
+  must = true;
+  may_encrypt = false;
+}
+
+// ============================================================================
+// Command Definitions
+// ============================================================================
+
+// Update-Location-Request (ULR) - Code 316
+// Direction: MME/SGSN -> HSS
+command Update-Location-Request {
+  code = 316;
+  application_id = 16777251;
+  request = true;
+  proxiable = true;
+
+  fixed required Session-Id session_id = 1;
+  optional DRMP drmp = 2;
+  optional Vendor-Specific-Application-Id vendor_specific_application_id = 3;
+  fixed required Auth-Session-State auth_session_state = 4;
+  fixed required Origin-Host origin_host = 5;
+  fixed required Origin-Realm origin_realm = 6;
+  optional Destination-Host destination_host = 7;
+  fixed required Destination-Realm destination_realm = 8;
+  fixed required User-Name user_name = 9;  // IMSI
+  optional OC-Supported-Features oc_supported_features = 10;
+  repeated optional Supported-Features supported_features = 11;
+  optional Terminal-Information terminal_information = 12;
+  fixed required RAT-Type rat_type = 13;
+  fixed required ULR-Flags ulr_flags = 14;
+  optional UE-SRVCC-Capability ue_srvcc_capability = 15;
+  fixed required Visited-PLMN-Id visited_plmn_id = 16;
+  optional SGSN-Number sgsn_number = 17;
+  optional Homogeneous-Support-of-IMS-Voice-Over-PS-Sessions homogeneous_support_ims_voice = 18;
+  optional GMLC-Address gmlc_address = 19;
+  repeated optional Active-APN active_apn = 20;
+  optional Equivalent-PLMN-List equivalent_plmn_list = 21;
+  optional MME-Number-for-MT-SMS mme_number_for_mt_sms = 22;
+  optional SMS-Register-Request sms_register_request = 23;
+  repeated optional Proxy-Info proxy_info = 100;
+  repeated optional Route-Record route_record = 101;
+}
+
+// Update-Location-Answer (ULA) - Code 316
+// Direction: HSS -> MME/SGSN
+command Update-Location-Answer {
+  code = 316;
+  application_id = 16777251;
+  request = false;
+  proxiable = true;
+
+  fixed required Session-Id session_id = 1;
+  optional DRMP drmp = 2;
+  optional Vendor-Specific-Application-Id vendor_specific_application_id = 3;
+  optional Result-Code result_code = 4;
+  optional Experimental-Result experimental_result = 5;
+  optional Error-Diagnostic error_diagnostic = 6;
+  fixed required Auth-Session-State auth_session_state = 7;
+  fixed required Origin-Host origin_host = 8;
+  fixed required Origin-Realm origin_realm = 9;
+  optional OC-Supported-Features oc_supported_features = 10;
+  optional OC-OLR oc_olr = 11;
+  repeated optional Load load = 12;
+  repeated optional Supported-Features supported_features = 13;
+  optional ULA-Flags ula_flags = 14;
+  optional Subscription-Data subscription_data = 15;
+  repeated optional Reset-ID reset_id = 16;
+  optional Failed-AVP failed_avp = 17;
+  repeated optional Proxy-Info proxy_info = 100;
+  repeated optional Route-Record route_record = 101;
+}
+
+// Authentication-Information-Request (AIR) - Code 318
+// Direction: MME/SGSN -> HSS
+command Authentication-Information-Request {
+  code = 318;
+  application_id = 16777251;
+  request = true;
+  proxiable = true;
+
+  fixed required Session-Id session_id = 1;
+  optional DRMP drmp = 2;
+  optional Vendor-Specific-Application-Id vendor_specific_application_id = 3;
+  fixed required Auth-Session-State auth_session_state = 4;
+  fixed required Origin-Host origin_host = 5;
+  fixed required Origin-Realm origin_realm = 6;
+  optional Destination-Host destination_host = 7;
+  fixed required Destination-Realm destination_realm = 8;
+  fixed required User-Name user_name = 9;  // IMSI
+  optional OC-Supported-Features oc_supported_features = 10;
+  repeated optional Supported-Features supported_features = 11;
+  optional Requested-EUTRAN-Authentication-Info requested_eutran_auth_info = 12;
+  optional Requested-UTRAN-GERAN-Authentication-Info requested_utran_geran_auth_info = 13;
+  fixed required Visited-PLMN-Id visited_plmn_id = 14;
+  optional AIR-Flags air_flags = 15;
+  repeated optional Proxy-Info proxy_info = 100;
+  repeated optional Route-Record route_record = 101;
+}
+
+// Authentication-Information-Answer (AIA) - Code 318
+// Direction: HSS -> MME/SGSN
+command Authentication-Information-Answer {
+  code = 318;
+  application_id = 16777251;
+  request = false;
+  proxiable = true;
+
+  fixed required Session-Id session_id = 1;
+  optional DRMP drmp = 2;
+  optional Vendor-Specific-Application-Id vendor_specific_application_id = 3;
+  optional Result-Code result_code = 4;
+  optional Experimental-Result experimental_result = 5;
+  optional Error-Diagnostic error_diagnostic = 6;
+  fixed required Auth-Session-State auth_session_state = 7;
+  fixed required Origin-Host origin_host = 8;
+  fixed required Origin-Realm origin_realm = 9;
+  optional OC-Supported-Features oc_supported_features = 10;
+  optional OC-OLR oc_olr = 11;
+  repeated optional Load load = 12;
+  repeated optional Supported-Features supported_features = 13;
+  optional Authentication-Info authentication_info = 14;
+  optional UE-Usage-Type ue_usage_type = 15;
+  optional Failed-AVP failed_avp = 16;
+  repeated optional Proxy-Info proxy_info = 100;
+  repeated optional Route-Record route_record = 101;
+}
+
+// Cancel-Location-Request (CLR) - Code 317
+// Direction: HSS -> MME/SGSN
+command Cancel-Location-Request {
+  code = 317;
+  application_id = 16777251;
+  request = true;
+  proxiable = true;
+
+  fixed required Session-Id session_id = 1;
+  optional DRMP drmp = 2;
+  optional Vendor-Specific-Application-Id vendor_specific_application_id = 3;
+  fixed required Auth-Session-State auth_session_state = 4;
+  fixed required Origin-Host origin_host = 5;
+  fixed required Origin-Realm origin_realm = 6;
+  fixed required Destination-Host destination_host = 7;
+  fixed required Destination-Realm destination_realm = 8;
+  fixed required User-Name user_name = 9;  // IMSI
+  repeated optional Supported-Features supported_features = 10;
+  fixed required Cancellation-Type cancellation_type = 11;
+  optional CLR-Flags clr_flags = 12;
+  repeated optional Proxy-Info proxy_info = 100;
+  repeated optional Route-Record route_record = 101;
+}
+
+// Cancel-Location-Answer (CLA) - Code 317
+// Direction: MME/SGSN -> HSS
+command Cancel-Location-Answer {
+  code = 317;
+  application_id = 16777251;
+  request = false;
+  proxiable = true;
+
+  fixed required Session-Id session_id = 1;
+  optional DRMP drmp = 2;
+  optional Vendor-Specific-Application-Id vendor_specific_application_id = 3;
+  repeated optional Supported-Features supported_features = 4;
+  optional Result-Code result_code = 5;
+  optional Experimental-Result experimental_result = 6;
+  fixed required Auth-Session-State auth_session_state = 7;
+  fixed required Origin-Host origin_host = 8;
+  fixed required Origin-Realm origin_realm = 9;
+  optional Failed-AVP failed_avp = 10;
+  repeated optional Proxy-Info proxy_info = 100;
+  repeated optional Route-Record route_record = 101;
+}
+
+// Insert-Subscriber-Data-Request (IDR) - Code 319
+// Direction: HSS -> MME/SGSN
+command Insert-Subscriber-Data-Request {
+  code = 319;
+  application_id = 16777251;
+  request = true;
+  proxiable = true;
+
+  fixed required Session-Id session_id = 1;
+  optional DRMP drmp = 2;
+  optional Vendor-Specific-Application-Id vendor_specific_application_id = 3;
+  fixed required Auth-Session-State auth_session_state = 4;
+  fixed required Origin-Host origin_host = 5;
+  fixed required Origin-Realm origin_realm = 6;
+  fixed required Destination-Host destination_host = 7;
+  fixed required Destination-Realm destination_realm = 8;
+  fixed required User-Name user_name = 9;  // IMSI
+  repeated optional Supported-Features supported_features = 10;
+  fixed required Subscription-Data subscription_data = 11;
+  optional IDR-Flags idr_flags = 12;
+  repeated optional Reset-ID reset_id = 13;
+  repeated optional Proxy-Info proxy_info = 100;
+  repeated optional Route-Record route_record = 101;
+}
+
+// Insert-Subscriber-Data-Answer (IDA) - Code 319
+// Direction: MME/SGSN -> HSS
+command Insert-Subscriber-Data-Answer {
+  code = 319;
+  application_id = 16777251;
+  request = false;
+  proxiable = true;
+
+  fixed required Session-Id session_id = 1;
+  optional DRMP drmp = 2;
+  optional Vendor-Specific-Application-Id vendor_specific_application_id = 3;
+  repeated optional Supported-Features supported_features = 4;
+  optional Result-Code result_code = 5;
+  optional Experimental-Result experimental_result = 6;
+  fixed required Auth-Session-State auth_session_state = 7;
+  fixed required Origin-Host origin_host = 8;
+  fixed required Origin-Realm origin_realm = 9;
+  optional IMS-Voice-Over-PS-Sessions-Supported ims_voice_over_ps_supported = 10;
+  optional Last-UE-Activity-Time last_ue_activity_time = 11;
+  optional RAT-Type rat_type = 12;
+  optional IDA-Flags ida_flags = 13;
+  optional EPS-User-State eps_user_state = 14;
+  optional EPS-Location-Information eps_location_information = 15;
+  optional Local-Time-Zone local_time_zone = 16;
+  optional Failed-AVP failed_avp = 17;
+  repeated optional Proxy-Info proxy_info = 100;
+  repeated optional Route-Record route_record = 101;
+}
+
+// Delete-Subscriber-Data-Request (DSR) - Code 320
+// Direction: HSS -> MME/SGSN
+command Delete-Subscriber-Data-Request {
+  code = 320;
+  application_id = 16777251;
+  request = true;
+  proxiable = true;
+
+  fixed required Session-Id session_id = 1;
+  optional DRMP drmp = 2;
+  optional Vendor-Specific-Application-Id vendor_specific_application_id = 3;
+  fixed required Auth-Session-State auth_session_state = 4;
+  fixed required Origin-Host origin_host = 5;
+  fixed required Origin-Realm origin_realm = 6;
+  fixed required Destination-Host destination_host = 7;
+  fixed required Destination-Realm destination_realm = 8;
+  fixed required User-Name user_name = 9;  // IMSI
+  repeated optional Supported-Features supported_features = 10;
+  fixed required DSR-Flags dsr_flags = 11;
+  repeated optional Context-Identifier context_identifier = 12;
+  optional Trace-Reference trace_reference = 13;
+  repeated optional TS-Code ts_code = 14;
+  repeated optional SS-Code ss_code = 15;
+  repeated optional Proxy-Info proxy_info = 100;
+  repeated optional Route-Record route_record = 101;
+}
+
+// Delete-Subscriber-Data-Answer (DSA) - Code 320
+// Direction: MME/SGSN -> HSS
+command Delete-Subscriber-Data-Answer {
+  code = 320;
+  application_id = 16777251;
+  request = false;
+  proxiable = true;
+
+  fixed required Session-Id session_id = 1;
+  optional DRMP drmp = 2;
+  optional Vendor-Specific-Application-Id vendor_specific_application_id = 3;
+  repeated optional Supported-Features supported_features = 4;
+  optional Result-Code result_code = 5;
+  optional Experimental-Result experimental_result = 6;
+  fixed required Auth-Session-State auth_session_state = 7;
+  fixed required Origin-Host origin_host = 8;
+  fixed required Origin-Realm origin_realm = 9;
+  optional DSA-Flags dsa_flags = 10;
+  optional Failed-AVP failed_avp = 11;
+  repeated optional Proxy-Info proxy_info = 100;
+  repeated optional Route-Record route_record = 101;
+}
+
+// Purge-UE-Request (PUR) - Code 321
+// Direction: MME/SGSN -> HSS
+command Purge-UE-Request {
+  code = 321;
+  application_id = 16777251;
+  request = true;
+  proxiable = true;
+
+  fixed required Session-Id session_id = 1;
+  optional DRMP drmp = 2;
+  optional Vendor-Specific-Application-Id vendor_specific_application_id = 3;
+  fixed required Auth-Session-State auth_session_state = 4;
+  fixed required Origin-Host origin_host = 5;
+  fixed required Origin-Realm origin_realm = 6;
+  optional Destination-Host destination_host = 7;
+  fixed required Destination-Realm destination_realm = 8;
+  fixed required User-Name user_name = 9;  // IMSI
+  optional OC-Supported-Features oc_supported_features = 10;
+  optional PUR-Flags pur_flags = 11;
+  repeated optional Supported-Features supported_features = 12;
+  optional EPS-Location-Information eps_location_information = 13;
+  repeated optional Proxy-Info proxy_info = 100;
+  repeated optional Route-Record route_record = 101;
+}
+
+// Purge-UE-Answer (PUA) - Code 321
+// Direction: HSS -> MME/SGSN
+command Purge-UE-Answer {
+  code = 321;
+  application_id = 16777251;
+  request = false;
+  proxiable = true;
+
+  fixed required Session-Id session_id = 1;
+  optional DRMP drmp = 2;
+  optional Vendor-Specific-Application-Id vendor_specific_application_id = 3;
+  repeated optional Supported-Features supported_features = 4;
+  optional Result-Code result_code = 5;
+  optional Experimental-Result experimental_result = 6;
+  fixed required Auth-Session-State auth_session_state = 7;
+  fixed required Origin-Host origin_host = 8;
+  fixed required Origin-Realm origin_realm = 9;
+  optional OC-Supported-Features oc_supported_features = 10;
+  optional OC-OLR oc_olr = 11;
+  repeated optional Load load = 12;
+  optional PUA-Flags pua_flags = 13;
+  optional Failed-AVP failed_avp = 14;
+  repeated optional Proxy-Info proxy_info = 100;
+  repeated optional Route-Record route_record = 101;
+}
+
+// Reset-Request (RSR) - Code 322
+// Direction: HSS -> MME/SGSN
+command Reset-Request {
+  code = 322;
+  application_id = 16777251;
+  request = true;
+  proxiable = true;
+
+  fixed required Session-Id session_id = 1;
+  optional DRMP drmp = 2;
+  optional Vendor-Specific-Application-Id vendor_specific_application_id = 3;
+  fixed required Auth-Session-State auth_session_state = 4;
+  fixed required Origin-Host origin_host = 5;
+  fixed required Origin-Realm origin_realm = 6;
+  fixed required Destination-Host destination_host = 7;
+  fixed required Destination-Realm destination_realm = 8;
+  repeated optional Supported-Features supported_features = 9;
+  repeated optional User-Id user_id = 10;
+  repeated optional Reset-ID reset_id = 11;
+  optional Subscription-Data subscription_data = 12;
+  repeated optional Proxy-Info proxy_info = 100;
+  repeated optional Route-Record route_record = 101;
+}
+
+// Reset-Answer (RSA) - Code 322
+// Direction: MME/SGSN -> HSS
+command Reset-Answer {
+  code = 322;
+  application_id = 16777251;
+  request = false;
+  proxiable = true;
+
+  fixed required Session-Id session_id = 1;
+  optional DRMP drmp = 2;
+  optional Vendor-Specific-Application-Id vendor_specific_application_id = 3;
+  repeated optional Supported-Features supported_features = 4;
+  optional Result-Code result_code = 5;
+  optional Experimental-Result experimental_result = 6;
+  fixed required Auth-Session-State auth_session_state = 7;
+  fixed required Origin-Host origin_host = 8;
+  fixed required Origin-Realm origin_realm = 9;
+  optional Failed-AVP failed_avp = 10;
+  repeated optional Proxy-Info proxy_info = 100;
+  repeated optional Route-Record route_record = 101;
+}
+
+// Notify-Request (NOR) - Code 323
+// Direction: MME/SGSN -> HSS
+command Notify-Request {
+  code = 323;
+  application_id = 16777251;
+  request = true;
+  proxiable = true;
+
+  fixed required Session-Id session_id = 1;
+  optional Vendor-Specific-Application-Id vendor_specific_application_id = 2;
+  optional DRMP drmp = 3;
+  fixed required Auth-Session-State auth_session_state = 4;
+  fixed required Origin-Host origin_host = 5;
+  fixed required Origin-Realm origin_realm = 6;
+  optional Destination-Host destination_host = 7;
+  fixed required Destination-Realm destination_realm = 8;
+  fixed required User-Name user_name = 9;  // IMSI
+  optional OC-Supported-Features oc_supported_features = 10;
+  repeated optional Supported-Features supported_features = 11;
+  optional Terminal-Information terminal_information = 12;
+  optional MIP6-Agent-Info mip6_agent_info = 13;
+  optional Visited-Network-Identifier visited_network_identifier = 14;
+  optional Context-Identifier context_identifier = 15;
+  optional Service-Selection service_selection = 16;
+  optional Alert-Reason alert_reason = 17;
+  optional UE-SRVCC-Capability ue_srvcc_capability = 18;
+  optional NOR-Flags nor_flags = 19;
+  optional Homogeneous-Support-of-IMS-Voice-Over-PS-Sessions homogeneous_support_ims_voice = 20;
+  repeated optional Proxy-Info proxy_info = 100;
+  repeated optional Route-Record route_record = 101;
+}
+
+// Notify-Answer (NOA) - Code 323
+// Direction: HSS -> MME/SGSN
+command Notify-Answer {
+  code = 323;
+  application_id = 16777251;
+  request = false;
+  proxiable = true;
+
+  fixed required Session-Id session_id = 1;
+  optional DRMP drmp = 2;
+  optional Vendor-Specific-Application-Id vendor_specific_application_id = 3;
+  optional Result-Code result_code = 4;
+  optional Experimental-Result experimental_result = 5;
+  fixed required Auth-Session-State auth_session_state = 6;
+  fixed required Origin-Host origin_host = 7;
+  fixed required Origin-Realm origin_realm = 8;
+  optional OC-Supported-Features oc_supported_features = 9;
+  optional OC-OLR oc_olr = 10;
+  repeated optional Load load = 11;
+  repeated optional Supported-Features supported_features = 12;
+  optional Failed-AVP failed_avp = 13;
+  repeated optional Proxy-Info proxy_info = 100;
+  repeated optional Route-Record route_record = 101;
+}
