@@ -1,0 +1,422 @@
+// Diameter Protocol Definition
+// This file defines the schema for Diameter base protocol commands
+// Similar to protobuf, this will be used to generate Go code
+
+syntax = "diameter1";
+
+package diameter.base;
+
+option go_package = "github.com/hsdfat8/diam-gw/commands/base";
+
+// AVP Definitions
+avp Origin-Host {
+  code = 264;
+  type = DiameterIdentity;
+  must = true;
+  may_encrypt = false;
+}
+
+avp Origin-Realm {
+  code = 296;
+  type = DiameterIdentity;
+  must = true;
+  may_encrypt = false;
+}
+
+avp Host-IP-Address {
+  code = 257;
+  type = Address;
+  must = true;
+  may_encrypt = false;
+}
+
+avp Vendor-Id {
+  code = 266;
+  type = Unsigned32;
+  must = true;
+  may_encrypt = false;
+}
+
+avp Product-Name {
+  code = 269;
+  type = UTF8String;
+  must = false;
+  may_encrypt = false;
+}
+
+avp Origin-State-Id {
+  code = 278;
+  type = Unsigned32;
+  must = false;
+  may_encrypt = false;
+}
+
+avp Supported-Vendor-Id {
+  code = 265;
+  type = Unsigned32;
+  must = false;
+  may_encrypt = false;
+}
+
+avp Auth-Application-Id {
+  code = 258;
+  type = Unsigned32;
+  must = false;
+  may_encrypt = false;
+}
+
+avp Inband-Security-Id {
+  code = 299;
+  type = Unsigned32;
+  must = false;
+  may_encrypt = false;
+}
+
+avp Acct-Application-Id {
+  code = 259;
+  type = Unsigned32;
+  must = false;
+  may_encrypt = false;
+}
+
+avp Vendor-Specific-Application-Id {
+  code = 260;
+  type = Grouped;
+  must = false;
+  may_encrypt = false;
+}
+
+avp Firmware-Revision {
+  code = 267;
+  type = Unsigned32;
+  must = false;
+  may_encrypt = false;
+}
+
+avp Result-Code {
+  code = 268;
+  type = Unsigned32;
+  must = true;
+  may_encrypt = false;
+}
+
+avp Error-Message {
+  code = 281;
+  type = UTF8String;
+  must = false;
+  may_encrypt = false;
+}
+
+avp Failed-AVP {
+  code = 279;
+  type = Grouped;
+  must = false;
+  may_encrypt = false;
+}
+
+avp Session-Id {
+  code = 263;
+  type = UTF8String;
+  must = true;
+  may_encrypt = false;
+}
+
+avp Destination-Realm {
+  code = 283;
+  type = DiameterIdentity;
+  must = true;
+  may_encrypt = false;
+}
+
+avp Destination-Host {
+  code = 293;
+  type = DiameterIdentity;
+  must = false;
+  may_encrypt = false;
+}
+
+avp Disconnect-Cause {
+  code = 273;
+  type = Enumerated;
+  must = true;
+  may_encrypt = false;
+}
+
+avp Re-Auth-Request-Type {
+  code = 285;
+  type = Enumerated;
+  must = true;
+  may_encrypt = false;
+}
+
+avp User-Name {
+  code = 1;
+  type = UTF8String;
+  must = false;
+  may_encrypt = true;
+}
+
+avp Termination-Cause {
+  code = 295;
+  type = Enumerated;
+  must = true;
+  may_encrypt = false;
+}
+
+avp Accounting-Record-Type {
+  code = 480;
+  type = Enumerated;
+  must = true;
+  may_encrypt = false;
+}
+
+avp Accounting-Record-Number {
+  code = 485;
+  type = Unsigned32;
+  must = true;
+  may_encrypt = false;
+}
+
+// Command Definitions
+
+// Capabilities-Exchange-Request (CER)
+command Capabilities-Exchange-Request {
+  code = 257;
+  application_id = 0;
+  request = true;
+  proxiable = false;
+
+  // Fixed required AVPs
+  fixed required Origin-Host origin_host = 1;
+  fixed required Origin-Realm origin_realm = 2;
+
+  // Required AVPs (at least one)
+  repeated required Host-IP-Address host_ip_address = 3;
+
+  fixed required Vendor-Id vendor_id = 4;
+  fixed required Product-Name product_name = 5;
+
+  // Optional AVPs
+  optional Origin-State-Id origin_state_id = 6;
+  repeated optional Supported-Vendor-Id supported_vendor_id = 7;
+  repeated optional Auth-Application-Id auth_application_id = 8;
+  repeated optional Inband-Security-Id inband_security_id = 9;
+  repeated optional Acct-Application-Id acct_application_id = 10;
+  repeated optional Vendor-Specific-Application-Id vendor_specific_application_id = 11;
+  optional Firmware-Revision firmware_revision = 12;
+}
+
+// Capabilities-Exchange-Answer (CEA)
+command Capabilities-Exchange-Answer {
+  code = 257;
+  application_id = 0;
+  request = false;
+  proxiable = false;
+
+  fixed required Result-Code result_code = 1;
+  fixed required Origin-Host origin_host = 2;
+  fixed required Origin-Realm origin_realm = 3;
+  repeated required Host-IP-Address host_ip_address = 4;
+  fixed required Vendor-Id vendor_id = 5;
+  fixed required Product-Name product_name = 6;
+
+  optional Origin-State-Id origin_state_id = 7;
+  optional Error-Message error_message = 8;
+  optional Failed-AVP failed_avp = 9;
+  repeated optional Supported-Vendor-Id supported_vendor_id = 10;
+  repeated optional Auth-Application-Id auth_application_id = 11;
+  repeated optional Inband-Security-Id inband_security_id = 12;
+  repeated optional Acct-Application-Id acct_application_id = 13;
+  repeated optional Vendor-Specific-Application-Id vendor_specific_application_id = 14;
+  optional Firmware-Revision firmware_revision = 15;
+}
+
+// Device-Watchdog-Request (DWR)
+command Device-Watchdog-Request {
+  code = 280;
+  application_id = 0;
+  request = true;
+  proxiable = false;
+
+  fixed required Origin-Host origin_host = 1;
+  fixed required Origin-Realm origin_realm = 2;
+  optional Origin-State-Id origin_state_id = 3;
+}
+
+// Device-Watchdog-Answer (DWA)
+command Device-Watchdog-Answer {
+  code = 280;
+  application_id = 0;
+  request = false;
+  proxiable = false;
+
+  fixed required Result-Code result_code = 1;
+  fixed required Origin-Host origin_host = 2;
+  fixed required Origin-Realm origin_realm = 3;
+  optional Error-Message error_message = 4;
+  optional Failed-AVP failed_avp = 5;
+  optional Origin-State-Id origin_state_id = 6;
+}
+
+// Disconnect-Peer-Request (DPR)
+command Disconnect-Peer-Request {
+  code = 282;
+  application_id = 0;
+  request = true;
+  proxiable = false;
+
+  fixed required Origin-Host origin_host = 1;
+  fixed required Origin-Realm origin_realm = 2;
+  fixed required Disconnect-Cause disconnect_cause = 3;
+}
+
+// Disconnect-Peer-Answer (DPA)
+command Disconnect-Peer-Answer {
+  code = 282;
+  application_id = 0;
+  request = false;
+  proxiable = false;
+
+  fixed required Result-Code result_code = 1;
+  fixed required Origin-Host origin_host = 2;
+  fixed required Origin-Realm origin_realm = 3;
+  optional Error-Message error_message = 4;
+  optional Failed-AVP failed_avp = 5;
+}
+
+// Re-Auth-Request (RAR)
+command Re-Auth-Request {
+  code = 258;
+  application_id = 0;
+  request = true;
+  proxiable = true;
+
+  fixed required Session-Id session_id = 1;
+  fixed required Origin-Host origin_host = 2;
+  fixed required Origin-Realm origin_realm = 3;
+  fixed required Destination-Realm destination_realm = 4;
+  fixed required Destination-Host destination_host = 5;
+  fixed required Auth-Application-Id auth_application_id = 6;
+  fixed required Re-Auth-Request-Type re_auth_request_type = 7;
+  optional User-Name user_name = 8;
+  optional Origin-State-Id origin_state_id = 9;
+}
+
+// Re-Auth-Answer (RAA)
+command Re-Auth-Answer {
+  code = 258;
+  application_id = 0;
+  request = false;
+  proxiable = true;
+
+  fixed required Session-Id session_id = 1;
+  fixed required Result-Code result_code = 2;
+  fixed required Origin-Host origin_host = 3;
+  fixed required Origin-Realm origin_realm = 4;
+  optional User-Name user_name = 5;
+  optional Origin-State-Id origin_state_id = 6;
+  optional Error-Message error_message = 7;
+  optional Failed-AVP failed_avp = 8;
+}
+
+// Session-Termination-Request (STR)
+command Session-Termination-Request {
+  code = 275;
+  application_id = 0;
+  request = true;
+  proxiable = true;
+
+  fixed required Session-Id session_id = 1;
+  fixed required Origin-Host origin_host = 2;
+  fixed required Origin-Realm origin_realm = 3;
+  fixed required Destination-Realm destination_realm = 4;
+  fixed required Auth-Application-Id auth_application_id = 5;
+  fixed required Termination-Cause termination_cause = 6;
+  optional User-Name user_name = 7;
+  optional Destination-Host destination_host = 8;
+}
+
+// Session-Termination-Answer (STA)
+command Session-Termination-Answer {
+  code = 275;
+  application_id = 0;
+  request = false;
+  proxiable = true;
+
+  fixed required Session-Id session_id = 1;
+  fixed required Result-Code result_code = 2;
+  fixed required Origin-Host origin_host = 3;
+  fixed required Origin-Realm origin_realm = 4;
+  optional User-Name user_name = 5;
+  optional Error-Message error_message = 6;
+  optional Failed-AVP failed_avp = 7;
+}
+
+// Abort-Session-Request (ASR)
+command Abort-Session-Request {
+  code = 274;
+  application_id = 0;
+  request = true;
+  proxiable = true;
+
+  fixed required Session-Id session_id = 1;
+  fixed required Origin-Host origin_host = 2;
+  fixed required Origin-Realm origin_realm = 3;
+  fixed required Destination-Realm destination_realm = 4;
+  fixed required Destination-Host destination_host = 5;
+  fixed required Auth-Application-Id auth_application_id = 6;
+  optional User-Name user_name = 7;
+  optional Origin-State-Id origin_state_id = 8;
+}
+
+// Abort-Session-Answer (ASA)
+command Abort-Session-Answer {
+  code = 274;
+  application_id = 0;
+  request = false;
+  proxiable = true;
+
+  fixed required Session-Id session_id = 1;
+  fixed required Result-Code result_code = 2;
+  fixed required Origin-Host origin_host = 3;
+  fixed required Origin-Realm origin_realm = 4;
+  optional User-Name user_name = 5;
+  optional Origin-State-Id origin_state_id = 6;
+  optional Error-Message error_message = 7;
+  optional Failed-AVP failed_avp = 8;
+}
+
+// Accounting-Request (ACR)
+command Accounting-Request {
+  code = 271;
+  application_id = 0;
+  request = true;
+  proxiable = true;
+
+  fixed required Session-Id session_id = 1;
+  fixed required Origin-Host origin_host = 2;
+  fixed required Origin-Realm origin_realm = 3;
+  fixed required Destination-Realm destination_realm = 4;
+  fixed required Accounting-Record-Type accounting_record_type = 5;
+  fixed required Accounting-Record-Number accounting_record_number = 6;
+  optional Acct-Application-Id acct_application_id = 7;
+  optional User-Name user_name = 8;
+  optional Destination-Host destination_host = 9;
+}
+
+// Accounting-Answer (ACA)
+command Accounting-Answer {
+  code = 271;
+  application_id = 0;
+  request = false;
+  proxiable = true;
+
+  fixed required Session-Id session_id = 1;
+  fixed required Result-Code result_code = 2;
+  fixed required Origin-Host origin_host = 3;
+  fixed required Origin-Realm origin_realm = 4;
+  fixed required Accounting-Record-Type accounting_record_type = 5;
+  fixed required Accounting-Record-Number accounting_record_number = 6;
+  optional Acct-Application-Id acct_application_id = 7;
+  optional User-Name user_name = 8;
+}

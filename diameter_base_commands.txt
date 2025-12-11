@@ -1,0 +1,607 @@
+================================================================================
+            DIAMETER BASE PROTOCOL COMMANDS - DETAILED DESCRIPTION
+                              RFC 3588 / RFC 6733
+================================================================================
+
+================================================================================
+1. CAPABILITIES EXCHANGE (CER/CEA) - Command Code: 257
+================================================================================
+
+PURPOSE:
+--------
+- Establish peer connection and negotiate capabilities
+- Exchange supported applications, security mechanisms, and vendor info
+- MUST be the first message sent after TCP/SCTP connection established
+- Both peers learn each other's identity and capabilities
+
+---------------------------------------------------------------------------------
+1.1 CAPABILITIES-EXCHANGE-REQUEST (CER)
+---------------------------------------------------------------------------------
+
+Direction: Initiator -> Receiver (after transport connection established)
+
+ABNF Definition:
+<CER> ::= < Diameter Header: 257, REQ >
+          { Origin-Host }           ; Sender's FQDN identity
+          { Origin-Realm }          ; Sender's realm
+       1* { Host-IP-Address }       ; Sender's IP address(es)
+          { Vendor-Id }             ; Sender's vendor ID
+          { Product-Name }          ; Sender's product name
+          [ Origin-State-Id ]       ; Sender's state ID (detect restarts)
+        * [ Supported-Vendor-Id ]   ; Vendor IDs supported
+        * [ Auth-Application-Id ]   ; Auth applications supported
+        * [ Inband-Security-Id ]    ; Security mechanisms (TLS, etc.)
+        * [ Acct-Application-Id ]   ; Accounting applications supported
+        * [ Vendor-Specific-Application-Id ]  ; Vendor-specific apps
+          [ Firmware-Revision ]     ; Firmware version
+        * [ AVP ]                   ; Additional AVPs
+
+Key AVPs:
+- Origin-Host (264): FQDN identifying the sender, e.g., "smf.example.com"
+- Origin-Realm (296): Administrative domain, e.g., "example.com"
+- Host-IP-Address (257): IP addresses where peer listens
+- Vendor-Id (266): IANA enterprise number of implementation vendor
+- Product-Name (269): Product name string, e.g., "MyDiameterServer v1.0"
+- Auth-Application-Id (258): Supported auth app IDs (e.g., 4 for Credit-Control)
+- Acct-Application-Id (259): Supported accounting app IDs
+- Inband-Security-Id (299): 0=NO_INBAND_SECURITY, 1=TLS
+
+Example Scenario:
+  SMF connects to PCF, sends CER with:
+  - Origin-Host: "smf1.mnc001.mcc001.3gppnetwork.org"
+  - Origin-Realm: "mnc001.mcc001.3gppnetwork.org"
+  - Auth-Application-Id: 16777238 (Gx application)
+
+---------------------------------------------------------------------------------
+1.2 CAPABILITIES-EXCHANGE-ANSWER (CEA)
+---------------------------------------------------------------------------------
+
+Direction: Receiver -> Initiator (response to CER)
+
+ABNF Definition:
+<CEA> ::= < Diameter Header: 257 >
+          { Result-Code }           ; Success or error code
+          { Origin-Host }           ; Responder's FQDN
+          { Origin-Realm }          ; Responder's realm
+       1* { Host-IP-Address }       ; Responder's IP address(es)
+          { Vendor-Id }             ; Responder's vendor ID
+          { Product-Name }          ; Responder's product name
+          [ Origin-State-Id ]       ; Responder's state ID
+          [ Error-Message ]         ; Human-readable error (if failed)
+          [ Failed-AVP ]            ; AVP that caused failure
+        * [ Supported-Vendor-Id ]   ; Vendor IDs supported
+        * [ Auth-Application-Id ]   ; Auth applications supported
+        * [ Inband-Security-Id ]    ; Security mechanisms
+        * [ Acct-Application-Id ]   ; Accounting applications supported
+        * [ Vendor-Specific-Application-Id ]  ; Vendor-specific apps
+          [ Firmware-Revision ]     ; Firmware version
+        * [ AVP ]                   ; Additional AVPs
+
+Result-Code Values:
+- 2001 (DIAMETER_SUCCESS): Capabilities exchange successful
+- 5010 (DIAMETER_NO_COMMON_APPLICATION): No common apps supported
+- 5017 (DIAMETER_NO_COMMON_SECURITY): No common security mechanism
+
+State After Success:
+- Peer connection moves to OPEN state
+- Both peers know each other's supported applications
+- Can now exchange application-specific messages
+
+================================================================================
+2. DEVICE WATCHDOG (DWR/DWA) - Command Code: 280
+================================================================================
+
+PURPOSE:
+--------
+- Detect transport failures and peer availability
+- Keep-alive mechanism for idle connections
+- Sent when no other traffic for Tw (watchdog timer) seconds
+- Default Tw: 30 seconds (recommended)
+
+---------------------------------------------------------------------------------
+2.1 DEVICE-WATCHDOG-REQUEST (DWR)
+---------------------------------------------------------------------------------
+
+Direction: Either peer can send when connection is idle
+
+ABNF Definition:
+<DWR> ::= < Diameter Header: 280, REQ >
+          { Origin-Host }           ; Sender's identity
+          { Origin-Realm }          ; Sender's realm
+          [ Origin-State-Id ]       ; Detect peer restart
+        * [ AVP ]                   ; Additional AVPs
+
+Key Points:
+- Sent after Tw seconds of inactivity on the connection
+- Very lightweight message (minimal AVPs)
+- Origin-State-Id helps detect if peer has restarted
+
+---------------------------------------------------------------------------------
+2.2 DEVICE-WATCHDOG-ANSWER (DWA)
+---------------------------------------------------------------------------------
+
+Direction: Response to DWR
+
+ABNF Definition:
+<DWA> ::= < Diameter Header: 280 >
+          { Result-Code }           ; Should be DIAMETER_SUCCESS
+          { Origin-Host }           ; Responder's identity
+          { Origin-Realm }          ; Responder's realm
+          [ Error-Message ]         ; Error description if failed
+          [ Failed-AVP ]            ; Failed AVP if applicable
+          [ Origin-State-Id ]       ; Responder's state ID
+        * [ AVP ]                   ; Additional AVPs
+
+Result-Code Values:
+- 2001 (DIAMETER_SUCCESS): Peer is alive and operational
+
+Watchdog Algorithm:
+1. Start watchdog timer Tw (30 seconds default)
+2. If any message received, reset timer
+3. If timer expires:
+   - Send DWR
+   - Start response timer
+4. If DWA received: peer is alive, reset Tw
+5. If no DWA received: consider peer down, trigger failover
+
+State Detection via Origin-State-Id:
+- If Origin-State-Id in DWA differs from CER/CEA, peer has restarted
+- All sessions with that peer should be considered terminated
+
+================================================================================
+3. DISCONNECT PEER (DPR/DPA) - Command Code: 282
+================================================================================
+
+PURPOSE:
+--------
+- Gracefully terminate peer connection
+- Allow peer to prepare for disconnection
+- Clean shutdown without triggering failover
+
+---------------------------------------------------------------------------------
+3.1 DISCONNECT-PEER-REQUEST (DPR)
+---------------------------------------------------------------------------------
+
+Direction: Peer wanting to disconnect -> Other peer
+
+ABNF Definition:
+<DPR> ::= < Diameter Header: 282, REQ >
+          { Origin-Host }           ; Sender's identity
+          { Origin-Realm }          ; Sender's realm
+          { Disconnect-Cause }      ; Reason for disconnection
+        * [ AVP ]                   ; Additional AVPs
+
+Disconnect-Cause AVP (273) Values:
+- 0 (REBOOTING): Node is rebooting, will reconnect soon
+- 1 (BUSY): Node is too busy, try another peer
+- 2 (DO_NOT_WANT_TO_TALK_TO_YOU): Peer should not reconnect
+
+Use Cases:
+- Planned maintenance/reboot: Use REBOOTING
+- Overloaded server: Use BUSY
+- Configuration change removing peer: Use DO_NOT_WANT_TO_TALK_TO_YOU
+
+---------------------------------------------------------------------------------
+3.2 DISCONNECT-PEER-ANSWER (DPA)
+---------------------------------------------------------------------------------
+
+Direction: Response to DPR
+
+ABNF Definition:
+<DPA> ::= < Diameter Header: 282 >
+          { Result-Code }           ; Should be DIAMETER_SUCCESS
+          { Origin-Host }           ; Responder's identity
+          { Origin-Realm }          ; Responder's realm
+          [ Error-Message ]         ; Error description
+          [ Failed-AVP ]            ; Failed AVP if applicable
+        * [ AVP ]                   ; Additional AVPs
+
+After DPA:
+- Both peers close the transport connection
+- If Disconnect-Cause was REBOOTING or BUSY:
+  - Receiving peer may attempt reconnection after Tc timer
+- If Disconnect-Cause was DO_NOT_WANT_TO_TALK_TO_YOU:
+  - Receiving peer should NOT attempt reconnection
+
+================================================================================
+4. RE-AUTHENTICATION (RAR/RAA) - Command Code: 258
+================================================================================
+
+PURPOSE:
+--------
+- Server-initiated re-authentication/re-authorization
+- Force client to re-authenticate user
+- Update authorization parameters mid-session
+
+---------------------------------------------------------------------------------
+4.1 RE-AUTH-REQUEST (RAR)
+---------------------------------------------------------------------------------
+
+Direction: Server -> Client (server-initiated)
+
+ABNF Definition:
+<RAR> ::= < Diameter Header: 258, REQ, PXY >
+          < Session-Id >            ; Identifies the session
+          { Origin-Host }           ; Server's identity
+          { Origin-Realm }          ; Server's realm
+          { Destination-Realm }     ; Client's realm
+          { Destination-Host }      ; Client's identity
+          { Auth-Application-Id }   ; Application ID
+          { Re-Auth-Request-Type }  ; Type of re-auth required
+          [ User-Name ]             ; User to re-authenticate
+          [ Origin-State-Id ]       ; Server's state
+        * [ Proxy-Info ]            ; Proxy information
+        * [ Route-Record ]          ; Route information
+        * [ AVP ]                   ; Additional AVPs
+
+Re-Auth-Request-Type AVP (285) Values:
+- 0 (AUTHORIZE_ONLY): Re-authorization only, no re-authentication
+- 1 (AUTHORIZE_AUTHENTICATE): Full re-authentication required
+
+Use Cases:
+- Policy change requiring session update
+- Periodic re-authentication for security
+- Credit exhaustion requiring re-authorization
+
+---------------------------------------------------------------------------------
+4.2 RE-AUTH-ANSWER (RAA)
+---------------------------------------------------------------------------------
+
+Direction: Client -> Server (response to RAR)
+
+ABNF Definition:
+<RAA> ::= < Diameter Header: 258, PXY >
+          < Session-Id >            ; Same session ID as RAR
+          { Result-Code }           ; Success or failure
+          { Origin-Host }           ; Client's identity
+          { Origin-Realm }          ; Client's realm
+          [ User-Name ]             ; User that was re-authenticated
+          [ Origin-State-Id ]       ; Client's state
+          [ Error-Message ]         ; Error description
+          [ Error-Reporting-Host ]  ; Host reporting error
+          [ Failed-AVP ]            ; Failed AVP
+        * [ Redirect-Host ]         ; Redirect information
+          [ Redirect-Host-Usage ]   ; How to use redirect
+          [ Redirect-Max-Cache-Time ] ; Cache time for redirect
+        * [ Proxy-Info ]            ; Proxy information
+        * [ AVP ]                   ; Additional AVPs
+
+Result-Code Values:
+- 2001 (DIAMETER_SUCCESS): Re-auth successful
+- 5001 (DIAMETER_AVP_UNSUPPORTED): Required AVP not supported
+- 5002 (DIAMETER_UNKNOWN_SESSION_ID): Session not found
+
+================================================================================
+5. SESSION TERMINATION (STR/STA) - Command Code: 275
+================================================================================
+
+PURPOSE:
+--------
+- Client-initiated session termination
+- Notify server that user session has ended
+- Release server-side session resources
+
+---------------------------------------------------------------------------------
+5.1 SESSION-TERMINATION-REQUEST (STR)
+---------------------------------------------------------------------------------
+
+Direction: Client -> Server
+
+ABNF Definition:
+<STR> ::= < Diameter Header: 275, REQ, PXY >
+          < Session-Id >            ; Session being terminated
+          { Origin-Host }           ; Client's identity
+          { Origin-Realm }          ; Client's realm
+          { Destination-Realm }     ; Server's realm
+          { Auth-Application-Id }   ; Application ID
+          { Termination-Cause }     ; Why session is ending
+          [ User-Name ]             ; User whose session ended
+          [ Destination-Host ]      ; Specific server
+        * [ Class ]                 ; Class AVPs from auth
+          [ Origin-State-Id ]       ; Client's state
+        * [ Proxy-Info ]            ; Proxy information
+        * [ Route-Record ]          ; Route information
+        * [ AVP ]                   ; Additional AVPs
+
+Termination-Cause AVP (295) Values:
+- 1 (DIAMETER_LOGOUT): User initiated logout
+- 2 (DIAMETER_SERVICE_NOT_PROVIDED): Service could not be provided
+- 3 (DIAMETER_BAD_ANSWER): Invalid answer from server
+- 4 (DIAMETER_ADMINISTRATIVE): Admin terminated session
+- 5 (DIAMETER_LINK_BROKEN): Link to user broken
+- 6 (DIAMETER_AUTH_EXPIRED): Authorization expired
+- 7 (DIAMETER_USER_MOVED): User moved to another server
+- 8 (DIAMETER_SESSION_TIMEOUT): Session timed out
+
+---------------------------------------------------------------------------------
+5.2 SESSION-TERMINATION-ANSWER (STA)
+---------------------------------------------------------------------------------
+
+Direction: Server -> Client
+
+ABNF Definition:
+<STA> ::= < Diameter Header: 275, PXY >
+          < Session-Id >            ; Same session ID as STR
+          { Result-Code }           ; Success or failure
+          { Origin-Host }           ; Server's identity
+          { Origin-Realm }          ; Server's realm
+          [ User-Name ]             ; User whose session ended
+        * [ Class ]                 ; Class AVPs
+          [ Error-Message ]         ; Error description
+          [ Error-Reporting-Host ]  ; Host reporting error
+          [ Failed-AVP ]            ; Failed AVP
+          [ Origin-State-Id ]       ; Server's state
+        * [ Redirect-Host ]         ; Redirect information
+          [ Redirect-Host-Usage ]   ; How to use redirect
+          [ Redirect-Max-Cache-Time ] ; Cache time
+        * [ Proxy-Info ]            ; Proxy information
+        * [ AVP ]                   ; Additional AVPs
+
+================================================================================
+6. ABORT SESSION (ASR/ASA) - Command Code: 274
+================================================================================
+
+PURPOSE:
+--------
+- Server-initiated session termination
+- Force client to terminate user session
+- Used when server needs to end session (policy, admin, etc.)
+
+---------------------------------------------------------------------------------
+6.1 ABORT-SESSION-REQUEST (ASR)
+---------------------------------------------------------------------------------
+
+Direction: Server -> Client (server-initiated)
+
+ABNF Definition:
+<ASR> ::= < Diameter Header: 274, REQ, PXY >
+          < Session-Id >            ; Session to abort
+          { Origin-Host }           ; Server's identity
+          { Origin-Realm }          ; Server's realm
+          { Destination-Realm }     ; Client's realm
+          { Destination-Host }      ; Client's identity
+          { Auth-Application-Id }   ; Application ID
+          [ User-Name ]             ; User whose session to abort
+          [ Origin-State-Id ]       ; Server's state
+        * [ Proxy-Info ]            ; Proxy information
+        * [ Route-Record ]          ; Route information
+        * [ AVP ]                   ; Additional AVPs
+
+Use Cases:
+- Admin disconnecting a user
+- Policy violation detected
+- Prepaid credit exhausted
+- Fraud detection triggered
+
+---------------------------------------------------------------------------------
+6.2 ABORT-SESSION-ANSWER (ASA)
+---------------------------------------------------------------------------------
+
+Direction: Client -> Server
+
+ABNF Definition:
+<ASA> ::= < Diameter Header: 274, PXY >
+          < Session-Id >            ; Same session ID as ASR
+          { Result-Code }           ; Success or failure
+          { Origin-Host }           ; Client's identity
+          { Origin-Realm }          ; Client's realm
+          [ User-Name ]             ; User whose session aborted
+          [ Origin-State-Id ]       ; Client's state
+          [ Error-Message ]         ; Error description
+          [ Error-Reporting-Host ]  ; Host reporting error
+          [ Failed-AVP ]            ; Failed AVP
+        * [ Redirect-Host ]         ; Redirect information
+          [ Redirect-Host-Usage ]   ; How to use redirect
+          [ Redirect-Max-Cache-Time ] ; Cache time
+        * [ Proxy-Info ]            ; Proxy information
+        * [ AVP ]                   ; Additional AVPs
+
+Result-Code Values:
+- 2001 (DIAMETER_SUCCESS): Session successfully aborted
+- 5002 (DIAMETER_UNKNOWN_SESSION_ID): Session not found
+
+================================================================================
+7. ACCOUNTING (ACR/ACA) - Command Code: 271
+================================================================================
+
+PURPOSE:
+--------
+- Report resource usage for billing/auditing
+- Track session lifecycle (start, interim, stop)
+- Support both real-time and batch accounting
+
+---------------------------------------------------------------------------------
+7.1 ACCOUNTING-REQUEST (ACR)
+---------------------------------------------------------------------------------
+
+Direction: Client -> Server
+
+ABNF Definition:
+<ACR> ::= < Diameter Header: 271, REQ, PXY >
+          < Session-Id >            ; Session being accounted
+          { Origin-Host }           ; Client's identity
+          { Origin-Realm }          ; Client's realm
+          { Destination-Realm }     ; Accounting server's realm
+          { Accounting-Record-Type }; Type of record
+          { Accounting-Record-Number } ; Sequence number
+          [ Acct-Application-Id ]   ; Accounting app ID
+          [ Vendor-Specific-Application-Id ] ; Vendor-specific app
+          [ User-Name ]             ; User being accounted
+          [ Destination-Host ]      ; Specific accounting server
+          [ Accounting-Sub-Session-Id ] ; Sub-session ID
+          [ Acct-Session-Id ]       ; Legacy session ID
+          [ Acct-Multi-Session-Id ] ; Multi-session ID
+          [ Acct-Interim-Interval ] ; Interim interval
+          [ Accounting-Realtime-Required ] ; Real-time requirement
+          [ Origin-State-Id ]       ; Client's state
+          [ Event-Timestamp ]       ; Time of event
+        * [ Proxy-Info ]            ; Proxy information
+        * [ Route-Record ]          ; Route information
+        * [ AVP ]                   ; Additional AVPs (usage data)
+
+Accounting-Record-Type AVP (480) Values:
+- 1 (EVENT_RECORD): One-time event, no session
+- 2 (START_RECORD): Session start
+- 3 (INTERIM_RECORD): Periodic update during session
+- 4 (STOP_RECORD): Session end
+
+Accounting-Realtime-Required AVP (483) Values:
+- 1 (DELIVER_AND_GRANT): Must deliver, grant service anyway
+- 2 (GRANT_AND_STORE): Store if can't deliver, grant service
+- 3 (GRANT_AND_LOSE): Grant service, may lose record
+
+---------------------------------------------------------------------------------
+7.2 ACCOUNTING-ANSWER (ACA)
+---------------------------------------------------------------------------------
+
+Direction: Server -> Client
+
+ABNF Definition:
+<ACA> ::= < Diameter Header: 271, PXY >
+          < Session-Id >            ; Same session ID as ACR
+          { Result-Code }           ; Success or failure
+          { Origin-Host }           ; Server's identity
+          { Origin-Realm }          ; Server's realm
+          { Accounting-Record-Type }; Type of record
+          { Accounting-Record-Number } ; Same as ACR
+          [ Acct-Application-Id ]   ; Accounting app ID
+          [ Vendor-Specific-Application-Id ] ; Vendor-specific app
+          [ User-Name ]             ; User being accounted
+          [ Acct-Interim-Interval ] ; Server-specified interval
+          [ Accounting-Realtime-Required ] ; Server preference
+          [ Origin-State-Id ]       ; Server's state
+          [ Event-Timestamp ]       ; Server timestamp
+        * [ Proxy-Info ]            ; Proxy information
+        * [ AVP ]                   ; Additional AVPs
+
+================================================================================
+8. MESSAGE FLOW EXAMPLES
+================================================================================
+
+PEER CONNECTION ESTABLISHMENT:
+------------------------------
+    Client                              Server
+       |                                   |
+       |-------- TCP/SCTP Connect -------->|
+       |                                   |
+       |------------ CER ----------------->|
+       |                                   |
+       |<----------- CEA -----------------|
+       |         (Result-Code=2001)        |
+       |                                   |
+       |======= Connection OPEN ===========|
+
+WATCHDOG EXCHANGE (Idle Connection):
+------------------------------------
+    Client                              Server
+       |                                   |
+       |  (Tw timer expires, no traffic)   |
+       |                                   |
+       |------------ DWR ----------------->|
+       |                                   |
+       |<----------- DWA -----------------|
+       |         (Result-Code=2001)        |
+       |                                   |
+       |  (Reset Tw timer)                 |
+
+GRACEFUL DISCONNECT:
+--------------------
+    Client                              Server
+       |                                   |
+       |------------ DPR ----------------->|
+       |    (Disconnect-Cause=REBOOTING)   |
+       |                                   |
+       |<----------- DPA -----------------|
+       |         (Result-Code=2001)        |
+       |                                   |
+       |<----- Close TCP/SCTP ------------>|
+
+SERVER-INITIATED RE-AUTH:
+-------------------------
+    Client                              Server
+       |                                   |
+       |<----------- RAR -----------------|
+       |  (Re-Auth-Request-Type=           |
+       |   AUTHORIZE_AUTHENTICATE)         |
+       |                                   |
+       | (Client re-authenticates user)    |
+       |                                   |
+       |------------ RAA ----------------->|
+       |         (Result-Code=2001)        |
+
+CLIENT SESSION TERMINATION:
+---------------------------
+    Client                              Server
+       |                                   |
+       |------------ STR ----------------->|
+       |  (Termination-Cause=              |
+       |   DIAMETER_LOGOUT)                |
+       |                                   |
+       |<----------- STA -----------------|
+       |         (Result-Code=2001)        |
+
+SERVER-INITIATED SESSION ABORT:
+-------------------------------
+    Client                              Server
+       |                                   |
+       |<----------- ASR -----------------|
+       |  (Session needs to be aborted)    |
+       |                                   |
+       | (Client terminates user session)  |
+       |                                   |
+       |------------ ASA ----------------->|
+       |         (Result-Code=2001)        |
+
+ACCOUNTING SESSION:
+-------------------
+    Client                              Server
+       |                                   |
+       |------------ ACR ----------------->|
+       |  (Accounting-Record-Type=START)   |
+       |                                   |
+       |<----------- ACA -----------------|
+       |                                   |
+       |  ... session in progress ...      |
+       |                                   |
+       |------------ ACR ----------------->|
+       |  (Accounting-Record-Type=INTERIM) |
+       |                                   |
+       |<----------- ACA -----------------|
+       |                                   |
+       |  ... session ends ...             |
+       |                                   |
+       |------------ ACR ----------------->|
+       |  (Accounting-Record-Type=STOP)    |
+       |                                   |
+       |<----------- ACA -----------------|
+
+================================================================================
+9. PEER STATE MACHINE
+================================================================================
+
+States:
+-------
+- Closed: No connection
+- Wait-Conn-Ack: TCP/SCTP connect initiated, waiting for ACK
+- Wait-I-CEA: CER sent, waiting for CEA
+- Wait-Conn-Ack/Elect: Connection collision, election in progress
+- Wait-Returns: Waiting for election result
+- R-Open: Connection open (responder role)
+- I-Open: Connection open (initiator role)
+- Closing: DPR sent, waiting for DPA
+
+Key Events:
+-----------
+- Start: Initiate connection
+- R-Conn-CER: Received connection + CER
+- I-Rcv-Conn-Ack: Connection established
+- I-Rcv-CEA: Received CEA
+- R-Rcv-CER: Received CER (responder)
+- I-Rcv-Non-CEA: Received non-CEA when expecting CEA
+- Timeout: Timer expired
+- I-Peer-Disc: Peer disconnected
+- Stop: Admin stop
+
+================================================================================
+                              END OF DOCUMENT
+================================================================================

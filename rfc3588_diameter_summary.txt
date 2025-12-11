@@ -1,0 +1,349 @@
+================================================================================
+                RFC 3588 - DIAMETER BASE PROTOCOL SUMMARY
+                    Command and AVP Structure Reference
+================================================================================
+
+Document: RFC 3588 (September 2003) - Obsoleted by RFC 6733
+Authors: P. Calhoun, J. Loughney, E. Guttman, G. Zorn, J. Arkko
+Purpose: Authentication, Authorization and Accounting (AAA) framework
+
+================================================================================
+                        1. DIAMETER HEADER STRUCTURE
+================================================================================
+
+ 0                   1                   2                   3
+ 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
++-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+|    Version    |                 Message Length                |
++-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+| Command Flags |                  Command-Code                 |
++-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+|                         Application-ID                        |
++-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+|                      Hop-by-Hop Identifier                    |
++-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+|                      End-to-End Identifier                    |
++-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+|  AVPs ...
++-+-+-+-+-+-+-+-+-+-+-+-+-
+
+HEADER FIELDS:
+--------------
+- Version (8 bits): Must be set to 1 for Diameter Version 1
+- Message Length (24 bits): Total length including header fields
+- Command Flags (8 bits): See Command Flags below
+- Command-Code (24 bits): Identifies the command (IANA managed)
+- Application-ID (32 bits): Identifies the Diameter application
+- Hop-by-Hop Identifier (32 bits): Used for request/answer matching
+- End-to-End Identifier (32 bits): Used for duplicate detection
+
+COMMAND FLAGS:
+--------------
+ 0 1 2 3 4 5 6 7
++-+-+-+-+-+-+-+-+
+|R P E T r r r r|
++-+-+-+-+-+-+-+-+
+
+- R (Request): Set = Request message, Clear = Answer message
+- P (Proxiable): Set = May be proxied/relayed/redirected
+- E (Error): Set = Protocol error (only in answers)
+- T (Potentially retransmitted): Set after link failover
+- r (reserved): Must be set to zero
+
+================================================================================
+                        2. AVP HEADER STRUCTURE
+================================================================================
+
+ 0                   1                   2                   3
+ 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
++-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+|                           AVP Code                            |
++-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+|V M P r r r r r|                  AVP Length                   |
++-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+|                        Vendor-ID (opt)                        |
++-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+|    Data ...
++-+-+-+-+-+-+-+-+
+
+AVP HEADER FIELDS:
+------------------
+- AVP Code (32 bits): Combined with Vendor-ID identifies the AVP
+  * Codes 1-255: Reserved for RADIUS backward compatibility
+  * Codes 256+: Used for Diameter (IANA allocated)
+  
+- AVP Flags (8 bits):
+  * V (Vendor-Specific): Set = Vendor-ID field present
+  * M (Mandatory): Set = AVP MUST be understood
+  * P (Protected): Set = Needs encryption for end-to-end security
+  * r (reserved): Must be set to zero
+
+- AVP Length (24 bits): Total AVP length including header and data
+
+- Vendor-ID (32 bits, optional): Present only if V flag is set
+  * Uses IANA "SMI Network Management Private Enterprise Codes"
+  * Value 0 = IETF AVP values (should not be used with V flag)
+
+- Data: Zero or more octets, padded to 32-bit boundary
+
+================================================================================
+                        3. AVP DATA TYPES
+================================================================================
+
+BASIC AVP DATA FORMATS:
+-----------------------
+| Type       | Description                                    | Length    |
+|------------|------------------------------------------------|-----------|
+| OctetString| Arbitrary data, variable length                | >= 8 (12) |
+| Integer32  | 32-bit signed value, network byte order        | 12 (16)   |
+| Integer64  | 64-bit signed value, network byte order        | 16 (20)   |
+| Unsigned32 | 32-bit unsigned value, network byte order      | 12 (16)   |
+| Unsigned64 | 64-bit unsigned value, network byte order      | 16 (20)   |
+| Float32    | Single precision floating point                | 12 (16)   |
+| Float64    | Double precision floating point                | 16 (20)   |
+| Grouped    | Sequence of AVPs with their own headers        | Variable  |
+
+Note: Length in parentheses is when V flag is set (Vendor-ID present)
+
+DERIVED AVP DATA FORMATS:
+-------------------------
+| Type            | Base Type   | Description                         |
+|-----------------|-------------|-------------------------------------|
+| Address         | OctetString | AddressType (2 bytes) + IP address  |
+| Time            | OctetString | NTP timestamp format (4 bytes)      |
+| UTF8String      | OctetString | ISO/IEC 10646-1 UTF-8 encoded       |
+| DiameterIdentity| OctetString | FQDN of Diameter node               |
+| DiameterURI     | OctetString | aaa:// or aaas:// URI format        |
+| Enumerated      | Integer32   | Defined list of valid values        |
+| IPFilterRule    | OctetString | ASCII filter rule syntax            |
+| QoSFilterRule   | OctetString | ASCII QoS rule syntax               |
+
+================================================================================
+                        4. BASE PROTOCOL COMMAND CODES
+================================================================================
+
+| Command-Name                    | Abbrev | Code | Section |
+|---------------------------------|--------|------|---------|
+| Capabilities-Exchange-Request   | CER    | 257  | 5.3.1   |
+| Capabilities-Exchange-Answer    | CEA    | 257  | 5.3.2   |
+| Re-Auth-Request                 | RAR    | 258  | 8.3.1   |
+| Re-Auth-Answer                  | RAA    | 258  | 8.3.2   |
+| Accounting-Request              | ACR    | 271  | 9.7.1   |
+| Accounting-Answer               | ACA    | 271  | 9.7.2   |
+| Abort-Session-Request           | ASR    | 274  | 8.5.1   |
+| Abort-Session-Answer            | ASA    | 274  | 8.5.2   |
+| Session-Termination-Request     | STR    | 275  | 8.4.1   |
+| Session-Termination-Answer      | STA    | 275  | 8.4.2   |
+| Device-Watchdog-Request         | DWR    | 280  | 5.5.1   |
+| Device-Watchdog-Answer          | DWA    | 280  | 5.5.2   |
+| Disconnect-Peer-Request         | DPR    | 282  | 5.4.1   |
+| Disconnect-Peer-Answer          | DPA    | 282  | 5.4.2   |
+
+================================================================================
+                        5. APPLICATION IDENTIFIERS
+================================================================================
+
+| Application               | ID Value    |
+|---------------------------|-------------|
+| Diameter Common Messages  | 0           |
+| NASREQ                    | 1           |
+| Mobile-IP                 | 2           |
+| Diameter Base Accounting  | 3           |
+| Relay                     | 0xffffffff  |
+
+================================================================================
+                        6. COMMAND CODE ABNF FORMAT
+================================================================================
+
+ABNF Syntax:
+  command-def = command-name "::=" diameter-message
+  
+  header = "<" Diameter-Header: command-id [r-bit] [p-bit] [e-bit] 
+           [application-id] ">"
+  
+  fixed    = [qual] "<" avp-spec ">"     ; Fixed position AVP
+  required = [qual] "{" avp-spec "}"     ; Required AVP, any position
+  optional = [qual] "[" avp-name "]"     ; Optional AVP
+  
+  qual     = [min] "*" [max]             ; Occurrence qualifier
+
+Example Command Definition:
+---------------------------
+CER ::= < Diameter Header: 257, REQ >
+        { Origin-Host }
+        { Origin-Realm }
+      1*{ Host-IP-Address }
+        { Vendor-Id }
+        { Product-Name }
+        [ Origin-State-Id ]
+      * [ Supported-Vendor-Id ]
+      * [ Auth-Application-Id ]
+      * [ Inband-Security-Id ]
+      * [ Acct-Application-Id ]
+      * [ Vendor-Specific-Application-Id ]
+        [ Firmware-Revision ]
+      * [ AVP ]
+
+================================================================================
+                        7. COMMON BASE PROTOCOL AVPs
+================================================================================
+
+ROUTING AVPs:
+-------------
+| AVP Name                        | Code | Type           |
+|---------------------------------|------|----------------|
+| Session-Id                      | 263  | UTF8String     |
+| Origin-Host                     | 264  | DiameterIdentity|
+| Origin-Realm                    | 296  | DiameterIdentity|
+| Destination-Host                | 293  | DiameterIdentity|
+| Destination-Realm               | 283  | DiameterIdentity|
+| Route-Record                    | 282  | DiameterIdentity|
+| Proxy-Info                      | 284  | Grouped        |
+| Proxy-Host                      | 280  | DiameterIdentity|
+| Proxy-State                     | 33   | OctetString    |
+
+AUTHENTICATION/AUTHORIZATION AVPs:
+----------------------------------
+| AVP Name                        | Code | Type           |
+|---------------------------------|------|----------------|
+| Auth-Application-Id             | 258  | Unsigned32     |
+| Auth-Request-Type               | 274  | Enumerated     |
+| Auth-Session-State              | 277  | Enumerated     |
+| Authorization-Lifetime          | 291  | Unsigned32     |
+| Auth-Grace-Period               | 276  | Unsigned32     |
+| Re-Auth-Request-Type            | 285  | Enumerated     |
+| User-Name                       | 1    | UTF8String     |
+| Session-Timeout                 | 27   | Unsigned32     |
+
+ACCOUNTING AVPs:
+----------------
+| AVP Name                        | Code | Type           |
+|---------------------------------|------|----------------|
+| Acct-Application-Id             | 259  | Unsigned32     |
+| Accounting-Record-Type          | 480  | Enumerated     |
+| Accounting-Record-Number        | 485  | Unsigned32     |
+| Acct-Session-Id                 | 44   | OctetString    |
+| Acct-Multi-Session-Id           | 50   | UTF8String     |
+| Accounting-Sub-Session-Id       | 287  | Unsigned64     |
+| Acct-Interim-Interval           | 85   | Unsigned32     |
+| Accounting-Realtime-Required    | 483  | Enumerated     |
+
+ERROR/RESULT AVPs:
+------------------
+| AVP Name                        | Code | Type           |
+|---------------------------------|------|----------------|
+| Result-Code                     | 268  | Unsigned32     |
+| Error-Message                   | 281  | UTF8String     |
+| Error-Reporting-Host            | 294  | DiameterIdentity|
+| Failed-AVP                      | 279  | Grouped        |
+| Experimental-Result             | 297  | Grouped        |
+| Experimental-Result-Code        | 298  | Unsigned32     |
+
+PEER/CAPABILITIES AVPs:
+-----------------------
+| AVP Name                        | Code | Type           |
+|---------------------------------|------|----------------|
+| Host-IP-Address                 | 257  | Address        |
+| Vendor-Id                       | 266  | Unsigned32     |
+| Supported-Vendor-Id             | 265  | Unsigned32     |
+| Product-Name                    | 269  | UTF8String     |
+| Firmware-Revision               | 267  | Unsigned32     |
+| Inband-Security-Id              | 299  | Unsigned32     |
+| Vendor-Specific-Application-Id  | 260  | Grouped        |
+| Origin-State-Id                 | 278  | Unsigned32     |
+| Disconnect-Cause                | 273  | Enumerated     |
+
+REDIRECT AVPs:
+--------------
+| AVP Name                        | Code | Type           |
+|---------------------------------|------|----------------|
+| Redirect-Host                   | 292  | DiameterURI    |
+| Redirect-Host-Usage             | 261  | Enumerated     |
+| Redirect-Max-Cache-Time         | 262  | Unsigned32     |
+
+SESSION AVPs:
+-------------
+| AVP Name                        | Code | Type           |
+|---------------------------------|------|----------------|
+| Session-Binding                 | 270  | Unsigned32     |
+| Session-Server-Failover         | 271  | Enumerated     |
+| Multi-Round-Time-Out            | 272  | Unsigned32     |
+| Class                           | 25   | OctetString    |
+| Event-Timestamp                 | 55   | Time           |
+| Termination-Cause               | 295  | Enumerated     |
+
+================================================================================
+                        8. RESULT-CODE VALUES
+================================================================================
+
+INFORMATIONAL (1xxx):
+---------------------
+1001 - DIAMETER_MULTI_ROUND_AUTH
+
+SUCCESS (2xxx):
+---------------
+2001 - DIAMETER_SUCCESS
+2002 - DIAMETER_LIMITED_SUCCESS
+
+PROTOCOL ERRORS (3xxx):
+-----------------------
+3001 - DIAMETER_COMMAND_UNSUPPORTED
+3002 - DIAMETER_UNABLE_TO_DELIVER
+3003 - DIAMETER_REALM_NOT_SERVED
+3004 - DIAMETER_TOO_BUSY
+3005 - DIAMETER_LOOP_DETECTED
+3006 - DIAMETER_REDIRECT_INDICATION
+3007 - DIAMETER_APPLICATION_UNSUPPORTED
+3008 - DIAMETER_INVALID_HDR_BITS
+3009 - DIAMETER_INVALID_AVP_BITS
+3010 - DIAMETER_UNKNOWN_PEER
+
+TRANSIENT FAILURES (4xxx):
+--------------------------
+4001 - DIAMETER_AUTHENTICATION_REJECTED
+4002 - DIAMETER_OUT_OF_SPACE
+
+PERMANENT FAILURES (5xxx):
+--------------------------
+5001 - DIAMETER_AVP_UNSUPPORTED
+5002 - DIAMETER_UNKNOWN_SESSION_ID
+5003 - DIAMETER_AUTHORIZATION_REJECTED
+5004 - DIAMETER_INVALID_AVP_VALUE
+5005 - DIAMETER_MISSING_AVP
+5006 - DIAMETER_RESOURCES_EXCEEDED
+5007 - DIAMETER_CONTRADICTING_AVPS
+5008 - DIAMETER_AVP_NOT_ALLOWED
+5009 - DIAMETER_AVP_OCCURS_TOO_MANY_TIMES
+5010 - DIAMETER_NO_COMMON_APPLICATION
+5011 - DIAMETER_UNSUPPORTED_VERSION
+5012 - DIAMETER_UNABLE_TO_COMPLY
+5013 - DIAMETER_INVALID_BIT_IN_HEADER
+5014 - DIAMETER_INVALID_AVP_LENGTH
+5015 - DIAMETER_INVALID_MESSAGE_LENGTH
+5016 - DIAMETER_INVALID_AVP_BIT_COMBO
+5017 - DIAMETER_NO_COMMON_SECURITY
+
+================================================================================
+                        9. TRANSPORT
+================================================================================
+
+- Default Port: 3868 (TCP and SCTP)
+- Required: Clients MUST support TCP or SCTP; Agents/Servers MUST support both
+- Security: IPsec MUST be supported; TLS MAY be supported
+- Connection retry timer (Tc): Recommended 30 seconds
+
+================================================================================
+                        10. NOTES
+================================================================================
+
+- RFC 3588 is obsoleted by RFC 6733 (October 2012)
+- All AVPs must be padded to 32-bit boundary
+- M-bit determines if AVP is mandatory for message processing
+- V-bit indicates vendor-specific AVP with Vendor-ID field present
+- Session-Id must be globally and eternally unique
+- Hop-by-Hop ID must be unique on a connection at any given time
+- End-to-End ID must remain unique locally for at least 4 minutes
+
+================================================================================
+                        END OF SUMMARY
+================================================================================
