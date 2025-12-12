@@ -2288,10 +2288,21 @@ func (g *Generator) generatePairedPcapTests(buf *bytes.Buffer) {
 	}
 
 	// Second pass: generate tests for complete pairs
+	// Sort by command name for consistent output
+	sortedPairs := make([]struct {
+		request *CommandDefinition
+		answer  *CommandDefinition
+	}, 0, len(commandPairs))
 	for _, pair := range commandPairs {
 		if pair.request != nil && pair.answer != nil {
-			g.generateCommandPairPcapTest(buf, pair.request, pair.answer)
+			sortedPairs = append(sortedPairs, pair)
 		}
+	}
+	sort.Slice(sortedPairs, func(i, j int) bool {
+		return sortedPairs[i].request.Name < sortedPairs[j].request.Name
+	})
+	for _, pair := range sortedPairs {
+		g.generateCommandPairPcapTest(buf, pair.request, pair.answer)
 	}
 }
 

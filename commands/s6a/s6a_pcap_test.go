@@ -231,6 +231,691 @@ func writeDiameterPairToPcap(filename string, requestData, responseData []byte, 
 	return nil
 }
 
+// TestAI_Pair_PCAP tests PCAP file generation for AI request-response pair
+func TestAI_Pair_PCAP(t *testing.T) {
+	// Create testdata directory
+	if err := os.MkdirAll("testdata", 0755); err != nil {
+		t.Fatalf("Failed to create testdata directory: %v", err)
+	}
+
+	// Create pcap file path
+	pcapFile := filepath.Join("testdata", "test_air_aia.pcap")
+	// PCAP files are kept for Wireshark analysis
+
+	// Create Request message
+	request := NewAuthenticationInformationRequest()
+	request.SessionId = models_base.UTF8String("client.example.com;1234567890;1")
+	request.AuthSessionState = models_base.Enumerated(1)
+	request.OriginHost = models_base.DiameterIdentity("client.example.com")
+	request.OriginRealm = models_base.DiameterIdentity("client.example.com")
+	request.DestinationRealm = models_base.DiameterIdentity("server.example.com")
+	request.UserName = models_base.UTF8String("452040000000010")
+	request.VisitedPlmnId = models_base.OctetString([]byte{0x00, 0xF1, 0x10})
+	request.Drmp = ptrEnumerated(1)
+	request.VendorSpecificApplicationId = &VendorSpecificApplicationId{
+		VendorId:          ptrUnsigned32(10415),
+		AuthApplicationId: ptrUnsigned32(16777252),
+		AcctApplicationId: ptrUnsigned32(1),
+	}
+	request.DestinationHost = ptrDiameterIdentity("server.example.com")
+	request.OcSupportedFeatures = ptrOctetString([]byte{0x01, 0x02, 0x03})
+	request.SupportedFeatures = []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})}
+	request.RequestedEutranAuthenticationInfo = &RequestedEUTRANAuthenticationInfo{
+		NumberOfRequestedVectors:   ptrUnsigned32(1),
+		ImmediateResponsePreferred: ptrUnsigned32(1),
+		ReSynchronizationInfo:      ptrOctetString([]byte{0x01, 0x02, 0x03}),
+	}
+	request.RequestedUtranGeranAuthenticationInfo = &RequestedUTRANGERANAuthenticationInfo{
+		NumberOfRequestedVectors:   ptrUnsigned32(1),
+		ImmediateResponsePreferred: ptrUnsigned32(1),
+		ReSynchronizationInfo:      ptrOctetString([]byte{0x01, 0x02, 0x03}),
+	}
+	request.AirFlags = ptrUnsigned32(1)
+	request.Avp = []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})}
+	request.ProxyInfo = []*ProxyInfo{
+		&ProxyInfo{
+			ProxyHost:  models_base.DiameterIdentity("client.example.com"),
+			ProxyState: ptrOctetString([]byte{0x01, 0x02, 0x03}),
+		},
+	}
+	request.RouteRecord = []models_base.DiameterIdentity{models_base.DiameterIdentity("client.example.com")}
+
+	// Set header identifiers for request
+	request.Header.HopByHopID = 0x12345678
+	request.Header.EndToEndID = 0x87654321
+
+	// Create Answer message
+	answer := NewAuthenticationInformationAnswer()
+	answer.SessionId = models_base.UTF8String("client.example.com;1234567890;1")
+	answer.AuthSessionState = models_base.Enumerated(1)
+	answer.OriginHost = models_base.DiameterIdentity("server.example.com")
+	answer.OriginRealm = models_base.DiameterIdentity("server.example.com")
+	answer.Drmp = ptrEnumerated(1)
+	answer.VendorSpecificApplicationId = &VendorSpecificApplicationId{
+		VendorId:          ptrUnsigned32(10415),
+		AuthApplicationId: ptrUnsigned32(16777252),
+		AcctApplicationId: ptrUnsigned32(1),
+	}
+	answer.ResultCode = ptrUnsigned32(2001) // DIAMETER_SUCCESS
+	answer.ExperimentalResult = &ExperimentalResult{
+		VendorId:               models_base.Unsigned32(10415),
+		ExperimentalResultCode: models_base.Unsigned32(1),
+	}
+	answer.ErrorDiagnostic = ptrEnumerated(1)
+	answer.OcSupportedFeatures = ptrOctetString([]byte{0x01, 0x02, 0x03})
+	answer.OcOlr = ptrOctetString([]byte{0x01, 0x02, 0x03})
+	answer.Load = []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})}
+	answer.SupportedFeatures = []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})}
+	answer.AuthenticationInfo = &AuthenticationInfo{
+		EUtranVector: []*EUTRANVector{
+			&EUTRANVector{
+				ItemNumber: ptrUnsigned32(1),
+				Rand:       models_base.OctetString([]byte{0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f, 0x10}),
+				Xres:       models_base.OctetString([]byte{0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18}),
+				Autn:       models_base.OctetString([]byte{0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27, 0x28, 0x29, 0x2a, 0x2b, 0x2c, 0x2d, 0x2e, 0x2f, 0x30}),
+				Kasme:      models_base.OctetString([]byte{0x31, 0x32, 0x33, 0x34, 0x35, 0x36, 0x37, 0x38, 0x39, 0x3a, 0x3b, 0x3c, 0x3d, 0x3e, 0x3f, 0x40, 0x41, 0x42, 0x43, 0x44, 0x45, 0x46, 0x47, 0x48, 0x49, 0x4a, 0x4b, 0x4c, 0x4d, 0x4e, 0x4f, 0x50}),
+			},
+		},
+		UtranVector: []*UTRANVector{
+			&UTRANVector{
+				ItemNumber: ptrUnsigned32(1),
+				Rand:       models_base.OctetString([]byte{0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f, 0x10}),
+				Xres:       models_base.OctetString([]byte{0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18}),
+				Autn:       models_base.OctetString([]byte{0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27, 0x28, 0x29, 0x2a, 0x2b, 0x2c, 0x2d, 0x2e, 0x2f, 0x30}),
+				Ck:         models_base.OctetString([]byte{0x31, 0x32, 0x33, 0x34, 0x35, 0x36, 0x37, 0x38, 0x39, 0x3a, 0x3b, 0x3c, 0x3d, 0x3e, 0x3f, 0x40}),
+				Ik:         models_base.OctetString([]byte{0x31, 0x32, 0x33, 0x34, 0x35, 0x36, 0x37, 0x38, 0x39, 0x3a, 0x3b, 0x3c, 0x3d, 0x3e, 0x3f, 0x40}),
+			},
+		},
+		GeranVector: []*GERANVector{
+			&GERANVector{
+				ItemNumber: ptrUnsigned32(1),
+				Rand:       models_base.OctetString([]byte{0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f, 0x10}),
+				Sres:       models_base.OctetString([]byte{0x11, 0x12, 0x13, 0x14}),
+				Kc:         models_base.OctetString([]byte{0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27, 0x28}),
+			},
+		},
+	}
+	answer.UeUsageType = ptrOctetString([]byte{0x01, 0x02, 0x03})
+	answer.Avp = []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})}
+	answer.FailedAvp = &FailedAVP{
+		AVP: []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})},
+	}
+	answer.ProxyInfo = []*ProxyInfo{
+		&ProxyInfo{
+			ProxyHost:  models_base.DiameterIdentity("client.example.com"),
+			ProxyState: ptrOctetString([]byte{0x01, 0x02, 0x03}),
+		},
+	}
+	answer.RouteRecord = []models_base.DiameterIdentity{models_base.DiameterIdentity("server.example.com")}
+
+	// Set header identifiers for answer (must match request)
+	answer.Header.HopByHopID = 0x12345678
+	answer.Header.EndToEndID = 0x87654321
+
+	// Marshal request
+	requestData, err := request.Marshal()
+	if err != nil {
+		t.Fatalf("Failed to marshal request: %v", err)
+	}
+
+	// Marshal answer
+	answerData, err := answer.Marshal()
+	if err != nil {
+		t.Fatalf("Failed to marshal answer: %v", err)
+	}
+
+	// Write request-response pair to PCAP
+	err = writeDiameterPairToPcap(pcapFile, requestData, answerData, net.ParseIP("192.168.1.100"), net.ParseIP("192.168.1.1"))
+	if err != nil {
+		t.Fatalf("Failed to write PCAP: %v", err)
+	}
+
+	// Verify PCAP file
+	info, err := os.Stat(pcapFile)
+	if err != nil {
+		t.Fatalf("PCAP file not created: %v", err)
+	}
+	if info.Size() == 0 {
+		t.Fatal("PCAP file is empty")
+	}
+
+	t.Logf("PCAP file created: %s (%d bytes)", pcapFile, info.Size())
+	t.Logf("Open in Wireshark to view the request-response pair")
+}
+
+// TestCL_Pair_PCAP tests PCAP file generation for CL request-response pair
+func TestCL_Pair_PCAP(t *testing.T) {
+	// Create testdata directory
+	if err := os.MkdirAll("testdata", 0755); err != nil {
+		t.Fatalf("Failed to create testdata directory: %v", err)
+	}
+
+	// Create pcap file path
+	pcapFile := filepath.Join("testdata", "test_clr_cla.pcap")
+	// PCAP files are kept for Wireshark analysis
+
+	// Create Request message
+	request := NewCancelLocationRequest()
+	request.SessionId = models_base.UTF8String("client.example.com;1234567890;1")
+	request.AuthSessionState = models_base.Enumerated(1)
+	request.OriginHost = models_base.DiameterIdentity("client.example.com")
+	request.OriginRealm = models_base.DiameterIdentity("client.example.com")
+	request.DestinationHost = models_base.DiameterIdentity("server.example.com")
+	request.DestinationRealm = models_base.DiameterIdentity("server.example.com")
+	request.UserName = models_base.UTF8String("452040000000010")
+	request.CancellationType = models_base.Enumerated(1)
+	request.Drmp = ptrEnumerated(1)
+	request.VendorSpecificApplicationId = &VendorSpecificApplicationId{
+		VendorId:          ptrUnsigned32(10415),
+		AuthApplicationId: ptrUnsigned32(16777252),
+		AcctApplicationId: ptrUnsigned32(1),
+	}
+	request.SupportedFeatures = []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})}
+	request.ClrFlags = ptrUnsigned32(1)
+	request.Avp = []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})}
+	request.ProxyInfo = []*ProxyInfo{
+		&ProxyInfo{
+			ProxyHost:  models_base.DiameterIdentity("client.example.com"),
+			ProxyState: ptrOctetString([]byte{0x01, 0x02, 0x03}),
+		},
+	}
+	request.RouteRecord = []models_base.DiameterIdentity{models_base.DiameterIdentity("client.example.com")}
+
+	// Set header identifiers for request
+	request.Header.HopByHopID = 0x12345678
+	request.Header.EndToEndID = 0x87654321
+
+	// Create Answer message
+	answer := NewCancelLocationAnswer()
+	answer.SessionId = models_base.UTF8String("client.example.com;1234567890;1")
+	answer.AuthSessionState = models_base.Enumerated(1)
+	answer.OriginHost = models_base.DiameterIdentity("server.example.com")
+	answer.OriginRealm = models_base.DiameterIdentity("server.example.com")
+	answer.Drmp = ptrEnumerated(1)
+	answer.VendorSpecificApplicationId = &VendorSpecificApplicationId{
+		VendorId:          ptrUnsigned32(10415),
+		AuthApplicationId: ptrUnsigned32(16777252),
+		AcctApplicationId: ptrUnsigned32(1),
+	}
+	answer.SupportedFeatures = []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})}
+	answer.ResultCode = ptrUnsigned32(2001) // DIAMETER_SUCCESS
+	answer.ExperimentalResult = &ExperimentalResult{
+		VendorId:               models_base.Unsigned32(10415),
+		ExperimentalResultCode: models_base.Unsigned32(1),
+	}
+	answer.Avp = []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})}
+	answer.FailedAvp = &FailedAVP{
+		AVP: []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})},
+	}
+	answer.ProxyInfo = []*ProxyInfo{
+		&ProxyInfo{
+			ProxyHost:  models_base.DiameterIdentity("client.example.com"),
+			ProxyState: ptrOctetString([]byte{0x01, 0x02, 0x03}),
+		},
+	}
+	answer.RouteRecord = []models_base.DiameterIdentity{models_base.DiameterIdentity("server.example.com")}
+
+	// Set header identifiers for answer (must match request)
+	answer.Header.HopByHopID = 0x12345678
+	answer.Header.EndToEndID = 0x87654321
+
+	// Marshal request
+	requestData, err := request.Marshal()
+	if err != nil {
+		t.Fatalf("Failed to marshal request: %v", err)
+	}
+
+	// Marshal answer
+	answerData, err := answer.Marshal()
+	if err != nil {
+		t.Fatalf("Failed to marshal answer: %v", err)
+	}
+
+	// Write request-response pair to PCAP
+	err = writeDiameterPairToPcap(pcapFile, requestData, answerData, net.ParseIP("192.168.1.100"), net.ParseIP("192.168.1.1"))
+	if err != nil {
+		t.Fatalf("Failed to write PCAP: %v", err)
+	}
+
+	// Verify PCAP file
+	info, err := os.Stat(pcapFile)
+	if err != nil {
+		t.Fatalf("PCAP file not created: %v", err)
+	}
+	if info.Size() == 0 {
+		t.Fatal("PCAP file is empty")
+	}
+
+	t.Logf("PCAP file created: %s (%d bytes)", pcapFile, info.Size())
+	t.Logf("Open in Wireshark to view the request-response pair")
+}
+
+// TestDSD_Pair_PCAP tests PCAP file generation for DSD request-response pair
+func TestDSD_Pair_PCAP(t *testing.T) {
+	// Create testdata directory
+	if err := os.MkdirAll("testdata", 0755); err != nil {
+		t.Fatalf("Failed to create testdata directory: %v", err)
+	}
+
+	// Create pcap file path
+	pcapFile := filepath.Join("testdata", "test_dsdr_dsda.pcap")
+	// PCAP files are kept for Wireshark analysis
+
+	// Create Request message
+	request := NewDeleteSubscriberDataRequest()
+	request.SessionId = models_base.UTF8String("client.example.com;1234567890;1")
+	request.AuthSessionState = models_base.Enumerated(1)
+	request.OriginHost = models_base.DiameterIdentity("client.example.com")
+	request.OriginRealm = models_base.DiameterIdentity("client.example.com")
+	request.DestinationHost = models_base.DiameterIdentity("server.example.com")
+	request.DestinationRealm = models_base.DiameterIdentity("server.example.com")
+	request.UserName = models_base.UTF8String("452040000000010")
+	request.DsrFlags = models_base.Unsigned32(1)
+	request.Drmp = ptrEnumerated(1)
+	request.VendorSpecificApplicationId = &VendorSpecificApplicationId{
+		VendorId:          ptrUnsigned32(10415),
+		AuthApplicationId: ptrUnsigned32(16777252),
+		AcctApplicationId: ptrUnsigned32(1),
+	}
+	request.SupportedFeatures = []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})}
+	request.ScefId = ptrOctetString([]byte{0x01, 0x02, 0x03})
+	request.ContextIdentifier = []models_base.Unsigned32{models_base.Unsigned32(1)}
+	request.TraceReference = ptrOctetString([]byte{0x01, 0x02, 0x03})
+	request.TsCode = []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})}
+	request.SsCode = []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})}
+	request.EdrxRelatedRat = ptrOctetString([]byte{0x01, 0x02, 0x03})
+	request.ExternalIdentifier = []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})}
+	request.Avp = []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})}
+	request.ProxyInfo = []*ProxyInfo{
+		&ProxyInfo{
+			ProxyHost:  models_base.DiameterIdentity("client.example.com"),
+			ProxyState: ptrOctetString([]byte{0x01, 0x02, 0x03}),
+		},
+	}
+	request.RouteRecord = []models_base.DiameterIdentity{models_base.DiameterIdentity("client.example.com")}
+
+	// Set header identifiers for request
+	request.Header.HopByHopID = 0x12345678
+	request.Header.EndToEndID = 0x87654321
+
+	// Create Answer message
+	answer := NewDeleteSubscriberDataAnswer()
+	answer.SessionId = models_base.UTF8String("client.example.com;1234567890;1")
+	answer.AuthSessionState = models_base.Enumerated(1)
+	answer.OriginHost = models_base.DiameterIdentity("server.example.com")
+	answer.OriginRealm = models_base.DiameterIdentity("server.example.com")
+	answer.Drmp = ptrEnumerated(1)
+	answer.VendorSpecificApplicationId = &VendorSpecificApplicationId{
+		VendorId:          ptrUnsigned32(10415),
+		AuthApplicationId: ptrUnsigned32(16777252),
+		AcctApplicationId: ptrUnsigned32(1),
+	}
+	answer.SupportedFeatures = []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})}
+	answer.ResultCode = ptrUnsigned32(2001) // DIAMETER_SUCCESS
+	answer.ExperimentalResult = &ExperimentalResult{
+		VendorId:               models_base.Unsigned32(10415),
+		ExperimentalResultCode: models_base.Unsigned32(1),
+	}
+	answer.DsaFlags = ptrUnsigned32(1)
+	answer.Avp = []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})}
+	answer.FailedAvp = &FailedAVP{
+		AVP: []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})},
+	}
+	answer.ProxyInfo = []*ProxyInfo{
+		&ProxyInfo{
+			ProxyHost:  models_base.DiameterIdentity("client.example.com"),
+			ProxyState: ptrOctetString([]byte{0x01, 0x02, 0x03}),
+		},
+	}
+	answer.RouteRecord = []models_base.DiameterIdentity{models_base.DiameterIdentity("server.example.com")}
+
+	// Set header identifiers for answer (must match request)
+	answer.Header.HopByHopID = 0x12345678
+	answer.Header.EndToEndID = 0x87654321
+
+	// Marshal request
+	requestData, err := request.Marshal()
+	if err != nil {
+		t.Fatalf("Failed to marshal request: %v", err)
+	}
+
+	// Marshal answer
+	answerData, err := answer.Marshal()
+	if err != nil {
+		t.Fatalf("Failed to marshal answer: %v", err)
+	}
+
+	// Write request-response pair to PCAP
+	err = writeDiameterPairToPcap(pcapFile, requestData, answerData, net.ParseIP("192.168.1.100"), net.ParseIP("192.168.1.1"))
+	if err != nil {
+		t.Fatalf("Failed to write PCAP: %v", err)
+	}
+
+	// Verify PCAP file
+	info, err := os.Stat(pcapFile)
+	if err != nil {
+		t.Fatalf("PCAP file not created: %v", err)
+	}
+	if info.Size() == 0 {
+		t.Fatal("PCAP file is empty")
+	}
+
+	t.Logf("PCAP file created: %s (%d bytes)", pcapFile, info.Size())
+	t.Logf("Open in Wireshark to view the request-response pair")
+}
+
+// TestISD_Pair_PCAP tests PCAP file generation for ISD request-response pair
+func TestISD_Pair_PCAP(t *testing.T) {
+	// Create testdata directory
+	if err := os.MkdirAll("testdata", 0755); err != nil {
+		t.Fatalf("Failed to create testdata directory: %v", err)
+	}
+
+	// Create pcap file path
+	pcapFile := filepath.Join("testdata", "test_isdr_isda.pcap")
+	// PCAP files are kept for Wireshark analysis
+
+	// Create Request message
+	request := NewInsertSubscriberDataRequest()
+	request.SessionId = models_base.UTF8String("client.example.com;1234567890;1")
+	request.AuthSessionState = models_base.Enumerated(1)
+	request.OriginHost = models_base.DiameterIdentity("client.example.com")
+	request.OriginRealm = models_base.DiameterIdentity("client.example.com")
+	request.DestinationHost = models_base.DiameterIdentity("server.example.com")
+	request.DestinationRealm = models_base.DiameterIdentity("server.example.com")
+	request.UserName = models_base.UTF8String("452040000000010")
+	request.SubscriptionData = &SubscriptionData{
+		SubscriberStatus:             ptrEnumerated(1),
+		Msisdn:                       ptrOctetString([]byte{0x01, 0x02, 0x03}),
+		AMsisdn:                      ptrOctetString([]byte{0x01, 0x02, 0x03}),
+		StnSr:                        ptrOctetString([]byte{0x01, 0x02, 0x03}),
+		IcsIndicator:                 ptrOctetString([]byte{0x01, 0x02, 0x03}),
+		NetworkAccessMode:            ptrOctetString([]byte{0x01, 0x02, 0x03}),
+		OperatorDeterminedBarring:    ptrUnsigned32(1),
+		HplmnOdb:                     ptrOctetString([]byte{0x00, 0xF1, 0x10}),
+		RegionalSubscriptionZoneCode: []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})},
+		AccessRestrictionData:        ptrUnsigned32(1),
+		ApnOiReplacement:             ptrUTF8String("452040000000010"),
+		LcsInfo:                      ptrOctetString([]byte{0x01, 0x02, 0x03}),
+		TeleserviceList:              ptrOctetString([]byte{0x01, 0x02, 0x03}),
+		CallBarringInfo:              []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})},
+		ChargingCharacteristics:      ptrOctetString([]byte{0x01, 0x02, 0x03}),
+		Ambr: &AMBR{
+			MaxRequestedBandwidthUl:  models_base.OctetString([]byte{0x01, 0x02, 0x03}),
+			MaxRequestedBandwidthDl:  models_base.OctetString([]byte{0x01, 0x02, 0x03}),
+			ExtendedMaxRequestedBwUl: ptrOctetString([]byte{0x01, 0x02, 0x03}),
+			ExtendedMaxRequestedBwDl: ptrOctetString([]byte{0x01, 0x02, 0x03}),
+		},
+		ApnConfigurationProfile: &APNConfigurationProfile{
+			ContextIdentifier: models_base.Unsigned32(1),
+			// AllApnConfigIncluded: nil, // (type: Enumerated) needs to be set
+			// ApnConfiguration: nil, // (type: Grouped) needs to be set
+		},
+		RatFrequencySelectionPriorityId: ptrOctetString([]byte{0x01, 0x02, 0x03}),
+		TraceData:                       ptrOctetString([]byte{0x01, 0x02, 0x03}),
+		GprsSubscriptionData:            ptrOctetString([]byte{0x01, 0x02, 0x03}),
+		CsgSubscriptionData: []*CSGSubscriptionData{
+			&CSGSubscriptionData{
+				CsgId:            models_base.OctetString([]byte{0x01, 0x02, 0x03}),
+				ExpirationDate:   ptrOctetString([]byte{0x01, 0x02, 0x03}),
+				ServiceSelection: []models_base.UTF8String{models_base.UTF8String("test")},
+				VisitedPlmnId:    ptrOctetString([]byte{0x01, 0x02, 0x03}),
+			},
+		},
+		RoamingRestricted:                    ptrOctetString([]byte{0x01, 0x02, 0x03}),
+		SubscribedPeriodicRauTauTimer:        ptrOctetString([]byte{0x01, 0x02, 0x03}),
+		MpsPriority:                          ptrOctetString([]byte{0x01, 0x02, 0x03}),
+		VplmnLipaAllowed:                     ptrOctetString([]byte{0x00, 0xF1, 0x10}),
+		RelayNodeIndicator:                   ptrOctetString([]byte{0x01, 0x02, 0x03}),
+		MdtUserConsent:                       ptrOctetString([]byte{0x01, 0x02, 0x03}),
+		SubscribedVsrvcc:                     ptrOctetString([]byte{0x01, 0x02, 0x03}),
+		ProseSubscriptionData:                ptrOctetString([]byte{0x01, 0x02, 0x03}),
+		SubscriptionDataFlags:                ptrOctetString([]byte{0x01, 0x02, 0x03}),
+		AdjacentAccessRestrictionData:        []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})},
+		DlBufferingSuggestedPacketCount:      ptrOctetString([]byte{0x01, 0x02, 0x03}),
+		ImsiGroupId:                          []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})},
+		UeUsageType:                          ptrOctetString([]byte{0x01, 0x02, 0x03}),
+		AeseCommunicationPattern:             []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})},
+		MonitoringEventConfiguration:         []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})},
+		EmergencyInfo:                        ptrOctetString([]byte{0x01, 0x02, 0x03}),
+		V2xSubscriptionData:                  ptrOctetString([]byte{0x01, 0x02, 0x03}),
+		EdrxCycleLength:                      ptrOctetString([]byte{0x01, 0x02, 0x03}),
+		ExternalIdentifier:                   ptrOctetString([]byte{0x01, 0x02, 0x03}),
+		ActiveTime:                           ptrOctetString([]byte{0x01, 0x02, 0x03}),
+		ServiceGapTime:                       ptrOctetString([]byte{0x01, 0x02, 0x03}),
+		BroadcastLocationAssistanceDataTypes: ptrOctetString([]byte{0x01, 0x02, 0x03}),
+		AerialUeSubscriptionInformation:      ptrOctetString([]byte{0x01, 0x02, 0x03}),
+		CoreNetworkRestrictions:              ptrOctetString([]byte{0x01, 0x02, 0x03}),
+	}
+	request.Drmp = ptrEnumerated(1)
+	request.VendorSpecificApplicationId = &VendorSpecificApplicationId{
+		VendorId:          ptrUnsigned32(10415),
+		AuthApplicationId: ptrUnsigned32(16777252),
+		AcctApplicationId: ptrUnsigned32(1),
+	}
+	request.SupportedFeatures = []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})}
+	request.IdrFlags = ptrUnsigned32(1)
+	request.ResetId = []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})}
+	request.Avp = []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})}
+	request.ProxyInfo = []*ProxyInfo{
+		&ProxyInfo{
+			ProxyHost:  models_base.DiameterIdentity("client.example.com"),
+			ProxyState: ptrOctetString([]byte{0x01, 0x02, 0x03}),
+		},
+	}
+	request.RouteRecord = []models_base.DiameterIdentity{models_base.DiameterIdentity("client.example.com")}
+
+	// Set header identifiers for request
+	request.Header.HopByHopID = 0x12345678
+	request.Header.EndToEndID = 0x87654321
+
+	// Create Answer message
+	answer := NewInsertSubscriberDataAnswer()
+	answer.SessionId = models_base.UTF8String("client.example.com;1234567890;1")
+	answer.AuthSessionState = models_base.Enumerated(1)
+	answer.OriginHost = models_base.DiameterIdentity("server.example.com")
+	answer.OriginRealm = models_base.DiameterIdentity("server.example.com")
+	answer.Drmp = ptrEnumerated(1)
+	answer.VendorSpecificApplicationId = &VendorSpecificApplicationId{
+		VendorId:          ptrUnsigned32(10415),
+		AuthApplicationId: ptrUnsigned32(16777252),
+		AcctApplicationId: ptrUnsigned32(1),
+	}
+	answer.SupportedFeatures = []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})}
+	answer.ResultCode = ptrUnsigned32(2001) // DIAMETER_SUCCESS
+	answer.ExperimentalResult = &ExperimentalResult{
+		VendorId:               models_base.Unsigned32(10415),
+		ExperimentalResultCode: models_base.Unsigned32(1),
+	}
+	answer.ImsVoiceOverPsSessionsSupported = ptrOctetString([]byte{0x01, 0x02, 0x03})
+	answer.LastUeActivityTime = ptrOctetString([]byte{0x01, 0x02, 0x03})
+	answer.RatType = ptrEnumerated(1)
+	answer.IdaFlags = ptrUnsigned32(1)
+	answer.EpsUserState = ptrOctetString([]byte{0x01, 0x02, 0x03})
+	answer.EpsLocationInformation = ptrOctetString([]byte{0x01, 0x02, 0x03})
+	answer.LocalTimeZone = ptrOctetString([]byte{0x01, 0x02, 0x03})
+	answer.SupportedServices = ptrOctetString([]byte{0x01, 0x02, 0x03})
+	answer.MonitoringEventReport = []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})}
+	answer.MonitoringEventConfigStatus = []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})}
+	answer.Avp = []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})}
+	answer.FailedAvp = &FailedAVP{
+		AVP: []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})},
+	}
+	answer.ProxyInfo = []*ProxyInfo{
+		&ProxyInfo{
+			ProxyHost:  models_base.DiameterIdentity("client.example.com"),
+			ProxyState: ptrOctetString([]byte{0x01, 0x02, 0x03}),
+		},
+	}
+	answer.RouteRecord = []models_base.DiameterIdentity{models_base.DiameterIdentity("server.example.com")}
+
+	// Set header identifiers for answer (must match request)
+	answer.Header.HopByHopID = 0x12345678
+	answer.Header.EndToEndID = 0x87654321
+
+	// Marshal request
+	requestData, err := request.Marshal()
+	if err != nil {
+		t.Fatalf("Failed to marshal request: %v", err)
+	}
+
+	// Marshal answer
+	answerData, err := answer.Marshal()
+	if err != nil {
+		t.Fatalf("Failed to marshal answer: %v", err)
+	}
+
+	// Write request-response pair to PCAP
+	err = writeDiameterPairToPcap(pcapFile, requestData, answerData, net.ParseIP("192.168.1.100"), net.ParseIP("192.168.1.1"))
+	if err != nil {
+		t.Fatalf("Failed to write PCAP: %v", err)
+	}
+
+	// Verify PCAP file
+	info, err := os.Stat(pcapFile)
+	if err != nil {
+		t.Fatalf("PCAP file not created: %v", err)
+	}
+	if info.Size() == 0 {
+		t.Fatal("PCAP file is empty")
+	}
+
+	t.Logf("PCAP file created: %s (%d bytes)", pcapFile, info.Size())
+	t.Logf("Open in Wireshark to view the request-response pair")
+}
+
+// TestN_Pair_PCAP tests PCAP file generation for N request-response pair
+func TestN_Pair_PCAP(t *testing.T) {
+	// Create testdata directory
+	if err := os.MkdirAll("testdata", 0755); err != nil {
+		t.Fatalf("Failed to create testdata directory: %v", err)
+	}
+
+	// Create pcap file path
+	pcapFile := filepath.Join("testdata", "test_nr_na.pcap")
+	// PCAP files are kept for Wireshark analysis
+
+	// Create Request message
+	request := NewNotifyRequest()
+	request.SessionId = models_base.UTF8String("client.example.com;1234567890;1")
+	request.AuthSessionState = models_base.Enumerated(1)
+	request.OriginHost = models_base.DiameterIdentity("client.example.com")
+	request.OriginRealm = models_base.DiameterIdentity("client.example.com")
+	request.DestinationRealm = models_base.DiameterIdentity("server.example.com")
+	request.UserName = models_base.UTF8String("452040000000010")
+	request.Drmp = ptrEnumerated(1)
+	request.VendorSpecificApplicationId = &VendorSpecificApplicationId{
+		VendorId:          ptrUnsigned32(10415),
+		AuthApplicationId: ptrUnsigned32(16777252),
+		AcctApplicationId: ptrUnsigned32(1),
+	}
+	request.DestinationHost = ptrDiameterIdentity("server.example.com")
+	request.OcSupportedFeatures = ptrOctetString([]byte{0x01, 0x02, 0x03})
+	request.SupportedFeatures = []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})}
+	request.TerminalInformation = &TerminalInformation{
+		Imei:            ptrUTF8String("123456789012345"),
+		Meid:            ptrOctetString([]byte{0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07}),
+		SoftwareVersion: ptrUTF8String("01"),
+	}
+	request.Mip6AgentInfo = &MIP6AgentInfo{
+		MipHomeAgentAddress: []models_base.Address{models_base.Address(net.ParseIP("192.168.1.100"))},
+		MipHomeAgentHost:    &MIPHomeAgentHost{
+			// DestinationRealm: nil, // (type: DiameterIdentity) needs to be set
+			// DestinationHost: nil, // (type: DiameterIdentity) needs to be set
+		},
+		Mip6HomeLinkPrefix: ptrOctetString([]byte{0x01, 0x02, 0x03}),
+	}
+	request.VisitedNetworkIdentifier = ptrOctetString([]byte{0x01, 0x02, 0x03})
+	request.ContextIdentifier = ptrUnsigned32(1)
+	request.ServiceSelection = ptrUTF8String("452040000000010")
+	request.AlertReason = ptrEnumerated(1)
+	request.UeSrvccCapability = ptrEnumerated(1)
+	request.NorFlags = ptrUnsigned32(1)
+	request.HomogeneousSupportImsVoice = ptrOctetString([]byte{0x01, 0x02, 0x03})
+	request.MaximumUeAvailabilityTime = ptrOctetString([]byte{0x01, 0x02, 0x03})
+	request.MonitoringEventConfigStatus = []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})}
+	request.EmergencyServices = ptrOctetString([]byte{0x01, 0x02, 0x03})
+	request.Avp = []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})}
+	request.ProxyInfo = []*ProxyInfo{
+		&ProxyInfo{
+			ProxyHost:  models_base.DiameterIdentity("client.example.com"),
+			ProxyState: ptrOctetString([]byte{0x01, 0x02, 0x03}),
+		},
+	}
+	request.RouteRecord = []models_base.DiameterIdentity{models_base.DiameterIdentity("client.example.com")}
+
+	// Set header identifiers for request
+	request.Header.HopByHopID = 0x12345678
+	request.Header.EndToEndID = 0x87654321
+
+	// Create Answer message
+	answer := NewNotifyAnswer()
+	answer.SessionId = models_base.UTF8String("client.example.com;1234567890;1")
+	answer.AuthSessionState = models_base.Enumerated(1)
+	answer.OriginHost = models_base.DiameterIdentity("server.example.com")
+	answer.OriginRealm = models_base.DiameterIdentity("server.example.com")
+	answer.Drmp = ptrEnumerated(1)
+	answer.VendorSpecificApplicationId = &VendorSpecificApplicationId{
+		VendorId:          ptrUnsigned32(10415),
+		AuthApplicationId: ptrUnsigned32(16777252),
+		AcctApplicationId: ptrUnsigned32(1),
+	}
+	answer.ResultCode = ptrUnsigned32(2001) // DIAMETER_SUCCESS
+	answer.ExperimentalResult = &ExperimentalResult{
+		VendorId:               models_base.Unsigned32(10415),
+		ExperimentalResultCode: models_base.Unsigned32(1),
+	}
+	answer.OcSupportedFeatures = ptrOctetString([]byte{0x01, 0x02, 0x03})
+	answer.OcOlr = ptrOctetString([]byte{0x01, 0x02, 0x03})
+	answer.Load = []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})}
+	answer.SupportedFeatures = []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})}
+	answer.Avp = []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})}
+	answer.FailedAvp = &FailedAVP{
+		AVP: []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})},
+	}
+	answer.ProxyInfo = []*ProxyInfo{
+		&ProxyInfo{
+			ProxyHost:  models_base.DiameterIdentity("client.example.com"),
+			ProxyState: ptrOctetString([]byte{0x01, 0x02, 0x03}),
+		},
+	}
+	answer.RouteRecord = []models_base.DiameterIdentity{models_base.DiameterIdentity("server.example.com")}
+
+	// Set header identifiers for answer (must match request)
+	answer.Header.HopByHopID = 0x12345678
+	answer.Header.EndToEndID = 0x87654321
+
+	// Marshal request
+	requestData, err := request.Marshal()
+	if err != nil {
+		t.Fatalf("Failed to marshal request: %v", err)
+	}
+
+	// Marshal answer
+	answerData, err := answer.Marshal()
+	if err != nil {
+		t.Fatalf("Failed to marshal answer: %v", err)
+	}
+
+	// Write request-response pair to PCAP
+	err = writeDiameterPairToPcap(pcapFile, requestData, answerData, net.ParseIP("192.168.1.100"), net.ParseIP("192.168.1.1"))
+	if err != nil {
+		t.Fatalf("Failed to write PCAP: %v", err)
+	}
+
+	// Verify PCAP file
+	info, err := os.Stat(pcapFile)
+	if err != nil {
+		t.Fatalf("PCAP file not created: %v", err)
+	}
+	if info.Size() == 0 {
+		t.Fatal("PCAP file is empty")
+	}
+
+	t.Logf("PCAP file created: %s (%d bytes)", pcapFile, info.Size())
+	t.Logf("Open in Wireshark to view the request-response pair")
+}
+
 // TestPU_Pair_PCAP tests PCAP file generation for PU request-response pair
 func TestPU_Pair_PCAP(t *testing.T) {
 	// Create testdata directory
@@ -513,138 +1198,6 @@ func TestR_Pair_PCAP(t *testing.T) {
 	t.Logf("Open in Wireshark to view the request-response pair")
 }
 
-// TestN_Pair_PCAP tests PCAP file generation for N request-response pair
-func TestN_Pair_PCAP(t *testing.T) {
-	// Create testdata directory
-	if err := os.MkdirAll("testdata", 0755); err != nil {
-		t.Fatalf("Failed to create testdata directory: %v", err)
-	}
-
-	// Create pcap file path
-	pcapFile := filepath.Join("testdata", "test_nr_na.pcap")
-	// PCAP files are kept for Wireshark analysis
-
-	// Create Request message
-	request := NewNotifyRequest()
-	request.SessionId = models_base.UTF8String("client.example.com;1234567890;1")
-	request.AuthSessionState = models_base.Enumerated(1)
-	request.OriginHost = models_base.DiameterIdentity("client.example.com")
-	request.OriginRealm = models_base.DiameterIdentity("client.example.com")
-	request.DestinationRealm = models_base.DiameterIdentity("server.example.com")
-	request.UserName = models_base.UTF8String("452040000000010")
-	request.Drmp = ptrEnumerated(1)
-	request.VendorSpecificApplicationId = &VendorSpecificApplicationId{
-		VendorId:          ptrUnsigned32(10415),
-		AuthApplicationId: ptrUnsigned32(16777252),
-		AcctApplicationId: ptrUnsigned32(1),
-	}
-	request.DestinationHost = ptrDiameterIdentity("server.example.com")
-	request.OcSupportedFeatures = ptrOctetString([]byte{0x01, 0x02, 0x03})
-	request.SupportedFeatures = []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})}
-	request.TerminalInformation = &TerminalInformation{
-		Imei:            ptrUTF8String("123456789012345"),
-		Meid:            ptrOctetString([]byte{0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07}),
-		SoftwareVersion: ptrUTF8String("01"),
-	}
-	request.Mip6AgentInfo = &MIP6AgentInfo{
-		MipHomeAgentAddress: []models_base.Address{models_base.Address(net.ParseIP("192.168.1.100"))},
-		MipHomeAgentHost:    &MIPHomeAgentHost{
-			// DestinationRealm: nil, // (type: DiameterIdentity) needs to be set
-			// DestinationHost: nil, // (type: DiameterIdentity) needs to be set
-		},
-		Mip6HomeLinkPrefix: ptrOctetString([]byte{0x01, 0x02, 0x03}),
-	}
-	request.VisitedNetworkIdentifier = ptrOctetString([]byte{0x01, 0x02, 0x03})
-	request.ContextIdentifier = ptrUnsigned32(1)
-	request.ServiceSelection = ptrUTF8String("452040000000010")
-	request.AlertReason = ptrEnumerated(1)
-	request.UeSrvccCapability = ptrEnumerated(1)
-	request.NorFlags = ptrUnsigned32(1)
-	request.HomogeneousSupportImsVoice = ptrOctetString([]byte{0x01, 0x02, 0x03})
-	request.MaximumUeAvailabilityTime = ptrOctetString([]byte{0x01, 0x02, 0x03})
-	request.MonitoringEventConfigStatus = []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})}
-	request.EmergencyServices = ptrOctetString([]byte{0x01, 0x02, 0x03})
-	request.Avp = []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})}
-	request.ProxyInfo = []*ProxyInfo{
-		&ProxyInfo{
-			ProxyHost:  models_base.DiameterIdentity("client.example.com"),
-			ProxyState: ptrOctetString([]byte{0x01, 0x02, 0x03}),
-		},
-	}
-	request.RouteRecord = []models_base.DiameterIdentity{models_base.DiameterIdentity("client.example.com")}
-
-	// Set header identifiers for request
-	request.Header.HopByHopID = 0x12345678
-	request.Header.EndToEndID = 0x87654321
-
-	// Create Answer message
-	answer := NewNotifyAnswer()
-	answer.SessionId = models_base.UTF8String("client.example.com;1234567890;1")
-	answer.AuthSessionState = models_base.Enumerated(1)
-	answer.OriginHost = models_base.DiameterIdentity("server.example.com")
-	answer.OriginRealm = models_base.DiameterIdentity("server.example.com")
-	answer.Drmp = ptrEnumerated(1)
-	answer.VendorSpecificApplicationId = &VendorSpecificApplicationId{
-		VendorId:          ptrUnsigned32(10415),
-		AuthApplicationId: ptrUnsigned32(16777252),
-		AcctApplicationId: ptrUnsigned32(1),
-	}
-	answer.ResultCode = ptrUnsigned32(2001) // DIAMETER_SUCCESS
-	answer.ExperimentalResult = &ExperimentalResult{
-		VendorId:               models_base.Unsigned32(10415),
-		ExperimentalResultCode: models_base.Unsigned32(1),
-	}
-	answer.OcSupportedFeatures = ptrOctetString([]byte{0x01, 0x02, 0x03})
-	answer.OcOlr = ptrOctetString([]byte{0x01, 0x02, 0x03})
-	answer.Load = []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})}
-	answer.SupportedFeatures = []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})}
-	answer.Avp = []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})}
-	answer.FailedAvp = &FailedAVP{
-		AVP: []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})},
-	}
-	answer.ProxyInfo = []*ProxyInfo{
-		&ProxyInfo{
-			ProxyHost:  models_base.DiameterIdentity("client.example.com"),
-			ProxyState: ptrOctetString([]byte{0x01, 0x02, 0x03}),
-		},
-	}
-	answer.RouteRecord = []models_base.DiameterIdentity{models_base.DiameterIdentity("server.example.com")}
-
-	// Set header identifiers for answer (must match request)
-	answer.Header.HopByHopID = 0x12345678
-	answer.Header.EndToEndID = 0x87654321
-
-	// Marshal request
-	requestData, err := request.Marshal()
-	if err != nil {
-		t.Fatalf("Failed to marshal request: %v", err)
-	}
-
-	// Marshal answer
-	answerData, err := answer.Marshal()
-	if err != nil {
-		t.Fatalf("Failed to marshal answer: %v", err)
-	}
-
-	// Write request-response pair to PCAP
-	err = writeDiameterPairToPcap(pcapFile, requestData, answerData, net.ParseIP("192.168.1.100"), net.ParseIP("192.168.1.1"))
-	if err != nil {
-		t.Fatalf("Failed to write PCAP: %v", err)
-	}
-
-	// Verify PCAP file
-	info, err := os.Stat(pcapFile)
-	if err != nil {
-		t.Fatalf("PCAP file not created: %v", err)
-	}
-	if info.Size() == 0 {
-		t.Fatal("PCAP file is empty")
-	}
-
-	t.Logf("PCAP file created: %s (%d bytes)", pcapFile, info.Size())
-	t.Logf("Open in Wireshark to view the request-response pair")
-}
-
 // TestUL_Pair_PCAP tests PCAP file generation for UL request-response pair
 func TestUL_Pair_PCAP(t *testing.T) {
 	// Create testdata directory
@@ -793,559 +1346,6 @@ func TestUL_Pair_PCAP(t *testing.T) {
 		CoreNetworkRestrictions:              ptrOctetString([]byte{0x01, 0x02, 0x03}),
 	}
 	answer.ResetId = []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})}
-	answer.Avp = []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})}
-	answer.FailedAvp = &FailedAVP{
-		AVP: []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})},
-	}
-	answer.ProxyInfo = []*ProxyInfo{
-		&ProxyInfo{
-			ProxyHost:  models_base.DiameterIdentity("client.example.com"),
-			ProxyState: ptrOctetString([]byte{0x01, 0x02, 0x03}),
-		},
-	}
-	answer.RouteRecord = []models_base.DiameterIdentity{models_base.DiameterIdentity("server.example.com")}
-
-	// Set header identifiers for answer (must match request)
-	answer.Header.HopByHopID = 0x12345678
-	answer.Header.EndToEndID = 0x87654321
-
-	// Marshal request
-	requestData, err := request.Marshal()
-	if err != nil {
-		t.Fatalf("Failed to marshal request: %v", err)
-	}
-
-	// Marshal answer
-	answerData, err := answer.Marshal()
-	if err != nil {
-		t.Fatalf("Failed to marshal answer: %v", err)
-	}
-
-	// Write request-response pair to PCAP
-	err = writeDiameterPairToPcap(pcapFile, requestData, answerData, net.ParseIP("192.168.1.100"), net.ParseIP("192.168.1.1"))
-	if err != nil {
-		t.Fatalf("Failed to write PCAP: %v", err)
-	}
-
-	// Verify PCAP file
-	info, err := os.Stat(pcapFile)
-	if err != nil {
-		t.Fatalf("PCAP file not created: %v", err)
-	}
-	if info.Size() == 0 {
-		t.Fatal("PCAP file is empty")
-	}
-
-	t.Logf("PCAP file created: %s (%d bytes)", pcapFile, info.Size())
-	t.Logf("Open in Wireshark to view the request-response pair")
-}
-
-// TestAI_Pair_PCAP tests PCAP file generation for AI request-response pair
-func TestAI_Pair_PCAP(t *testing.T) {
-	// Create testdata directory
-	if err := os.MkdirAll("testdata", 0755); err != nil {
-		t.Fatalf("Failed to create testdata directory: %v", err)
-	}
-
-	// Create pcap file path
-	pcapFile := filepath.Join("testdata", "test_air_aia.pcap")
-	// PCAP files are kept for Wireshark analysis
-
-	// Create Request message
-	request := NewAuthenticationInformationRequest()
-	request.SessionId = models_base.UTF8String("client.example.com;1234567890;1")
-	request.AuthSessionState = models_base.Enumerated(1)
-	request.OriginHost = models_base.DiameterIdentity("client.example.com")
-	request.OriginRealm = models_base.DiameterIdentity("client.example.com")
-	request.DestinationRealm = models_base.DiameterIdentity("server.example.com")
-	request.UserName = models_base.UTF8String("452040000000010")
-	request.VisitedPlmnId = models_base.OctetString([]byte{0x00, 0xF1, 0x10})
-	request.Drmp = ptrEnumerated(1)
-	request.VendorSpecificApplicationId = &VendorSpecificApplicationId{
-		VendorId:          ptrUnsigned32(10415),
-		AuthApplicationId: ptrUnsigned32(16777252),
-		AcctApplicationId: ptrUnsigned32(1),
-	}
-	request.DestinationHost = ptrDiameterIdentity("server.example.com")
-	request.OcSupportedFeatures = ptrOctetString([]byte{0x01, 0x02, 0x03})
-	request.SupportedFeatures = []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})}
-	request.RequestedEutranAuthenticationInfo = &RequestedEUTRANAuthenticationInfo{
-		NumberOfRequestedVectors:   ptrUnsigned32(1),
-		ImmediateResponsePreferred: ptrUnsigned32(1),
-		ReSynchronizationInfo:      ptrOctetString([]byte{0x01, 0x02, 0x03}),
-	}
-	request.RequestedUtranGeranAuthenticationInfo = &RequestedUTRANGERANAuthenticationInfo{
-		NumberOfRequestedVectors:   ptrUnsigned32(1),
-		ImmediateResponsePreferred: ptrUnsigned32(1),
-		ReSynchronizationInfo:      ptrOctetString([]byte{0x01, 0x02, 0x03}),
-	}
-	request.AirFlags = ptrUnsigned32(1)
-	request.Avp = []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})}
-	request.ProxyInfo = []*ProxyInfo{
-		&ProxyInfo{
-			ProxyHost:  models_base.DiameterIdentity("client.example.com"),
-			ProxyState: ptrOctetString([]byte{0x01, 0x02, 0x03}),
-		},
-	}
-	request.RouteRecord = []models_base.DiameterIdentity{models_base.DiameterIdentity("client.example.com")}
-
-	// Set header identifiers for request
-	request.Header.HopByHopID = 0x12345678
-	request.Header.EndToEndID = 0x87654321
-
-	// Create Answer message
-	answer := NewAuthenticationInformationAnswer()
-	answer.SessionId = models_base.UTF8String("client.example.com;1234567890;1")
-	answer.AuthSessionState = models_base.Enumerated(1)
-	answer.OriginHost = models_base.DiameterIdentity("server.example.com")
-	answer.OriginRealm = models_base.DiameterIdentity("server.example.com")
-	answer.Drmp = ptrEnumerated(1)
-	answer.VendorSpecificApplicationId = &VendorSpecificApplicationId{
-		VendorId:          ptrUnsigned32(10415),
-		AuthApplicationId: ptrUnsigned32(16777252),
-		AcctApplicationId: ptrUnsigned32(1),
-	}
-	answer.ResultCode = ptrUnsigned32(2001) // DIAMETER_SUCCESS
-	answer.ExperimentalResult = &ExperimentalResult{
-		VendorId:               models_base.Unsigned32(10415),
-		ExperimentalResultCode: models_base.Unsigned32(1),
-	}
-	answer.ErrorDiagnostic = ptrEnumerated(1)
-	answer.OcSupportedFeatures = ptrOctetString([]byte{0x01, 0x02, 0x03})
-	answer.OcOlr = ptrOctetString([]byte{0x01, 0x02, 0x03})
-	answer.Load = []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})}
-	answer.SupportedFeatures = []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})}
-	answer.AuthenticationInfo = &AuthenticationInfo{
-		EUtranVector: []*EUTRANVector{
-			&EUTRANVector{
-				ItemNumber: ptrUnsigned32(1),
-				Rand:       models_base.OctetString([]byte{0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f, 0x10}),
-				Xres:       models_base.OctetString([]byte{0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18}),
-				Autn:       models_base.OctetString([]byte{0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27, 0x28, 0x29, 0x2a, 0x2b, 0x2c, 0x2d, 0x2e, 0x2f, 0x30}),
-				Kasme:      models_base.OctetString([]byte{0x31, 0x32, 0x33, 0x34, 0x35, 0x36, 0x37, 0x38, 0x39, 0x3a, 0x3b, 0x3c, 0x3d, 0x3e, 0x3f, 0x40, 0x41, 0x42, 0x43, 0x44, 0x45, 0x46, 0x47, 0x48, 0x49, 0x4a, 0x4b, 0x4c, 0x4d, 0x4e, 0x4f, 0x50}),
-			},
-		},
-		UtranVector: []*UTRANVector{
-			&UTRANVector{
-				ItemNumber: ptrUnsigned32(1),
-				Rand:       models_base.OctetString([]byte{0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f, 0x10}),
-				Xres:       models_base.OctetString([]byte{0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18}),
-				Autn:       models_base.OctetString([]byte{0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27, 0x28, 0x29, 0x2a, 0x2b, 0x2c, 0x2d, 0x2e, 0x2f, 0x30}),
-				Ck:         models_base.OctetString([]byte{0x31, 0x32, 0x33, 0x34, 0x35, 0x36, 0x37, 0x38, 0x39, 0x3a, 0x3b, 0x3c, 0x3d, 0x3e, 0x3f, 0x40}),
-				Ik:         models_base.OctetString([]byte{0x31, 0x32, 0x33, 0x34, 0x35, 0x36, 0x37, 0x38, 0x39, 0x3a, 0x3b, 0x3c, 0x3d, 0x3e, 0x3f, 0x40}),
-			},
-		},
-		GeranVector: []*GERANVector{
-			&GERANVector{
-				ItemNumber: ptrUnsigned32(1),
-				Rand:       models_base.OctetString([]byte{0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f, 0x10}),
-				Sres:       models_base.OctetString([]byte{0x11, 0x12, 0x13, 0x14}),
-				Kc:         models_base.OctetString([]byte{0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27, 0x28}),
-			},
-		},
-	}
-	answer.UeUsageType = ptrOctetString([]byte{0x01, 0x02, 0x03})
-	answer.Avp = []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})}
-	answer.FailedAvp = &FailedAVP{
-		AVP: []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})},
-	}
-	answer.ProxyInfo = []*ProxyInfo{
-		&ProxyInfo{
-			ProxyHost:  models_base.DiameterIdentity("client.example.com"),
-			ProxyState: ptrOctetString([]byte{0x01, 0x02, 0x03}),
-		},
-	}
-	answer.RouteRecord = []models_base.DiameterIdentity{models_base.DiameterIdentity("server.example.com")}
-
-	// Set header identifiers for answer (must match request)
-	answer.Header.HopByHopID = 0x12345678
-	answer.Header.EndToEndID = 0x87654321
-
-	// Marshal request
-	requestData, err := request.Marshal()
-	if err != nil {
-		t.Fatalf("Failed to marshal request: %v", err)
-	}
-
-	// Marshal answer
-	answerData, err := answer.Marshal()
-	if err != nil {
-		t.Fatalf("Failed to marshal answer: %v", err)
-	}
-
-	// Write request-response pair to PCAP
-	err = writeDiameterPairToPcap(pcapFile, requestData, answerData, net.ParseIP("192.168.1.100"), net.ParseIP("192.168.1.1"))
-	if err != nil {
-		t.Fatalf("Failed to write PCAP: %v", err)
-	}
-
-	// Verify PCAP file
-	info, err := os.Stat(pcapFile)
-	if err != nil {
-		t.Fatalf("PCAP file not created: %v", err)
-	}
-	if info.Size() == 0 {
-		t.Fatal("PCAP file is empty")
-	}
-
-	t.Logf("PCAP file created: %s (%d bytes)", pcapFile, info.Size())
-	t.Logf("Open in Wireshark to view the request-response pair")
-}
-
-// TestCL_Pair_PCAP tests PCAP file generation for CL request-response pair
-func TestCL_Pair_PCAP(t *testing.T) {
-	// Create testdata directory
-	if err := os.MkdirAll("testdata", 0755); err != nil {
-		t.Fatalf("Failed to create testdata directory: %v", err)
-	}
-
-	// Create pcap file path
-	pcapFile := filepath.Join("testdata", "test_clr_cla.pcap")
-	// PCAP files are kept for Wireshark analysis
-
-	// Create Request message
-	request := NewCancelLocationRequest()
-	request.SessionId = models_base.UTF8String("client.example.com;1234567890;1")
-	request.AuthSessionState = models_base.Enumerated(1)
-	request.OriginHost = models_base.DiameterIdentity("client.example.com")
-	request.OriginRealm = models_base.DiameterIdentity("client.example.com")
-	request.DestinationHost = models_base.DiameterIdentity("server.example.com")
-	request.DestinationRealm = models_base.DiameterIdentity("server.example.com")
-	request.UserName = models_base.UTF8String("452040000000010")
-	request.CancellationType = models_base.Enumerated(1)
-	request.Drmp = ptrEnumerated(1)
-	request.VendorSpecificApplicationId = &VendorSpecificApplicationId{
-		VendorId:          ptrUnsigned32(10415),
-		AuthApplicationId: ptrUnsigned32(16777252),
-		AcctApplicationId: ptrUnsigned32(1),
-	}
-	request.SupportedFeatures = []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})}
-	request.ClrFlags = ptrUnsigned32(1)
-	request.Avp = []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})}
-	request.ProxyInfo = []*ProxyInfo{
-		&ProxyInfo{
-			ProxyHost:  models_base.DiameterIdentity("client.example.com"),
-			ProxyState: ptrOctetString([]byte{0x01, 0x02, 0x03}),
-		},
-	}
-	request.RouteRecord = []models_base.DiameterIdentity{models_base.DiameterIdentity("client.example.com")}
-
-	// Set header identifiers for request
-	request.Header.HopByHopID = 0x12345678
-	request.Header.EndToEndID = 0x87654321
-
-	// Create Answer message
-	answer := NewCancelLocationAnswer()
-	answer.SessionId = models_base.UTF8String("client.example.com;1234567890;1")
-	answer.AuthSessionState = models_base.Enumerated(1)
-	answer.OriginHost = models_base.DiameterIdentity("server.example.com")
-	answer.OriginRealm = models_base.DiameterIdentity("server.example.com")
-	answer.Drmp = ptrEnumerated(1)
-	answer.VendorSpecificApplicationId = &VendorSpecificApplicationId{
-		VendorId:          ptrUnsigned32(10415),
-		AuthApplicationId: ptrUnsigned32(16777252),
-		AcctApplicationId: ptrUnsigned32(1),
-	}
-	answer.SupportedFeatures = []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})}
-	answer.ResultCode = ptrUnsigned32(2001) // DIAMETER_SUCCESS
-	answer.ExperimentalResult = &ExperimentalResult{
-		VendorId:               models_base.Unsigned32(10415),
-		ExperimentalResultCode: models_base.Unsigned32(1),
-	}
-	answer.Avp = []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})}
-	answer.FailedAvp = &FailedAVP{
-		AVP: []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})},
-	}
-	answer.ProxyInfo = []*ProxyInfo{
-		&ProxyInfo{
-			ProxyHost:  models_base.DiameterIdentity("client.example.com"),
-			ProxyState: ptrOctetString([]byte{0x01, 0x02, 0x03}),
-		},
-	}
-	answer.RouteRecord = []models_base.DiameterIdentity{models_base.DiameterIdentity("server.example.com")}
-
-	// Set header identifiers for answer (must match request)
-	answer.Header.HopByHopID = 0x12345678
-	answer.Header.EndToEndID = 0x87654321
-
-	// Marshal request
-	requestData, err := request.Marshal()
-	if err != nil {
-		t.Fatalf("Failed to marshal request: %v", err)
-	}
-
-	// Marshal answer
-	answerData, err := answer.Marshal()
-	if err != nil {
-		t.Fatalf("Failed to marshal answer: %v", err)
-	}
-
-	// Write request-response pair to PCAP
-	err = writeDiameterPairToPcap(pcapFile, requestData, answerData, net.ParseIP("192.168.1.100"), net.ParseIP("192.168.1.1"))
-	if err != nil {
-		t.Fatalf("Failed to write PCAP: %v", err)
-	}
-
-	// Verify PCAP file
-	info, err := os.Stat(pcapFile)
-	if err != nil {
-		t.Fatalf("PCAP file not created: %v", err)
-	}
-	if info.Size() == 0 {
-		t.Fatal("PCAP file is empty")
-	}
-
-	t.Logf("PCAP file created: %s (%d bytes)", pcapFile, info.Size())
-	t.Logf("Open in Wireshark to view the request-response pair")
-}
-
-// TestISD_Pair_PCAP tests PCAP file generation for ISD request-response pair
-func TestISD_Pair_PCAP(t *testing.T) {
-	// Create testdata directory
-	if err := os.MkdirAll("testdata", 0755); err != nil {
-		t.Fatalf("Failed to create testdata directory: %v", err)
-	}
-
-	// Create pcap file path
-	pcapFile := filepath.Join("testdata", "test_isdr_isda.pcap")
-	// PCAP files are kept for Wireshark analysis
-
-	// Create Request message
-	request := NewInsertSubscriberDataRequest()
-	request.SessionId = models_base.UTF8String("client.example.com;1234567890;1")
-	request.AuthSessionState = models_base.Enumerated(1)
-	request.OriginHost = models_base.DiameterIdentity("client.example.com")
-	request.OriginRealm = models_base.DiameterIdentity("client.example.com")
-	request.DestinationHost = models_base.DiameterIdentity("server.example.com")
-	request.DestinationRealm = models_base.DiameterIdentity("server.example.com")
-	request.UserName = models_base.UTF8String("452040000000010")
-	request.SubscriptionData = &SubscriptionData{
-		SubscriberStatus:             ptrEnumerated(1),
-		Msisdn:                       ptrOctetString([]byte{0x01, 0x02, 0x03}),
-		AMsisdn:                      ptrOctetString([]byte{0x01, 0x02, 0x03}),
-		StnSr:                        ptrOctetString([]byte{0x01, 0x02, 0x03}),
-		IcsIndicator:                 ptrOctetString([]byte{0x01, 0x02, 0x03}),
-		NetworkAccessMode:            ptrOctetString([]byte{0x01, 0x02, 0x03}),
-		OperatorDeterminedBarring:    ptrUnsigned32(1),
-		HplmnOdb:                     ptrOctetString([]byte{0x00, 0xF1, 0x10}),
-		RegionalSubscriptionZoneCode: []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})},
-		AccessRestrictionData:        ptrUnsigned32(1),
-		ApnOiReplacement:             ptrUTF8String("452040000000010"),
-		LcsInfo:                      ptrOctetString([]byte{0x01, 0x02, 0x03}),
-		TeleserviceList:              ptrOctetString([]byte{0x01, 0x02, 0x03}),
-		CallBarringInfo:              []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})},
-		ChargingCharacteristics:      ptrOctetString([]byte{0x01, 0x02, 0x03}),
-		Ambr: &AMBR{
-			MaxRequestedBandwidthUl:  models_base.OctetString([]byte{0x01, 0x02, 0x03}),
-			MaxRequestedBandwidthDl:  models_base.OctetString([]byte{0x01, 0x02, 0x03}),
-			ExtendedMaxRequestedBwUl: ptrOctetString([]byte{0x01, 0x02, 0x03}),
-			ExtendedMaxRequestedBwDl: ptrOctetString([]byte{0x01, 0x02, 0x03}),
-		},
-		ApnConfigurationProfile: &APNConfigurationProfile{
-			ContextIdentifier: models_base.Unsigned32(1),
-			// AllApnConfigIncluded: nil, // (type: Enumerated) needs to be set
-			// ApnConfiguration: nil, // (type: Grouped) needs to be set
-		},
-		RatFrequencySelectionPriorityId: ptrOctetString([]byte{0x01, 0x02, 0x03}),
-		TraceData:                       ptrOctetString([]byte{0x01, 0x02, 0x03}),
-		GprsSubscriptionData:            ptrOctetString([]byte{0x01, 0x02, 0x03}),
-		CsgSubscriptionData: []*CSGSubscriptionData{
-			&CSGSubscriptionData{
-				CsgId:            models_base.OctetString([]byte{0x01, 0x02, 0x03}),
-				ExpirationDate:   ptrOctetString([]byte{0x01, 0x02, 0x03}),
-				ServiceSelection: []models_base.UTF8String{models_base.UTF8String("test")},
-				VisitedPlmnId:    ptrOctetString([]byte{0x01, 0x02, 0x03}),
-			},
-		},
-		RoamingRestricted:                    ptrOctetString([]byte{0x01, 0x02, 0x03}),
-		SubscribedPeriodicRauTauTimer:        ptrOctetString([]byte{0x01, 0x02, 0x03}),
-		MpsPriority:                          ptrOctetString([]byte{0x01, 0x02, 0x03}),
-		VplmnLipaAllowed:                     ptrOctetString([]byte{0x00, 0xF1, 0x10}),
-		RelayNodeIndicator:                   ptrOctetString([]byte{0x01, 0x02, 0x03}),
-		MdtUserConsent:                       ptrOctetString([]byte{0x01, 0x02, 0x03}),
-		SubscribedVsrvcc:                     ptrOctetString([]byte{0x01, 0x02, 0x03}),
-		ProseSubscriptionData:                ptrOctetString([]byte{0x01, 0x02, 0x03}),
-		SubscriptionDataFlags:                ptrOctetString([]byte{0x01, 0x02, 0x03}),
-		AdjacentAccessRestrictionData:        []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})},
-		DlBufferingSuggestedPacketCount:      ptrOctetString([]byte{0x01, 0x02, 0x03}),
-		ImsiGroupId:                          []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})},
-		UeUsageType:                          ptrOctetString([]byte{0x01, 0x02, 0x03}),
-		AeseCommunicationPattern:             []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})},
-		MonitoringEventConfiguration:         []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})},
-		EmergencyInfo:                        ptrOctetString([]byte{0x01, 0x02, 0x03}),
-		V2xSubscriptionData:                  ptrOctetString([]byte{0x01, 0x02, 0x03}),
-		EdrxCycleLength:                      ptrOctetString([]byte{0x01, 0x02, 0x03}),
-		ExternalIdentifier:                   ptrOctetString([]byte{0x01, 0x02, 0x03}),
-		ActiveTime:                           ptrOctetString([]byte{0x01, 0x02, 0x03}),
-		ServiceGapTime:                       ptrOctetString([]byte{0x01, 0x02, 0x03}),
-		BroadcastLocationAssistanceDataTypes: ptrOctetString([]byte{0x01, 0x02, 0x03}),
-		AerialUeSubscriptionInformation:      ptrOctetString([]byte{0x01, 0x02, 0x03}),
-		CoreNetworkRestrictions:              ptrOctetString([]byte{0x01, 0x02, 0x03}),
-	}
-	request.Drmp = ptrEnumerated(1)
-	request.VendorSpecificApplicationId = &VendorSpecificApplicationId{
-		VendorId:          ptrUnsigned32(10415),
-		AuthApplicationId: ptrUnsigned32(16777252),
-		AcctApplicationId: ptrUnsigned32(1),
-	}
-	request.SupportedFeatures = []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})}
-	request.IdrFlags = ptrUnsigned32(1)
-	request.ResetId = []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})}
-	request.Avp = []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})}
-	request.ProxyInfo = []*ProxyInfo{
-		&ProxyInfo{
-			ProxyHost:  models_base.DiameterIdentity("client.example.com"),
-			ProxyState: ptrOctetString([]byte{0x01, 0x02, 0x03}),
-		},
-	}
-	request.RouteRecord = []models_base.DiameterIdentity{models_base.DiameterIdentity("client.example.com")}
-
-	// Set header identifiers for request
-	request.Header.HopByHopID = 0x12345678
-	request.Header.EndToEndID = 0x87654321
-
-	// Create Answer message
-	answer := NewInsertSubscriberDataAnswer()
-	answer.SessionId = models_base.UTF8String("client.example.com;1234567890;1")
-	answer.AuthSessionState = models_base.Enumerated(1)
-	answer.OriginHost = models_base.DiameterIdentity("server.example.com")
-	answer.OriginRealm = models_base.DiameterIdentity("server.example.com")
-	answer.Drmp = ptrEnumerated(1)
-	answer.VendorSpecificApplicationId = &VendorSpecificApplicationId{
-		VendorId:          ptrUnsigned32(10415),
-		AuthApplicationId: ptrUnsigned32(16777252),
-		AcctApplicationId: ptrUnsigned32(1),
-	}
-	answer.SupportedFeatures = []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})}
-	answer.ResultCode = ptrUnsigned32(2001) // DIAMETER_SUCCESS
-	answer.ExperimentalResult = &ExperimentalResult{
-		VendorId:               models_base.Unsigned32(10415),
-		ExperimentalResultCode: models_base.Unsigned32(1),
-	}
-	answer.ImsVoiceOverPsSessionsSupported = ptrOctetString([]byte{0x01, 0x02, 0x03})
-	answer.LastUeActivityTime = ptrOctetString([]byte{0x01, 0x02, 0x03})
-	answer.RatType = ptrEnumerated(1)
-	answer.IdaFlags = ptrUnsigned32(1)
-	answer.EpsUserState = ptrOctetString([]byte{0x01, 0x02, 0x03})
-	answer.EpsLocationInformation = ptrOctetString([]byte{0x01, 0x02, 0x03})
-	answer.LocalTimeZone = ptrOctetString([]byte{0x01, 0x02, 0x03})
-	answer.SupportedServices = ptrOctetString([]byte{0x01, 0x02, 0x03})
-	answer.MonitoringEventReport = []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})}
-	answer.MonitoringEventConfigStatus = []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})}
-	answer.Avp = []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})}
-	answer.FailedAvp = &FailedAVP{
-		AVP: []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})},
-	}
-	answer.ProxyInfo = []*ProxyInfo{
-		&ProxyInfo{
-			ProxyHost:  models_base.DiameterIdentity("client.example.com"),
-			ProxyState: ptrOctetString([]byte{0x01, 0x02, 0x03}),
-		},
-	}
-	answer.RouteRecord = []models_base.DiameterIdentity{models_base.DiameterIdentity("server.example.com")}
-
-	// Set header identifiers for answer (must match request)
-	answer.Header.HopByHopID = 0x12345678
-	answer.Header.EndToEndID = 0x87654321
-
-	// Marshal request
-	requestData, err := request.Marshal()
-	if err != nil {
-		t.Fatalf("Failed to marshal request: %v", err)
-	}
-
-	// Marshal answer
-	answerData, err := answer.Marshal()
-	if err != nil {
-		t.Fatalf("Failed to marshal answer: %v", err)
-	}
-
-	// Write request-response pair to PCAP
-	err = writeDiameterPairToPcap(pcapFile, requestData, answerData, net.ParseIP("192.168.1.100"), net.ParseIP("192.168.1.1"))
-	if err != nil {
-		t.Fatalf("Failed to write PCAP: %v", err)
-	}
-
-	// Verify PCAP file
-	info, err := os.Stat(pcapFile)
-	if err != nil {
-		t.Fatalf("PCAP file not created: %v", err)
-	}
-	if info.Size() == 0 {
-		t.Fatal("PCAP file is empty")
-	}
-
-	t.Logf("PCAP file created: %s (%d bytes)", pcapFile, info.Size())
-	t.Logf("Open in Wireshark to view the request-response pair")
-}
-
-// TestDSD_Pair_PCAP tests PCAP file generation for DSD request-response pair
-func TestDSD_Pair_PCAP(t *testing.T) {
-	// Create testdata directory
-	if err := os.MkdirAll("testdata", 0755); err != nil {
-		t.Fatalf("Failed to create testdata directory: %v", err)
-	}
-
-	// Create pcap file path
-	pcapFile := filepath.Join("testdata", "test_dsdr_dsda.pcap")
-	// PCAP files are kept for Wireshark analysis
-
-	// Create Request message
-	request := NewDeleteSubscriberDataRequest()
-	request.SessionId = models_base.UTF8String("client.example.com;1234567890;1")
-	request.AuthSessionState = models_base.Enumerated(1)
-	request.OriginHost = models_base.DiameterIdentity("client.example.com")
-	request.OriginRealm = models_base.DiameterIdentity("client.example.com")
-	request.DestinationHost = models_base.DiameterIdentity("server.example.com")
-	request.DestinationRealm = models_base.DiameterIdentity("server.example.com")
-	request.UserName = models_base.UTF8String("452040000000010")
-	request.DsrFlags = models_base.Unsigned32(1)
-	request.Drmp = ptrEnumerated(1)
-	request.VendorSpecificApplicationId = &VendorSpecificApplicationId{
-		VendorId:          ptrUnsigned32(10415),
-		AuthApplicationId: ptrUnsigned32(16777252),
-		AcctApplicationId: ptrUnsigned32(1),
-	}
-	request.SupportedFeatures = []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})}
-	request.ScefId = ptrOctetString([]byte{0x01, 0x02, 0x03})
-	request.ContextIdentifier = []models_base.Unsigned32{models_base.Unsigned32(1)}
-	request.TraceReference = ptrOctetString([]byte{0x01, 0x02, 0x03})
-	request.TsCode = []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})}
-	request.SsCode = []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})}
-	request.EdrxRelatedRat = ptrOctetString([]byte{0x01, 0x02, 0x03})
-	request.ExternalIdentifier = []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})}
-	request.Avp = []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})}
-	request.ProxyInfo = []*ProxyInfo{
-		&ProxyInfo{
-			ProxyHost:  models_base.DiameterIdentity("client.example.com"),
-			ProxyState: ptrOctetString([]byte{0x01, 0x02, 0x03}),
-		},
-	}
-	request.RouteRecord = []models_base.DiameterIdentity{models_base.DiameterIdentity("client.example.com")}
-
-	// Set header identifiers for request
-	request.Header.HopByHopID = 0x12345678
-	request.Header.EndToEndID = 0x87654321
-
-	// Create Answer message
-	answer := NewDeleteSubscriberDataAnswer()
-	answer.SessionId = models_base.UTF8String("client.example.com;1234567890;1")
-	answer.AuthSessionState = models_base.Enumerated(1)
-	answer.OriginHost = models_base.DiameterIdentity("server.example.com")
-	answer.OriginRealm = models_base.DiameterIdentity("server.example.com")
-	answer.Drmp = ptrEnumerated(1)
-	answer.VendorSpecificApplicationId = &VendorSpecificApplicationId{
-		VendorId:          ptrUnsigned32(10415),
-		AuthApplicationId: ptrUnsigned32(16777252),
-		AcctApplicationId: ptrUnsigned32(1),
-	}
-	answer.SupportedFeatures = []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})}
-	answer.ResultCode = ptrUnsigned32(2001) // DIAMETER_SUCCESS
-	answer.ExperimentalResult = &ExperimentalResult{
-		VendorId:               models_base.Unsigned32(10415),
-		ExperimentalResultCode: models_base.Unsigned32(1),
-	}
-	answer.DsaFlags = ptrUnsigned32(1)
 	answer.Avp = []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})}
 	answer.FailedAvp = &FailedAVP{
 		AVP: []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})},

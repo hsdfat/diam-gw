@@ -22,6 +22,21 @@ generate-with-tests:
 		-tests
 	@echo "Code and test generation complete!"
 
+# Generate code, tests, and PCAP files
+generate-with-pcaps:
+	@echo "Generating Diameter command code, tests, and PCAP files..."
+	@echo "This will create package folders based on proto file headers"
+	go run cmd/diameter-codegen/main.go \
+		-proto-dir proto \
+		-output-dir commands \
+		-tests
+	@echo "Generating PCAP reference files..."
+	@go test ./commands/base -run "PCAP" -v > /dev/null 2>&1 || true
+	@go test ./commands/s13 -run "PCAP" -v > /dev/null 2>&1 || true
+	@go test ./commands/s6a -run "PCAP" -v > /dev/null 2>&1 || true
+	@echo "PCAP files generated in commands/*/testdata/"
+	@echo "Generation complete!"
+
 # Generate code from a specific proto file (for development/testing)
 generate-single:
 	@echo "Generating code from single proto file..."
@@ -99,6 +114,7 @@ help:
 	@echo "  all                        - Generate code and run tests (default)"
 	@echo "  generate                   - Generate Go code from all proto files in proto/"
 	@echo "  generate-with-tests        - Generate Go code AND unit tests from all proto files"
+	@echo "  generate-with-pcaps        - Generate code, tests, AND reference PCAP files"
 	@echo "  generate-single            - Generate code from specific proto file (use PROTO=path)"
 	@echo "                               Example: make generate-single PROTO=proto/diameter.proto"
 	@echo "  generate-single-with-tests - Generate code and tests from specific proto file"
@@ -118,4 +134,8 @@ help:
 	@echo "    - Marshal/Unmarshal roundtrip tests"
 	@echo "    - PCAP file generation tests (for Wireshark analysis)"
 	@echo ""
-	@echo "  PCAP files are saved to testdata/ directory for Wireshark analysis"
+	@echo "PCAP File Generation:"
+	@echo "  Use 'make generate-with-pcaps' to create reference PCAP files"
+	@echo "  PCAP files are saved to commands/*/testdata/ directories"
+	@echo "  These files can be opened in Wireshark for protocol analysis"
+	@echo "  Files are pre-generated and can be committed to version control"
