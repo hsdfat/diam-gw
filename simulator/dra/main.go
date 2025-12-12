@@ -39,7 +39,6 @@ func main() {
 	fmt.Println()
 
 	// Initialize logger
-	logger.Init(*verbose)
 
 	// Create DRA configuration
 	config := &Config{

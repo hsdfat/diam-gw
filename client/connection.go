@@ -66,7 +66,22 @@ type ConnectionStats struct {
 	BytesSent        atomic.Uint64
 	BytesReceived    atomic.Uint64
 	Reconnects       atomic.Uint32
-	LastError        atomic.Value // stores error
+	lastErrorMu      sync.RWMutex
+	lastError        error
+}
+
+// GetLastError returns the last error
+func (cs *ConnectionStats) GetLastError() error {
+	cs.lastErrorMu.RLock()
+	defer cs.lastErrorMu.RUnlock()
+	return cs.lastError
+}
+
+// SetLastError sets the last error
+func (cs *ConnectionStats) SetLastError(err error) {
+	cs.lastErrorMu.Lock()
+	defer cs.lastErrorMu.Unlock()
+	cs.lastError = err
 }
 
 // NewConnection creates a new Diameter connection
@@ -140,7 +155,7 @@ func (c *Connection) connect() error {
 	conn, err := dialer.DialContext(c.ctx, "tcp", addr)
 	if err != nil {
 		c.setState(StateFailed)
-		c.stats.LastError.Store(err)
+		c.stats.SetLastError(err)
 		return fmt.Errorf("failed to connect: %w", err)
 	}
 
@@ -159,7 +174,7 @@ func (c *Connection) connect() error {
 	if err := c.performHandshake(); err != nil {
 		c.close()
 		c.setState(StateFailed)
-		c.stats.LastError.Store(err)
+		c.stats.SetLastError(err)
 		return fmt.Errorf("handshake failed: %w", err)
 	}
 
@@ -623,7 +638,7 @@ func (c *Connection) startHealthMonitor() {
 func (c *Connection) handleFailure(err error) {
 	logger.Log.Errorw("Handling failure", "conn_id", c.id, "error", err)
 
-	c.stats.LastError.Store(err)
+	c.stats.SetLastError(err)
 	c.setState(StateFailed)
 	c.close()
 

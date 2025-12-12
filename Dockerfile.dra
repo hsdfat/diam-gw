@@ -1,0 +1,28 @@
+# Dockerfile for DRA Simulator
+FROM golang:1.25-alpine AS builder
+
+# Install netcat for health checks
+RUN apk add --no-cache netcat-openbsd
+
+# Set working directory
+WORKDIR /app
+
+# Copy go mod files
+COPY go.mod go.sum ./
+RUN go mod download
+
+# Copy source code
+COPY . .
+
+# Build DRA simulator
+RUN CGO_ENABLED=0 GOOS=linux go build -o dra-simulator simulator/dra/*.go
+
+# Expose Diameter port
+EXPOSE 3868
+
+# Create logs directory
+RUN mkdir -p /app/logs
+
+# Run DRA simulator
+ENTRYPOINT ["/app/dra-simulator"]
+CMD ["-host", "0.0.0.0", "-port", "3868", "-verbose"]

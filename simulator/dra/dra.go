@@ -564,7 +564,7 @@ func (c *ClientConnection) handleDPR(data []byte) error {
 func (c *ClientConnection) sendErrorResponse(requestData []byte, resultCode uint32) error {
 	// Extract H2H and E2E IDs from request
 	hopByHopID := binary.BigEndian.Uint32(requestData[12:16])
-	endToEndID := binary.BigEndian.Uint32(requestData[16:20])
+	// endToEndID := binary.BigEndian.Uint32(requestData[16:20])
 
 	// Create minimal error response
 	// This is a simplified implementation

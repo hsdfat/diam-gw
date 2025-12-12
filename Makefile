@@ -104,6 +104,10 @@ build-examples:
 	go build -o bin/s13-client examples/s13_client/*.go
 	@echo "Building simple pool example..."
 	go build -o bin/simple-pool examples/simple_pool/*.go
+	@echo "Building test-with-dra example..."
+	go build -o bin/test-with-dra examples/test_with_dra/*.go
+	@echo "Building multi-dra-test example..."
+	go build -o bin/multi-dra-test examples/multi_dra_test/*.go
 	@echo "All examples built in bin/"
 
 # Install the code generator
@@ -117,7 +121,7 @@ clean:
 	@echo "Cleaning generated files..."
 	rm -rf commands/base commands/s6a commands/s13
 	rm -f bin/diameter-codegen bin/dra-simulator
-	rm -f bin/basic-example bin/s13-client bin/simple-pool
+	rm -f bin/basic-example bin/s13-client bin/simple-pool bin/test-with-dra bin/multi-dra-test
 	rm -f coverage.out coverage.html
 	rm -rf testdata
 	rm -rf **/testdata
