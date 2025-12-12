@@ -96,6 +96,13 @@ func processProtoFile(protoFile, outputFile, packageName, outputDir string, genT
 
 	fmt.Printf("Generated code written to %s\n", finalOutputFile)
 
+	// Generate constants file
+	constFile := filepath.Join(filepath.Dir(finalOutputFile), "constants.go")
+	if err := generator.GenerateConstantsFile(constFile); err != nil {
+		return fmt.Errorf("generating constants file: %w", err)
+	}
+	fmt.Printf("Generated constants file written to %s\n", constFile)
+
 	// Generate test files if requested
 	if genTests {
 		baseFile := strings.TrimSuffix(finalOutputFile, ".pb.go")
@@ -197,6 +204,13 @@ func processProtoDirectory(protoDir, outputDir string, genTests bool) error {
 		}
 
 		fmt.Printf("Generated code written to %s\n", finalOutputFile)
+
+		// Generate constants file
+		constFile := filepath.Join(packageDir, "constants.go")
+		if err := generator.GenerateConstantsFile(constFile); err != nil {
+			return fmt.Errorf("generating constants file for %s: %w", filepath.Base(protoFile), err)
+		}
+		fmt.Printf("Generated constants file written to %s\n", constFile)
 
 		// Generate test files if requested
 		if genTests {

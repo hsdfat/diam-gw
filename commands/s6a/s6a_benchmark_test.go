@@ -24,7 +24,7 @@ func BenchmarkUpdateLocationRequest_Marshal(b *testing.B) {
 	msg.OriginHost = models_base.DiameterIdentity("client.example.com")
 	msg.OriginRealm = models_base.DiameterIdentity("client.example.com")
 	msg.DestinationRealm = models_base.DiameterIdentity("server.example.com")
-	msg.UserName = models_base.UTF8String("test")
+	msg.UserName = models_base.UTF8String("452040000000010")
 	msg.RatType = models_base.Enumerated(1)
 	msg.UlrFlags = models_base.Unsigned32(1)
 	msg.VisitedPlmnId = models_base.OctetString([]byte{0x00, 0xF1, 0x10})
@@ -48,7 +48,7 @@ func BenchmarkUpdateLocationRequest_Unmarshal(b *testing.B) {
 	msg.OriginHost = models_base.DiameterIdentity("client.example.com")
 	msg.OriginRealm = models_base.DiameterIdentity("client.example.com")
 	msg.DestinationRealm = models_base.DiameterIdentity("server.example.com")
-	msg.UserName = models_base.UTF8String("test")
+	msg.UserName = models_base.UTF8String("452040000000010")
 	msg.RatType = models_base.Enumerated(1)
 	msg.UlrFlags = models_base.Unsigned32(1)
 	msg.VisitedPlmnId = models_base.OctetString([]byte{0x00, 0xF1, 0x10})
@@ -78,7 +78,7 @@ func BenchmarkUpdateLocationRequest_Roundtrip(b *testing.B) {
 	msg.OriginHost = models_base.DiameterIdentity("client.example.com")
 	msg.OriginRealm = models_base.DiameterIdentity("client.example.com")
 	msg.DestinationRealm = models_base.DiameterIdentity("server.example.com")
-	msg.UserName = models_base.UTF8String("test")
+	msg.UserName = models_base.UTF8String("452040000000010")
 	msg.RatType = models_base.Enumerated(1)
 	msg.UlrFlags = models_base.Unsigned32(1)
 	msg.VisitedPlmnId = models_base.OctetString([]byte{0x00, 0xF1, 0x10})
@@ -189,7 +189,7 @@ func BenchmarkAuthenticationInformationRequest_Marshal(b *testing.B) {
 	msg.OriginHost = models_base.DiameterIdentity("client.example.com")
 	msg.OriginRealm = models_base.DiameterIdentity("client.example.com")
 	msg.DestinationRealm = models_base.DiameterIdentity("server.example.com")
-	msg.UserName = models_base.UTF8String("test")
+	msg.UserName = models_base.UTF8String("452040000000010")
 	msg.VisitedPlmnId = models_base.OctetString([]byte{0x00, 0xF1, 0x10})
 
 	b.ResetTimer()
@@ -211,7 +211,7 @@ func BenchmarkAuthenticationInformationRequest_Unmarshal(b *testing.B) {
 	msg.OriginHost = models_base.DiameterIdentity("client.example.com")
 	msg.OriginRealm = models_base.DiameterIdentity("client.example.com")
 	msg.DestinationRealm = models_base.DiameterIdentity("server.example.com")
-	msg.UserName = models_base.UTF8String("test")
+	msg.UserName = models_base.UTF8String("452040000000010")
 	msg.VisitedPlmnId = models_base.OctetString([]byte{0x00, 0xF1, 0x10})
 
 	data, err := msg.Marshal()
@@ -239,7 +239,7 @@ func BenchmarkAuthenticationInformationRequest_Roundtrip(b *testing.B) {
 	msg.OriginHost = models_base.DiameterIdentity("client.example.com")
 	msg.OriginRealm = models_base.DiameterIdentity("client.example.com")
 	msg.DestinationRealm = models_base.DiameterIdentity("server.example.com")
-	msg.UserName = models_base.UTF8String("test")
+	msg.UserName = models_base.UTF8String("452040000000010")
 	msg.VisitedPlmnId = models_base.OctetString([]byte{0x00, 0xF1, 0x10})
 
 	b.ResetTimer()
@@ -349,7 +349,7 @@ func BenchmarkCancelLocationRequest_Marshal(b *testing.B) {
 	msg.OriginRealm = models_base.DiameterIdentity("client.example.com")
 	msg.DestinationHost = models_base.DiameterIdentity("server.example.com")
 	msg.DestinationRealm = models_base.DiameterIdentity("server.example.com")
-	msg.UserName = models_base.UTF8String("test")
+	msg.UserName = models_base.UTF8String("452040000000010")
 	msg.CancellationType = models_base.Enumerated(1)
 
 	b.ResetTimer()
@@ -372,7 +372,7 @@ func BenchmarkCancelLocationRequest_Unmarshal(b *testing.B) {
 	msg.OriginRealm = models_base.DiameterIdentity("client.example.com")
 	msg.DestinationHost = models_base.DiameterIdentity("server.example.com")
 	msg.DestinationRealm = models_base.DiameterIdentity("server.example.com")
-	msg.UserName = models_base.UTF8String("test")
+	msg.UserName = models_base.UTF8String("452040000000010")
 	msg.CancellationType = models_base.Enumerated(1)
 
 	data, err := msg.Marshal()
@@ -401,7 +401,7 @@ func BenchmarkCancelLocationRequest_Roundtrip(b *testing.B) {
 	msg.OriginRealm = models_base.DiameterIdentity("client.example.com")
 	msg.DestinationHost = models_base.DiameterIdentity("server.example.com")
 	msg.DestinationRealm = models_base.DiameterIdentity("server.example.com")
-	msg.UserName = models_base.UTF8String("test")
+	msg.UserName = models_base.UTF8String("452040000000010")
 	msg.CancellationType = models_base.Enumerated(1)
 
 	b.ResetTimer()
@@ -511,7 +511,7 @@ func BenchmarkInsertSubscriberDataRequest_Marshal(b *testing.B) {
 	msg.OriginRealm = models_base.DiameterIdentity("client.example.com")
 	msg.DestinationHost = models_base.DiameterIdentity("server.example.com")
 	msg.DestinationRealm = models_base.DiameterIdentity("server.example.com")
-	msg.UserName = models_base.UTF8String("test")
+	msg.UserName = models_base.UTF8String("452040000000010")
 	msg.SubscriptionData = &SubscriptionData{
 		SubscriberStatus: ptrEnumerated(1),
 		Msisdn:           ptrOctetString([]byte{0x01, 0x02, 0x03}),
@@ -539,7 +539,7 @@ func BenchmarkInsertSubscriberDataRequest_Unmarshal(b *testing.B) {
 	msg.OriginRealm = models_base.DiameterIdentity("client.example.com")
 	msg.DestinationHost = models_base.DiameterIdentity("server.example.com")
 	msg.DestinationRealm = models_base.DiameterIdentity("server.example.com")
-	msg.UserName = models_base.UTF8String("test")
+	msg.UserName = models_base.UTF8String("452040000000010")
 	msg.SubscriptionData = &SubscriptionData{
 		SubscriberStatus: ptrEnumerated(1),
 		Msisdn:           ptrOctetString([]byte{0x01, 0x02, 0x03}),
@@ -573,7 +573,7 @@ func BenchmarkInsertSubscriberDataRequest_Roundtrip(b *testing.B) {
 	msg.OriginRealm = models_base.DiameterIdentity("client.example.com")
 	msg.DestinationHost = models_base.DiameterIdentity("server.example.com")
 	msg.DestinationRealm = models_base.DiameterIdentity("server.example.com")
-	msg.UserName = models_base.UTF8String("test")
+	msg.UserName = models_base.UTF8String("452040000000010")
 	msg.SubscriptionData = &SubscriptionData{
 		SubscriberStatus: ptrEnumerated(1),
 		Msisdn:           ptrOctetString([]byte{0x01, 0x02, 0x03}),
@@ -688,7 +688,7 @@ func BenchmarkDeleteSubscriberDataRequest_Marshal(b *testing.B) {
 	msg.OriginRealm = models_base.DiameterIdentity("client.example.com")
 	msg.DestinationHost = models_base.DiameterIdentity("server.example.com")
 	msg.DestinationRealm = models_base.DiameterIdentity("server.example.com")
-	msg.UserName = models_base.UTF8String("test")
+	msg.UserName = models_base.UTF8String("452040000000010")
 	msg.DsrFlags = models_base.Unsigned32(1)
 
 	b.ResetTimer()
@@ -711,7 +711,7 @@ func BenchmarkDeleteSubscriberDataRequest_Unmarshal(b *testing.B) {
 	msg.OriginRealm = models_base.DiameterIdentity("client.example.com")
 	msg.DestinationHost = models_base.DiameterIdentity("server.example.com")
 	msg.DestinationRealm = models_base.DiameterIdentity("server.example.com")
-	msg.UserName = models_base.UTF8String("test")
+	msg.UserName = models_base.UTF8String("452040000000010")
 	msg.DsrFlags = models_base.Unsigned32(1)
 
 	data, err := msg.Marshal()
@@ -740,7 +740,7 @@ func BenchmarkDeleteSubscriberDataRequest_Roundtrip(b *testing.B) {
 	msg.OriginRealm = models_base.DiameterIdentity("client.example.com")
 	msg.DestinationHost = models_base.DiameterIdentity("server.example.com")
 	msg.DestinationRealm = models_base.DiameterIdentity("server.example.com")
-	msg.UserName = models_base.UTF8String("test")
+	msg.UserName = models_base.UTF8String("452040000000010")
 	msg.DsrFlags = models_base.Unsigned32(1)
 
 	b.ResetTimer()
@@ -849,7 +849,7 @@ func BenchmarkPurgeUERequest_Marshal(b *testing.B) {
 	msg.OriginHost = models_base.DiameterIdentity("client.example.com")
 	msg.OriginRealm = models_base.DiameterIdentity("client.example.com")
 	msg.DestinationRealm = models_base.DiameterIdentity("server.example.com")
-	msg.UserName = models_base.UTF8String("test")
+	msg.UserName = models_base.UTF8String("452040000000010")
 
 	b.ResetTimer()
 	b.ReportAllocs()
@@ -870,7 +870,7 @@ func BenchmarkPurgeUERequest_Unmarshal(b *testing.B) {
 	msg.OriginHost = models_base.DiameterIdentity("client.example.com")
 	msg.OriginRealm = models_base.DiameterIdentity("client.example.com")
 	msg.DestinationRealm = models_base.DiameterIdentity("server.example.com")
-	msg.UserName = models_base.UTF8String("test")
+	msg.UserName = models_base.UTF8String("452040000000010")
 
 	data, err := msg.Marshal()
 	if err != nil {
@@ -897,7 +897,7 @@ func BenchmarkPurgeUERequest_Roundtrip(b *testing.B) {
 	msg.OriginHost = models_base.DiameterIdentity("client.example.com")
 	msg.OriginRealm = models_base.DiameterIdentity("client.example.com")
 	msg.DestinationRealm = models_base.DiameterIdentity("server.example.com")
-	msg.UserName = models_base.UTF8String("test")
+	msg.UserName = models_base.UTF8String("452040000000010")
 
 	b.ResetTimer()
 	b.ReportAllocs()
@@ -1161,7 +1161,7 @@ func BenchmarkNotifyRequest_Marshal(b *testing.B) {
 	msg.OriginHost = models_base.DiameterIdentity("client.example.com")
 	msg.OriginRealm = models_base.DiameterIdentity("client.example.com")
 	msg.DestinationRealm = models_base.DiameterIdentity("server.example.com")
-	msg.UserName = models_base.UTF8String("test")
+	msg.UserName = models_base.UTF8String("452040000000010")
 
 	b.ResetTimer()
 	b.ReportAllocs()
@@ -1182,7 +1182,7 @@ func BenchmarkNotifyRequest_Unmarshal(b *testing.B) {
 	msg.OriginHost = models_base.DiameterIdentity("client.example.com")
 	msg.OriginRealm = models_base.DiameterIdentity("client.example.com")
 	msg.DestinationRealm = models_base.DiameterIdentity("server.example.com")
-	msg.UserName = models_base.UTF8String("test")
+	msg.UserName = models_base.UTF8String("452040000000010")
 
 	data, err := msg.Marshal()
 	if err != nil {
@@ -1209,7 +1209,7 @@ func BenchmarkNotifyRequest_Roundtrip(b *testing.B) {
 	msg.OriginHost = models_base.DiameterIdentity("client.example.com")
 	msg.OriginRealm = models_base.DiameterIdentity("client.example.com")
 	msg.DestinationRealm = models_base.DiameterIdentity("server.example.com")
-	msg.UserName = models_base.UTF8String("test")
+	msg.UserName = models_base.UTF8String("452040000000010")
 
 	b.ResetTimer()
 	b.ReportAllocs()

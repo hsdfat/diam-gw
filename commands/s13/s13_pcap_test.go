@@ -258,19 +258,19 @@ func TestMEIdentityCheckRequest_PCAP(t *testing.T) {
 	}
 
 	// Optional fields (for complete PCAP examples)
-	msg.Drmp = ptrOctetString([]byte{0x01, 0x02, 0x03})
+	msg.Drmp = ptrEnumerated(1)
 	msg.VendorSpecificApplicationId = &VendorSpecificApplicationId{
 		VendorId:          ptrUnsigned32(10415),
 		AuthApplicationId: ptrUnsigned32(16777252),
 		AcctApplicationId: ptrUnsigned32(1),
 	}
 	msg.DestinationHost = ptrDiameterIdentity("server.example.com")
-	msg.UserName = ptrUTF8String("test")
+	msg.UserName = ptrUTF8String("452040000000010")
 	msg.Avp = []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})}
 	msg.ProxyInfo = []*ProxyInfo{
 		&ProxyInfo{
 			ProxyHost:  models_base.DiameterIdentity("client.example.com"),
-			ProxyState: models_base.OctetString([]byte{0x01, 0x02, 0x03}),
+			ProxyState: ptrOctetString([]byte{0x01, 0x02, 0x03}),
 		},
 	}
 	msg.RouteRecord = []models_base.DiameterIdentity{models_base.DiameterIdentity("client.example.com")}
@@ -331,7 +331,7 @@ func TestMEIdentityCheckAnswer_PCAP(t *testing.T) {
 		ExperimentalResultCode: models_base.Unsigned32(1),
 	}
 	msg.EquipmentStatus = ptrEnumerated(1)
-	msg.Drmp = ptrOctetString([]byte{0x01, 0x02, 0x03})
+	msg.Drmp = ptrEnumerated(1)
 	msg.VendorSpecificApplicationId = &VendorSpecificApplicationId{
 		VendorId:          ptrUnsigned32(10415),
 		AuthApplicationId: ptrUnsigned32(16777252),
@@ -339,12 +339,12 @@ func TestMEIdentityCheckAnswer_PCAP(t *testing.T) {
 	}
 	msg.Avp = []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})}
 	msg.FailedAvp = &FailedAVP{
-		Avp: []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})},
+		AVP: []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})},
 	}
 	msg.ProxyInfo = []*ProxyInfo{
 		&ProxyInfo{
 			ProxyHost:  models_base.DiameterIdentity("client.example.com"),
-			ProxyState: models_base.OctetString([]byte{0x01, 0x02, 0x03}),
+			ProxyState: ptrOctetString([]byte{0x01, 0x02, 0x03}),
 		},
 	}
 	msg.RouteRecord = []models_base.DiameterIdentity{models_base.DiameterIdentity("server.example.com")}

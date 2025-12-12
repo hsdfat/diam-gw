@@ -52,7 +52,7 @@ func TestUpdateLocationRequest_Validation(t *testing.T) {
 		msg.OriginHost = models_base.DiameterIdentity("client.example.com")
 		msg.OriginRealm = models_base.DiameterIdentity("client.example.com")
 		msg.DestinationRealm = models_base.DiameterIdentity("server.example.com")
-		msg.UserName = models_base.UTF8String("test")
+		msg.UserName = models_base.UTF8String("452040000000010")
 		msg.RatType = models_base.Enumerated(1)
 		msg.UlrFlags = models_base.Unsigned32(1)
 		msg.VisitedPlmnId = models_base.OctetString([]byte{0x00, 0xF1, 0x10})
@@ -73,7 +73,7 @@ func TestUpdateLocationRequest_MarshalUnmarshal(t *testing.T) {
 	original.OriginHost = models_base.DiameterIdentity("client.example.com")
 	original.OriginRealm = models_base.DiameterIdentity("client.example.com")
 	original.DestinationRealm = models_base.DiameterIdentity("server.example.com")
-	original.UserName = models_base.UTF8String("test")
+	original.UserName = models_base.UTF8String("452040000000010")
 	original.RatType = models_base.Enumerated(1)
 	original.UlrFlags = models_base.Unsigned32(1)
 	original.VisitedPlmnId = models_base.OctetString([]byte{0x00, 0xF1, 0x10})
@@ -308,7 +308,7 @@ func TestAuthenticationInformationRequest_Validation(t *testing.T) {
 		msg.OriginHost = models_base.DiameterIdentity("client.example.com")
 		msg.OriginRealm = models_base.DiameterIdentity("client.example.com")
 		msg.DestinationRealm = models_base.DiameterIdentity("server.example.com")
-		msg.UserName = models_base.UTF8String("test")
+		msg.UserName = models_base.UTF8String("452040000000010")
 		msg.VisitedPlmnId = models_base.OctetString([]byte{0x00, 0xF1, 0x10})
 
 		err := msg.Validate()
@@ -327,7 +327,7 @@ func TestAuthenticationInformationRequest_MarshalUnmarshal(t *testing.T) {
 	original.OriginHost = models_base.DiameterIdentity("client.example.com")
 	original.OriginRealm = models_base.DiameterIdentity("client.example.com")
 	original.DestinationRealm = models_base.DiameterIdentity("server.example.com")
-	original.UserName = models_base.UTF8String("test")
+	original.UserName = models_base.UTF8String("452040000000010")
 	original.VisitedPlmnId = models_base.OctetString([]byte{0x00, 0xF1, 0x10})
 
 	// Set header identifiers for comparison
@@ -555,7 +555,7 @@ func TestCancelLocationRequest_Validation(t *testing.T) {
 		msg.OriginRealm = models_base.DiameterIdentity("client.example.com")
 		msg.DestinationHost = models_base.DiameterIdentity("server.example.com")
 		msg.DestinationRealm = models_base.DiameterIdentity("server.example.com")
-		msg.UserName = models_base.UTF8String("test")
+		msg.UserName = models_base.UTF8String("452040000000010")
 		msg.CancellationType = models_base.Enumerated(1)
 
 		err := msg.Validate()
@@ -575,7 +575,7 @@ func TestCancelLocationRequest_MarshalUnmarshal(t *testing.T) {
 	original.OriginRealm = models_base.DiameterIdentity("client.example.com")
 	original.DestinationHost = models_base.DiameterIdentity("server.example.com")
 	original.DestinationRealm = models_base.DiameterIdentity("server.example.com")
-	original.UserName = models_base.UTF8String("test")
+	original.UserName = models_base.UTF8String("452040000000010")
 	original.CancellationType = models_base.Enumerated(1)
 
 	// Set header identifiers for comparison
@@ -809,7 +809,7 @@ func TestInsertSubscriberDataRequest_Validation(t *testing.T) {
 		msg.OriginRealm = models_base.DiameterIdentity("client.example.com")
 		msg.DestinationHost = models_base.DiameterIdentity("server.example.com")
 		msg.DestinationRealm = models_base.DiameterIdentity("server.example.com")
-		msg.UserName = models_base.UTF8String("test")
+		msg.UserName = models_base.UTF8String("452040000000010")
 		msg.SubscriptionData = &SubscriptionData{
 			SubscriberStatus: ptrEnumerated(1),
 			Msisdn:           ptrOctetString([]byte{0x01, 0x02, 0x03}),
@@ -834,7 +834,7 @@ func TestInsertSubscriberDataRequest_MarshalUnmarshal(t *testing.T) {
 	original.OriginRealm = models_base.DiameterIdentity("client.example.com")
 	original.DestinationHost = models_base.DiameterIdentity("server.example.com")
 	original.DestinationRealm = models_base.DiameterIdentity("server.example.com")
-	original.UserName = models_base.UTF8String("test")
+	original.UserName = models_base.UTF8String("452040000000010")
 	original.SubscriptionData = &SubscriptionData{
 		SubscriberStatus: ptrEnumerated(1),
 		Msisdn:           ptrOctetString([]byte{0x01, 0x02, 0x03}),
@@ -1070,7 +1070,7 @@ func TestDeleteSubscriberDataRequest_Validation(t *testing.T) {
 		msg.OriginRealm = models_base.DiameterIdentity("client.example.com")
 		msg.DestinationHost = models_base.DiameterIdentity("server.example.com")
 		msg.DestinationRealm = models_base.DiameterIdentity("server.example.com")
-		msg.UserName = models_base.UTF8String("test")
+		msg.UserName = models_base.UTF8String("452040000000010")
 		msg.DsrFlags = models_base.Unsigned32(1)
 
 		err := msg.Validate()
@@ -1090,7 +1090,7 @@ func TestDeleteSubscriberDataRequest_MarshalUnmarshal(t *testing.T) {
 	original.OriginRealm = models_base.DiameterIdentity("client.example.com")
 	original.DestinationHost = models_base.DiameterIdentity("server.example.com")
 	original.DestinationRealm = models_base.DiameterIdentity("server.example.com")
-	original.UserName = models_base.UTF8String("test")
+	original.UserName = models_base.UTF8String("452040000000010")
 	original.DsrFlags = models_base.Unsigned32(1)
 
 	// Set header identifiers for comparison
@@ -1323,7 +1323,7 @@ func TestPurgeUERequest_Validation(t *testing.T) {
 		msg.OriginHost = models_base.DiameterIdentity("client.example.com")
 		msg.OriginRealm = models_base.DiameterIdentity("client.example.com")
 		msg.DestinationRealm = models_base.DiameterIdentity("server.example.com")
-		msg.UserName = models_base.UTF8String("test")
+		msg.UserName = models_base.UTF8String("452040000000010")
 
 		err := msg.Validate()
 		if err != nil {
@@ -1341,7 +1341,7 @@ func TestPurgeUERequest_MarshalUnmarshal(t *testing.T) {
 	original.OriginHost = models_base.DiameterIdentity("client.example.com")
 	original.OriginRealm = models_base.DiameterIdentity("client.example.com")
 	original.DestinationRealm = models_base.DiameterIdentity("server.example.com")
-	original.UserName = models_base.UTF8String("test")
+	original.UserName = models_base.UTF8String("452040000000010")
 
 	// Set header identifiers for comparison
 	original.Header.HopByHopID = 0xAABBCCDD
@@ -1811,7 +1811,7 @@ func TestNotifyRequest_Validation(t *testing.T) {
 		msg.OriginHost = models_base.DiameterIdentity("client.example.com")
 		msg.OriginRealm = models_base.DiameterIdentity("client.example.com")
 		msg.DestinationRealm = models_base.DiameterIdentity("server.example.com")
-		msg.UserName = models_base.UTF8String("test")
+		msg.UserName = models_base.UTF8String("452040000000010")
 
 		err := msg.Validate()
 		if err != nil {
@@ -1829,7 +1829,7 @@ func TestNotifyRequest_MarshalUnmarshal(t *testing.T) {
 	original.OriginHost = models_base.DiameterIdentity("client.example.com")
 	original.OriginRealm = models_base.DiameterIdentity("client.example.com")
 	original.DestinationRealm = models_base.DiameterIdentity("server.example.com")
-	original.UserName = models_base.UTF8String("test")
+	original.UserName = models_base.UTF8String("452040000000010")
 
 	// Set header identifiers for comparison
 	original.Header.HopByHopID = 0xAABBCCDD
