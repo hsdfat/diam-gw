@@ -2060,7 +2060,7 @@ func (g *Generator) generateCommandPairPcapTest(buf *bytes.Buffer, requestCmd, a
 		// Try other patterns
 		baseName = strings.TrimSuffix(requestCmd.Abbreviation, "Req")
 	}
-	pcapFileName := fmt.Sprintf("test_%s_pair.pcap", strings.ToLower(baseName))
+	pcapFileName := fmt.Sprintf("test_%sr_%sa.pcap", strings.ToLower(baseName), strings.ToLower(baseName))
 
 	buf.WriteString(fmt.Sprintf("// Test%s_Pair_PCAP tests PCAP file generation for %s request-response pair\n", baseName, baseName))
 	buf.WriteString(fmt.Sprintf("func Test%s_Pair_PCAP(t *testing.T) {\n", baseName))
@@ -2080,7 +2080,13 @@ func (g *Generator) generateCommandPairPcapTest(buf *bytes.Buffer, requestCmd, a
 	cmdName := requestCmd.Name
 	for _, field := range requestCmd.Fields {
 		if field.Required {
-			g.generateTestFieldAssignmentWithVar(buf, field, &cmdName, "request", "\t")
+			g.generateTestFieldAssignmentWithAllChildren(buf, field, &cmdName, "request", "\t")
+		}
+	}
+
+	for _, field := range requestCmd.Fields {
+		if !field.Required {
+			g.generateTestFieldAssignmentWithAllChildren(buf, field, &cmdName, "request", "\t")
 		}
 	}
 
@@ -2095,7 +2101,13 @@ func (g *Generator) generateCommandPairPcapTest(buf *bytes.Buffer, requestCmd, a
 	cmdName = answerCmd.Name
 	for _, field := range answerCmd.Fields {
 		if field.Required {
-			g.generateTestFieldAssignmentWithVar(buf, field, &cmdName, "answer", "\t")
+			g.generateTestFieldAssignmentWithAllChildren(buf, field, &cmdName, "answer", "\t")
+		}
+	}
+
+	for _, field := range answerCmd.Fields {
+		if !field.Required {
+			g.generateTestFieldAssignmentWithAllChildren(buf, field, &cmdName, "answer", "\t")
 		}
 	}
 
@@ -2463,9 +2475,9 @@ func (g *Generator) GeneratePcapTests() (string, error) {
 	g.generatePcapHelpers(&buf)
 
 	// Generate PCAP test functions for each command
-	for _, cmd := range g.Parser.Commands {
-		g.generateCommandPcapTest(&buf, cmd)
-	}
+	// for _, cmd := range g.Parser.Commands {
+	// 	g.generateCommandPcapTest(&buf, cmd)
+	// }
 
 	// Generate paired request-response PCAP tests
 	g.generatePairedPcapTests(&buf)

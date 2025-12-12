@@ -6,129 +6,129 @@ package s6a
 const (
 	S6A_APPLICATION_ID = 16777251
 	VENDOR_ID_3GPP     = 10415
-	ULR_COMMAND_CODE   = 316
-	CLR_COMMAND_CODE   = 317
 	AIR_COMMAND_CODE   = 318
 	DSR_COMMAND_CODE   = 320
+	ULR_COMMAND_CODE   = 316
+	CLR_COMMAND_CODE   = 317
+	IDR_COMMAND_CODE   = 319
 	PUR_COMMAND_CODE   = 321
 	RSR_COMMAND_CODE   = 322
-	IDR_COMMAND_CODE   = 319
 	NOR_COMMAND_CODE   = 323
 )
 
 // AVP Codes
 const (
-	AVPCodeCLRFLAGS                              uint32 = 1638
-	AVPCodeAMSISDN                               uint32 = 1643
-	AVPCodeAUTHSESSIONSTATE                      uint32 = 277
-	AVPCodeCLASS                                 uint32 = 25
-	AVPCodeACCOUNTINGRECORDNUMBER                uint32 = 485
-	AVPCodeREAUTHREQUESTTYPE                     uint32 = 285
-	AVPCodeREDIRECTHOST                          uint32 = 292
-	AVPCodeIDAFLAGS                              uint32 = 1441
-	AVPCodeGERANVECTOR                           uint32 = 1416
+	AVPCodeVENDORID                              uint32 = 266
+	AVPCodeUSERNAME                              uint32 = 1
+	AVPCodeMIPHOMEAGENTADDRESS                   uint32 = 334
+	AVPCodeAUTHORIZATIONLIFETIME                 uint32 = 291
+	AVPCodeDISCONNECTCAUSE                       uint32 = 273
 	AVPCodeULAFLAGS                              uint32 = 1406
+	AVPCodeRESYNCHRONIZATIONINFO                 uint32 = 1411
 	AVPCodeSESSIONSERVERFAILOVER                 uint32 = 271
-	AVPCodeTERMINATIONCAUSE                      uint32 = 295
-	AVPCodeREDIRECTHOSTUSAGE                     uint32 = 261
-	AVPCodeORIGINHOST                            uint32 = 264
-	AVPCodeAMBR                                  uint32 = 1435
-	AVPCodeKC                                    uint32 = 1453
-	AVPCodePUAFLAGS                              uint32 = 1442
-	AVPCodeINBANDSECURITYID                      uint32 = 299
-	AVPCodeERRORREPORTINGHOST                    uint32 = 294
-	AVPCodeACCTMULTISESSIONID                    uint32 = 50
+	AVPCodeCLASS                                 uint32 = 25
+	AVPCodeSESSIONID                             uint32 = 263
+	AVPCodeACCOUNTINGRECORDNUMBER                uint32 = 485
+	AVPCodeDRMP                                  uint32 = 301
+	AVPCodeCLRFLAGS                              uint32 = 1638
+	AVPCodePURFLAGS                              uint32 = 1635
+	AVPCodeAPNCONFIGURATIONPROFILE               uint32 = 1429
+	AVPCodeAUTHREQUESTTYPE                       uint32 = 274
+	AVPCodeACCOUNTINGRECORDTYPE                  uint32 = 480
+	AVPCodeMIP6HOMELINKPREFIX                    uint32 = 125
+	AVPCodeHOSTIPADDRESS                         uint32 = 257
 	AVPCodeVENDORSPECIFICAPPLICATIONID           uint32 = 260
-	AVPCodeORIGINSTATEID                         uint32 = 278
 	AVPCodeDESTINATIONREALM                      uint32 = 283
-	AVPCodeAUTN                                  uint32 = 1449
+	AVPCodeIMEI                                  uint32 = 1402
+	AVPCodeEUTRANVECTOR                          uint32 = 1414
+	AVPCodeEVENTTIMESTAMP                        uint32 = 55
+	AVPCodeFIRMWAREREVISION                      uint32 = 267
+	AVPCode3GPP2MEID                             uint32 = 1471
+	AVPCodeDSAFLAGS                              uint32 = 1422
+	AVPCodeVISITEDPLMNID                         uint32 = 1407
+	AVPCodeXRES                                  uint32 = 1448
+	AVPCodeCANCELLATIONTYPE                      uint32 = 1420
+	AVPCodeSUBSCRIPTIONDATA                      uint32 = 1400
+	AVPCodeFAILEDAVP                             uint32 = 279
+	AVPCodeE2ESEQUENCE                           uint32 = 300
+	AVPCodeROUTERECORD                           uint32 = 282
+	AVPCodeALERTREASON                           uint32 = 1434
+	AVPCodeDSRFLAGS                              uint32 = 1421
+	AVPCodeULRFLAGS                              uint32 = 1405
+	AVPCodeSRES                                  uint32 = 1454
+	AVPCodeACCTINTERIMINTERVAL                   uint32 = 85
+	AVPCodeAUTHSESSIONSTATE                      uint32 = 277
+	AVPCodeACCOUNTINGREALTIMEREQUIRED            uint32 = 483
+	AVPCodeEXPERIMENTALRESULTCODE                uint32 = 298
+	AVPCodeAIRFLAGS                              uint32 = 1679
+	AVPCodeAMSISDN                               uint32 = 1643
+	AVPCodeSERVICESELECTION                      uint32 = 493
+	AVPCodeREDIRECTHOSTUSAGE                     uint32 = 261
+	AVPCodePUAFLAGS                              uint32 = 1442
+	AVPCodeCSGSUBSCRIPTIONDATA                   uint32 = 1436
+	AVPCodeNUMBEROFREQUESTEDVECTORS              uint32 = 1410
+	AVPCodeMIPHOMEAGENTHOST                      uint32 = 348
+	AVPCodeORIGINHOST                            uint32 = 264
+	AVPCodeORIGINREALM                           uint32 = 296
+	AVPCodeITEMNUMBER                            uint32 = 1419
+	AVPCodeREQUESTEDEUTRANAUTHENTICATIONINFO     uint32 = 1408
+	AVPCodeCONFIDENTIALITYKEY                    uint32 = 1451
+	AVPCodeSGSNNUMBER                            uint32 = 1489
+	AVPCodeAMBR                                  uint32 = 1435
+	AVPCodeTERMINATIONCAUSE                      uint32 = 295
+	AVPCodeEXPERIMENTALRESULT                    uint32 = 297
+	AVPCodeREAUTHREQUESTTYPE                     uint32 = 285
+	AVPCodeIMMEDIATERESPONSEPREFERRED            uint32 = 1412
+	AVPCodeMSISDN                                uint32 = 701
+	AVPCodeERRORDIAGNOSTIC                       uint32 = 1614
+	AVPCodeTERMINALINFORMATION                   uint32 = 1401
+	AVPCodeSESSIONTIMEOUT                        uint32 = 27
+	AVPCodeAUTHGRACEPERIOD                       uint32 = 276
+	AVPCodeRESULTCODE                            uint32 = 268
+	AVPCodePROXYSTATE                            uint32 = 33
+	AVPCodeINBANDSECURITYID                      uint32 = 299
+	AVPCodeACCESSRESTRICTIONDATA                 uint32 = 1426
+	AVPCodeALLAPNCONFIGURATIONSINCLUDEDINDICATOR uint32 = 1428
+	AVPCodeREDIRECTMAXCACHETIME                  uint32 = 262
+	AVPCodeORIGINSTATEID                         uint32 = 278
+	AVPCodeRATTYPE                               uint32 = 1032
+	AVPCodeAPNCONFIGURATION                      uint32 = 1430
+	AVPCodeCONTEXTIDENTIFIER                     uint32 = 1423
+	AVPCodeINTEGRITYKEY                          uint32 = 1452
+	AVPCodeMULTIROUNDTIMEOUT                     uint32 = 272
+	AVPCodePRODUCTNAME                           uint32 = 269
+	AVPCodeACCOUNTINGSUBSESSIONID                uint32 = 287
+	AVPCodeGERANVECTOR                           uint32 = 1416
+	AVPCodeSUBSCRIBERSTATUS                      uint32 = 1424
+	AVPCodeEPSSUBSCRIBEDQOSPROFILE               uint32 = 1431
+	AVPCodeNORFLAGS                              uint32 = 1443
+	AVPCodeDESTINATIONHOST                       uint32 = 293
+	AVPCodeERRORMESSAGE                          uint32 = 281
 	AVPCodeUESRVCCCAPABILITY                     uint32 = 1615
 	AVPCodeOPERATORDETERMINEDBARRING             uint32 = 1425
-	AVPCodeDSRFLAGS                              uint32 = 1421
-	AVPCodeREQUESTEDEUTRANAUTHENTICATIONINFO     uint32 = 1408
-	AVPCodeAIRFLAGS                              uint32 = 1679
-	AVPCodeCONTEXTIDENTIFIER                     uint32 = 1423
-	AVPCodePROXYINFO                             uint32 = 284
-	AVPCodeSESSIONID                             uint32 = 263
-	AVPCodeEVENTTIMESTAMP                        uint32 = 55
-	AVPCodeACCOUNTINGREALTIMEREQUIRED            uint32 = 483
-	AVPCodeAPNCONFIGURATIONPROFILE               uint32 = 1429
 	AVPCodeUTRANVECTOR                           uint32 = 1415
-	AVPCodeSERVICESELECTION                      uint32 = 493
-	AVPCodePROXYHOST                             uint32 = 280
-	AVPCodeMIPHOMEAGENTADDRESS                   uint32 = 334
-	AVPCodeACCOUNTINGRECORDTYPE                  uint32 = 480
-	AVPCodeRESYNCHRONIZATIONINFO                 uint32 = 1411
-	AVPCodeSUBSCRIBERSTATUS                      uint32 = 1424
-	AVPCodeERRORMESSAGE                          uint32 = 281
-	AVPCodeACCTSESSIONID                         uint32 = 44
-	AVPCodeHOSTIPADDRESS                         uint32 = 257
-	AVPCodeDRMP                                  uint32 = 301
-	AVPCodeDSAFLAGS                              uint32 = 1422
-	AVPCodeXRES                                  uint32 = 1448
-	AVPCodeULRFLAGS                              uint32 = 1405
-	AVPCodeAUTHENTICATIONINFO                    uint32 = 1413
-	AVPCodeMIPHOMEAGENTHOST                      uint32 = 348
-	AVPCodePRODUCTNAME                           uint32 = 269
-	AVPCodeAUTHREQUESTTYPE                       uint32 = 274
-	AVPCodeSUPPORTEDVENDORID                     uint32 = 265
-	AVPCodePROXYSTATE                            uint32 = 33
-	AVPCodeE2ESEQUENCE                           uint32 = 300
-	AVPCodeREDIRECTMAXCACHETIME                  uint32 = 262
-	AVPCodeSESSIONBINDING                        uint32 = 270
-	AVPCodeRESULTCODE                            uint32 = 268
-	AVPCodeAUTHGRACEPERIOD                       uint32 = 276
-	AVPCodeDISCONNECTCAUSE                       uint32 = 273
-	AVPCodeMIP6AGENTINFO                         uint32 = 486
-	AVPCode3GPP2MEID                             uint32 = 1471
-	AVPCodeTERMINALINFORMATION                   uint32 = 1401
-	AVPCodeIMMEDIATERESPONSEPREFERRED            uint32 = 1412
-	AVPCodeALLAPNCONFIGURATIONSINCLUDEDINDICATOR uint32 = 1428
-	AVPCodeUSERNAME                              uint32 = 1
-	AVPCodeACCTINTERIMINTERVAL                   uint32 = 85
-	AVPCodeEUTRANVECTOR                          uint32 = 1414
-	AVPCodePURFLAGS                              uint32 = 1635
-	AVPCodeCSGSUBSCRIPTIONDATA                   uint32 = 1436
-	AVPCodeCONFIDENTIALITYKEY                    uint32 = 1451
-	AVPCodeMSISDN                                uint32 = 701
-	AVPCodeMULTIROUNDTIMEOUT                     uint32 = 272
-	AVPCodeAUTHAPPLICATIONID                     uint32 = 258
-	AVPCodeROUTERECORD                           uint32 = 282
-	AVPCodeORIGINREALM                           uint32 = 296
-	AVPCodeACCOUNTINGSUBSESSIONID                uint32 = 287
-	AVPCodeIMEI                                  uint32 = 1402
-	AVPCodeRAND                                  uint32 = 1447
-	AVPCodeSGSNNUMBER                            uint32 = 1489
-	AVPCodeSESSIONTIMEOUT                        uint32 = 27
-	AVPCodeDESTINATIONHOST                       uint32 = 293
-	AVPCodeVISITEDPLMNID                         uint32 = 1407
 	AVPCodeAPNOIREPLACEMENT                      uint32 = 1427
-	AVPCodeACCESSRESTRICTIONDATA                 uint32 = 1426
-	AVPCodeAPNCONFIGURATION                      uint32 = 1430
-	AVPCodeFIRMWAREREVISION                      uint32 = 267
-	AVPCodeFAILEDAVP                             uint32 = 279
+	AVPCodePROXYHOST                             uint32 = 280
+	AVPCodeMIP6AGENTINFO                         uint32 = 486
+	AVPCodeAUTHAPPLICATIONID                     uint32 = 258
 	AVPCodeSOFTWAREVERSION                       uint32 = 1403
-	AVPCodeSRES                                  uint32 = 1454
-	AVPCodeEPSSUBSCRIBEDQOSPROFILE               uint32 = 1431
-	AVPCodeSUBSCRIPTIONDATA                      uint32 = 1400
-	AVPCodeKASME                                 uint32 = 1450
-	AVPCodeMIP6HOMELINKPREFIX                    uint32 = 125
+	AVPCodeAUTN                                  uint32 = 1449
+	AVPCodeAUTHENTICATIONINFO                    uint32 = 1413
+	AVPCodeKC                                    uint32 = 1453
+	AVPCodeIDAFLAGS                              uint32 = 1441
+	AVPCodeREDIRECTHOST                          uint32 = 292
+	AVPCodeSUPPORTEDVENDORID                     uint32 = 265
+	AVPCodeERRORREPORTINGHOST                    uint32 = 294
 	AVPCodeACCTAPPLICATIONID                     uint32 = 259
-	AVPCodeEXPERIMENTALRESULT                    uint32 = 297
 	AVPCodeEQUIPMENTSTATUS                       uint32 = 1445
-	AVPCodeNUMBEROFREQUESTEDVECTORS              uint32 = 1410
-	AVPCodeCANCELLATIONTYPE                      uint32 = 1420
-	AVPCodeINTEGRITYKEY                          uint32 = 1452
 	AVPCodeIDRFLAGS                              uint32 = 1490
-	AVPCodeVENDORID                              uint32 = 266
-	AVPCodeALERTREASON                           uint32 = 1434
-	AVPCodeERRORDIAGNOSTIC                       uint32 = 1614
-	AVPCodeITEMNUMBER                            uint32 = 1419
-	AVPCodeNORFLAGS                              uint32 = 1443
 	AVPCodeREQUESTEDUTRANGERANAUTHENTICATIONINFO uint32 = 1409
-	AVPCodeEXPERIMENTALRESULTCODE                uint32 = 298
-	AVPCodeAUTHORIZATIONLIFETIME                 uint32 = 291
-	AVPCodeRATTYPE                               uint32 = 1032
+	AVPCodeRAND                                  uint32 = 1447
+	AVPCodeACCTMULTISESSIONID                    uint32 = 50
+	AVPCodePROXYINFO                             uint32 = 284
+	AVPCodeSESSIONBINDING                        uint32 = 270
+	AVPCodeKASME                                 uint32 = 1450
+	AVPCodeACCTSESSIONID                         uint32 = 44
 )
 
 // Vendor IDs
@@ -156,55 +156,6 @@ const (
 	CommandCodeNOTIFYANSWER                     uint32 = 323
 )
 
-// PDNGWAllocationType represents the PDNGWAllocationType enumerated type
-type PDNGWAllocationType uint32
-
-// PDNGWAllocationType values
-const (
-	PDNGWAllocationType_STATIC  PDNGWAllocationType = 0
-	PDNGWAllocationType_DYNAMIC PDNGWAllocationType = 1
-)
-
-// VPLMNDynamicAddressAllowed represents the VPLMNDynamicAddressAllowed enumerated type
-type VPLMNDynamicAddressAllowed uint32
-
-// VPLMNDynamicAddressAllowed values
-const (
-	VPLMNDynamicAddressAllowed_ALLOWED    VPLMNDynamicAddressAllowed = 1
-	VPLMNDynamicAddressAllowed_NOTALLOWED VPLMNDynamicAddressAllowed = 0
-)
-
-// AlertReason represents the AlertReason enumerated type
-type AlertReason uint32
-
-// AlertReason values
-const (
-	AlertReason_UE_PRESENT          AlertReason = 0
-	AlertReason_UE_MEMORY_AVAILABLE AlertReason = 1
-)
-
-// SMSRegisterRequest represents the SMSRegisterRequest enumerated type
-type SMSRegisterRequest uint32
-
-// SMSRegisterRequest values
-const (
-	SMSRegisterRequest_SMS_REGISTRATION_REQUIRED      SMSRegisterRequest = 0
-	SMSRegisterRequest_SMS_REGISTRATION_NOT_PREFERRED SMSRegisterRequest = 1
-	SMSRegisterRequest_NO_PREFERENCE                  SMSRegisterRequest = 2
-)
-
-// CancellationType represents the CancellationType enumerated type
-type CancellationType uint32
-
-// CancellationType values
-const (
-	CancellationType_SUBSCRIPTION_WITHDRAWAL  CancellationType = 2
-	CancellationType_UPDATE_PROCEDURE_IWF     CancellationType = 3
-	CancellationType_INITIAL_ATTACH_PROCEDURE CancellationType = 4
-	CancellationType_MME_UPDATE_PROCEDURE     CancellationType = 0
-	CancellationType_SGSN_UPDATE_PROCEDURE    CancellationType = 1
-)
-
 // NetworkAccessMode represents the NetworkAccessMode enumerated type
 type NetworkAccessMode uint32
 
@@ -229,8 +180,26 @@ type AllAPNConfigurationsIncludedIndicator uint32
 
 // AllAPNConfigurationsIncludedIndicator values
 const (
-	AllAPNConfigurationsIncludedIndicator_MODIFIED_ADDED_APN_CONFIGURATIONS_INCLUDED AllAPNConfigurationsIncludedIndicator = 1
 	AllAPNConfigurationsIncludedIndicator_All_APN_CONFIGURATIONS_INCLUDED            AllAPNConfigurationsIncludedIndicator = 0
+	AllAPNConfigurationsIncludedIndicator_MODIFIED_ADDED_APN_CONFIGURATIONS_INCLUDED AllAPNConfigurationsIncludedIndicator = 1
+)
+
+// VPLMNDynamicAddressAllowed represents the VPLMNDynamicAddressAllowed enumerated type
+type VPLMNDynamicAddressAllowed uint32
+
+// VPLMNDynamicAddressAllowed values
+const (
+	VPLMNDynamicAddressAllowed_ALLOWED    VPLMNDynamicAddressAllowed = 1
+	VPLMNDynamicAddressAllowed_NOTALLOWED VPLMNDynamicAddressAllowed = 0
+)
+
+// AlertReason represents the AlertReason enumerated type
+type AlertReason uint32
+
+// AlertReason values
+const (
+	AlertReason_UE_PRESENT          AlertReason = 0
+	AlertReason_UE_MEMORY_AVAILABLE AlertReason = 1
 )
 
 // EquipmentStatus represents the EquipmentStatus enumerated type
@@ -238,9 +207,30 @@ type EquipmentStatus uint32
 
 // EquipmentStatus values
 const (
-	EquipmentStatus_GREYLISTED  EquipmentStatus = 2
 	EquipmentStatus_WHITELISTED EquipmentStatus = 0
 	EquipmentStatus_BLACKLISTED EquipmentStatus = 1
+	EquipmentStatus_GREYLISTED  EquipmentStatus = 2
+)
+
+// CancellationType represents the CancellationType enumerated type
+type CancellationType uint32
+
+// CancellationType values
+const (
+	CancellationType_MME_UPDATE_PROCEDURE     CancellationType = 0
+	CancellationType_SGSN_UPDATE_PROCEDURE    CancellationType = 1
+	CancellationType_SUBSCRIPTION_WITHDRAWAL  CancellationType = 2
+	CancellationType_UPDATE_PROCEDURE_IWF     CancellationType = 3
+	CancellationType_INITIAL_ATTACH_PROCEDURE CancellationType = 4
+)
+
+// PDNGWAllocationType represents the PDNGWAllocationType enumerated type
+type PDNGWAllocationType uint32
+
+// PDNGWAllocationType values
+const (
+	PDNGWAllocationType_STATIC  PDNGWAllocationType = 0
+	PDNGWAllocationType_DYNAMIC PDNGWAllocationType = 1
 )
 
 // UESRVCCCapability represents the UESRVCCCapability enumerated type
@@ -250,4 +240,14 @@ type UESRVCCCapability uint32
 const (
 	UESRVCCCapability_UE_SRVCC_NOT_SUPPORTED UESRVCCCapability = 0
 	UESRVCCCapability_UE_SRVCC_SUPPORTED     UESRVCCCapability = 1
+)
+
+// SMSRegisterRequest represents the SMSRegisterRequest enumerated type
+type SMSRegisterRequest uint32
+
+// SMSRegisterRequest values
+const (
+	SMSRegisterRequest_SMS_REGISTRATION_NOT_PREFERRED SMSRegisterRequest = 1
+	SMSRegisterRequest_NO_PREFERENCE                  SMSRegisterRequest = 2
+	SMSRegisterRequest_SMS_REGISTRATION_REQUIRED      SMSRegisterRequest = 0
 )
