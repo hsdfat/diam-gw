@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"go/format"
 	"os"
+	"sort"
 	"strings"
 )
 
@@ -146,7 +147,14 @@ func (g *Generator) Generate() (string, error) {
 
 	// Generate Grouped AVP structs
 	buf.WriteString("// Grouped AVP structures\n\n")
-	for name, avp := range g.Parser.AVPs {
+	// Sort AVP names for consistent output
+	sortedAVPNames := make([]string, 0, len(g.Parser.AVPs))
+	for name := range g.Parser.AVPs {
+		sortedAVPNames = append(sortedAVPNames, name)
+	}
+	sort.Strings(sortedAVPNames)
+	for _, name := range sortedAVPNames {
+		avp := g.Parser.AVPs[name]
 		if avp.TypeName == "Grouped" {
 			structName := toCamelCase(strings.ReplaceAll(name, "-", "_"))
 			buf.WriteString(fmt.Sprintf("// %s represents the %s grouped AVP (AVP Code %d)\n", structName, name, avp.Code))
@@ -216,7 +224,14 @@ func (g *Generator) GenerateConstants() (string, error) {
 	if len(g.Parser.Consts) > 0 {
 		buf.WriteString("// Protocol Constants\n")
 		buf.WriteString("const (\n")
-		for name, value := range g.Parser.Consts {
+		// Sort constant names for consistent output
+		constNames := make([]string, 0, len(g.Parser.Consts))
+		for name := range g.Parser.Consts {
+			constNames = append(constNames, name)
+		}
+		sort.Strings(constNames)
+		for _, name := range constNames {
+			value := g.Parser.Consts[name]
 			buf.WriteString(fmt.Sprintf("\t%s = %d\n", name, value))
 		}
 		buf.WriteString(")\n\n")
@@ -231,6 +246,7 @@ func (g *Generator) GenerateConstants() (string, error) {
 	for name := range g.Parser.AVPs {
 		avpNames = append(avpNames, name)
 	}
+	sort.Strings(avpNames)
 
 	for _, name := range avpNames {
 		avp := g.Parser.AVPs[name]
@@ -249,7 +265,15 @@ func (g *Generator) GenerateConstants() (string, error) {
 	if len(vendorIDs) > 0 {
 		buf.WriteString("// Vendor IDs\n")
 		buf.WriteString("const (\n")
+		// Sort vendor IDs for consistent output
+		sortedVendorIDs := make([]uint32, 0, len(vendorIDs))
 		for vendorID := range vendorIDs {
+			sortedVendorIDs = append(sortedVendorIDs, vendorID)
+		}
+		sort.Slice(sortedVendorIDs, func(i, j int) bool {
+			return sortedVendorIDs[i] < sortedVendorIDs[j]
+		})
+		for _, vendorID := range sortedVendorIDs {
 			buf.WriteString(fmt.Sprintf("\tVendorID%d uint32 = %d\n", vendorID, vendorID))
 		}
 		buf.WriteString(")\n\n")
@@ -259,7 +283,13 @@ func (g *Generator) GenerateConstants() (string, error) {
 	if len(g.Parser.Commands) > 0 {
 		buf.WriteString("// Command Codes\n")
 		buf.WriteString("const (\n")
-		for _, cmd := range g.Parser.Commands {
+		// Sort commands by name for consistent output
+		sortedCommands := make([]*CommandDefinition, len(g.Parser.Commands))
+		copy(sortedCommands, g.Parser.Commands)
+		sort.Slice(sortedCommands, func(i, j int) bool {
+			return sortedCommands[i].Name < sortedCommands[j].Name
+		})
+		for _, cmd := range sortedCommands {
 			constName := toConstantCase(cmd.Name)
 			buf.WriteString(fmt.Sprintf("\tCommandCode%s uint32 = %d\n", constName, cmd.Code))
 		}
@@ -267,7 +297,14 @@ func (g *Generator) GenerateConstants() (string, error) {
 	}
 
 	// Generate Enum type definitions
-	for enumName, enum := range g.Parser.Enums {
+	// Sort enum names for consistent output
+	sortedEnumNames := make([]string, 0, len(g.Parser.Enums))
+	for enumName := range g.Parser.Enums {
+		sortedEnumNames = append(sortedEnumNames, enumName)
+	}
+	sort.Strings(sortedEnumNames)
+	for _, enumName := range sortedEnumNames {
+		enum := g.Parser.Enums[enumName]
 		typeName := toCamelCase(enumName)
 		buf.WriteString(fmt.Sprintf("// %s represents the %s enumerated type\n", typeName, enumName))
 		buf.WriteString(fmt.Sprintf("type %s uint32\n\n", typeName))
@@ -275,7 +312,14 @@ func (g *Generator) GenerateConstants() (string, error) {
 		// Generate enum constants
 		buf.WriteString(fmt.Sprintf("// %s values\n", enumName))
 		buf.WriteString("const (\n")
-		for valueName, value := range enum.Values {
+		// Sort enum values for consistent output
+		sortedValueNames := make([]string, 0, len(enum.Values))
+		for valueName := range enum.Values {
+			sortedValueNames = append(sortedValueNames, valueName)
+		}
+		sort.Strings(sortedValueNames)
+		for _, valueName := range sortedValueNames {
+			value := enum.Values[valueName]
 			constName := typeName + "_" + valueName
 			buf.WriteString(fmt.Sprintf("\t%s %s = %d\n", constName, typeName, value))
 		}
@@ -1623,6 +1667,83 @@ func (g *Generator) generateTestFieldAssignmentWithAllChildren(buf *bytes.Buffer
 						buf.WriteString(fmt.Sprintf("%s\t\t%s: ptrTime(models_base.Time(time.Now())),\n", indent, nestedFieldName))
 					} else {
 						buf.WriteString(fmt.Sprintf("%s\t\t%s: models_base.Time(time.Now()),\n", indent, nestedFieldName))
+					}
+				case "Grouped":
+					// Handle nested grouped types
+					if nestedField.AVP.GroupedFields != nil && len(nestedField.AVP.GroupedFields) > 0 {
+						nestedGroupTypeName := toCamelCase(strings.ReplaceAll(nestedField.AVP.Name, "-", "_"))
+						if nestedIsRepeated {
+							buf.WriteString(fmt.Sprintf("%s\t\t%s: []*%s{\n", indent, nestedFieldName, nestedGroupTypeName))
+							buf.WriteString(fmt.Sprintf("%s\t\t\t&%s{\n", indent, nestedGroupTypeName))
+						} else {
+							buf.WriteString(fmt.Sprintf("%s\t\t%s: &%s{\n", indent, nestedFieldName, nestedGroupTypeName))
+						}
+
+						// Generate field assignments for nested grouped fields
+						for _, deepNestedField := range nestedField.AVP.GroupedFields {
+							deepNestedFieldName := deepNestedField.FieldName
+							deepNestedIsOptional := !deepNestedField.Required
+							deepNestedIsRepeated := deepNestedField.Repeated
+
+							switch deepNestedField.AVP.TypeName {
+							case "OctetString":
+								value := "[]byte{0x01, 0x02, 0x03}"
+								// Special cases for authentication vectors
+								if strings.Contains(strings.ToLower(deepNestedField.AVP.Name), "rand") {
+									value = "[]byte{0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f, 0x10}"
+								} else if strings.Contains(strings.ToLower(deepNestedField.AVP.Name), "xres") {
+									value = "[]byte{0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18}"
+								} else if strings.Contains(strings.ToLower(deepNestedField.AVP.Name), "autn") {
+									value = "[]byte{0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27, 0x28, 0x29, 0x2a, 0x2b, 0x2c, 0x2d, 0x2e, 0x2f, 0x30}"
+								} else if strings.Contains(strings.ToLower(deepNestedField.AVP.Name), "kasme") {
+									value = "[]byte{0x31, 0x32, 0x33, 0x34, 0x35, 0x36, 0x37, 0x38, 0x39, 0x3a, 0x3b, 0x3c, 0x3d, 0x3e, 0x3f, 0x40, 0x41, 0x42, 0x43, 0x44, 0x45, 0x46, 0x47, 0x48, 0x49, 0x4a, 0x4b, 0x4c, 0x4d, 0x4e, 0x4f, 0x50}"
+								} else if strings.Contains(strings.ToLower(deepNestedField.AVP.Name), "sres") {
+									value = "[]byte{0x11, 0x12, 0x13, 0x14}"
+								} else if strings.ToLower(deepNestedField.AVP.Name) == "kc" {
+									value = "[]byte{0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27, 0x28}"
+								} else if strings.Contains(strings.ToLower(deepNestedField.AVP.Name), "confidentiality") || strings.Contains(strings.ToLower(deepNestedField.AVP.Name), "integrity") {
+									value = "[]byte{0x31, 0x32, 0x33, 0x34, 0x35, 0x36, 0x37, 0x38, 0x39, 0x3a, 0x3b, 0x3c, 0x3d, 0x3e, 0x3f, 0x40}"
+								}
+								if deepNestedIsRepeated {
+									buf.WriteString(fmt.Sprintf("%s\t\t\t\t%s: []models_base.OctetString{models_base.OctetString(%s)},\n", indent, deepNestedFieldName, value))
+								} else if deepNestedIsOptional {
+									buf.WriteString(fmt.Sprintf("%s\t\t\t\t%s: ptrOctetString(%s),\n", indent, deepNestedFieldName, value))
+								} else {
+									buf.WriteString(fmt.Sprintf("%s\t\t\t\t%s: models_base.OctetString(%s),\n", indent, deepNestedFieldName, value))
+								}
+							case "Unsigned32":
+								value := "1"
+								if deepNestedIsRepeated {
+									buf.WriteString(fmt.Sprintf("%s\t\t\t\t%s: []models_base.Unsigned32{models_base.Unsigned32(%s)},\n", indent, deepNestedFieldName, value))
+								} else if deepNestedIsOptional {
+									buf.WriteString(fmt.Sprintf("%s\t\t\t\t%s: ptrUnsigned32(%s),\n", indent, deepNestedFieldName, value))
+								} else {
+									buf.WriteString(fmt.Sprintf("%s\t\t\t\t%s: models_base.Unsigned32(%s),\n", indent, deepNestedFieldName, value))
+								}
+							case "UTF8String":
+								value := "\"test\""
+								if deepNestedIsRepeated {
+									buf.WriteString(fmt.Sprintf("%s\t\t\t\t%s: []models_base.UTF8String{models_base.UTF8String(%s)},\n", indent, deepNestedFieldName, value))
+								} else if deepNestedIsOptional {
+									buf.WriteString(fmt.Sprintf("%s\t\t\t\t%s: ptrUTF8String(%s),\n", indent, deepNestedFieldName, value))
+								} else {
+									buf.WriteString(fmt.Sprintf("%s\t\t\t\t%s: models_base.UTF8String(%s),\n", indent, deepNestedFieldName, value))
+								}
+							default:
+								// For unknown types, add a comment
+								buf.WriteString(fmt.Sprintf("%s\t\t\t\t// %s: nil, // (type: %s) needs to be set\n", indent, deepNestedFieldName, deepNestedField.AVP.TypeName))
+							}
+						}
+
+						if nestedIsRepeated {
+							buf.WriteString(fmt.Sprintf("%s\t\t\t},\n", indent))
+							buf.WriteString(fmt.Sprintf("%s\t\t},\n", indent))
+						} else {
+							buf.WriteString(fmt.Sprintf("%s\t\t},\n", indent))
+						}
+					} else {
+						// For grouped without fields, add a comment
+						buf.WriteString(fmt.Sprintf("%s\t\t// %s: nil, // (type: %s) needs to be set\n", indent, nestedFieldName, nestedField.AVP.TypeName))
 					}
 				default:
 					// For unknown types, add a comment

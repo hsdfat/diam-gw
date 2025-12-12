@@ -231,6 +231,264 @@ func writeDiameterPairToPcap(filename string, requestData, responseData []byte, 
 	return nil
 }
 
+// TestDP_Pair_PCAP tests PCAP file generation for DP request-response pair
+func TestDP_Pair_PCAP(t *testing.T) {
+	// Create testdata directory
+	if err := os.MkdirAll("testdata", 0755); err != nil {
+		t.Fatalf("Failed to create testdata directory: %v", err)
+	}
+
+	// Create pcap file path
+	pcapFile := filepath.Join("testdata", "test_dpr_dpa.pcap")
+	// PCAP files are kept for Wireshark analysis
+
+	// Create Request message
+	request := NewDisconnectPeerRequest()
+	request.OriginHost = models_base.DiameterIdentity("client.example.com")
+	request.OriginRealm = models_base.DiameterIdentity("client.example.com")
+	request.DisconnectCause = models_base.Enumerated(1)
+	request.Avp = []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})}
+
+	// Set header identifiers for request
+	request.Header.HopByHopID = 0x12345678
+	request.Header.EndToEndID = 0x87654321
+
+	// Create Answer message
+	answer := NewDisconnectPeerAnswer()
+	answer.ResultCode = models_base.Unsigned32(2001) // DIAMETER_SUCCESS
+	answer.OriginHost = models_base.DiameterIdentity("server.example.com")
+	answer.OriginRealm = models_base.DiameterIdentity("server.example.com")
+	answer.ErrorMessage = ptrUTF8String("452040000000010")
+	answer.FailedAvp = &FailedAVP{
+		AVP: []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})},
+	}
+	answer.Avp = []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})}
+
+	// Set header identifiers for answer (must match request)
+	answer.Header.HopByHopID = 0x12345678
+	answer.Header.EndToEndID = 0x87654321
+
+	// Marshal request
+	requestData, err := request.Marshal()
+	if err != nil {
+		t.Fatalf("Failed to marshal request: %v", err)
+	}
+
+	// Marshal answer
+	answerData, err := answer.Marshal()
+	if err != nil {
+		t.Fatalf("Failed to marshal answer: %v", err)
+	}
+
+	// Write request-response pair to PCAP
+	err = writeDiameterPairToPcap(pcapFile, requestData, answerData, net.ParseIP("192.168.1.100"), net.ParseIP("192.168.1.1"))
+	if err != nil {
+		t.Fatalf("Failed to write PCAP: %v", err)
+	}
+
+	// Verify PCAP file
+	info, err := os.Stat(pcapFile)
+	if err != nil {
+		t.Fatalf("PCAP file not created: %v", err)
+	}
+	if info.Size() == 0 {
+		t.Fatal("PCAP file is empty")
+	}
+
+	t.Logf("PCAP file created: %s (%d bytes)", pcapFile, info.Size())
+	t.Logf("Open in Wireshark to view the request-response pair")
+}
+
+// TestRA_Pair_PCAP tests PCAP file generation for RA request-response pair
+func TestRA_Pair_PCAP(t *testing.T) {
+	// Create testdata directory
+	if err := os.MkdirAll("testdata", 0755); err != nil {
+		t.Fatalf("Failed to create testdata directory: %v", err)
+	}
+
+	// Create pcap file path
+	pcapFile := filepath.Join("testdata", "test_rar_raa.pcap")
+	// PCAP files are kept for Wireshark analysis
+
+	// Create Request message
+	request := NewReAuthRequest()
+	request.SessionId = models_base.UTF8String("client.example.com;1234567890;1")
+	request.OriginHost = models_base.DiameterIdentity("client.example.com")
+	request.OriginRealm = models_base.DiameterIdentity("client.example.com")
+	request.DestinationRealm = models_base.DiameterIdentity("server.example.com")
+	request.DestinationHost = models_base.DiameterIdentity("server.example.com")
+	request.AuthApplicationId = models_base.Unsigned32(1)
+	request.ReAuthRequestType = models_base.Enumerated(1)
+	request.UserName = ptrUTF8String("452040000000010")
+	request.OriginStateId = ptrUnsigned32(1)
+	request.ProxyInfo = []*ProxyInfo{
+		&ProxyInfo{
+			ProxyHost:  models_base.DiameterIdentity("client.example.com"),
+			ProxyState: ptrOctetString([]byte{0x01, 0x02, 0x03}),
+		},
+	}
+	request.RouteRecord = []models_base.DiameterIdentity{models_base.DiameterIdentity("client.example.com")}
+	request.Avp = []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})}
+
+	// Set header identifiers for request
+	request.Header.HopByHopID = 0x12345678
+	request.Header.EndToEndID = 0x87654321
+
+	// Create Answer message
+	answer := NewReAuthAnswer()
+	answer.SessionId = models_base.UTF8String("client.example.com;1234567890;1")
+	answer.ResultCode = models_base.Unsigned32(2001) // DIAMETER_SUCCESS
+	answer.OriginHost = models_base.DiameterIdentity("server.example.com")
+	answer.OriginRealm = models_base.DiameterIdentity("server.example.com")
+	answer.UserName = ptrUTF8String("452040000000010")
+	answer.OriginStateId = ptrUnsigned32(1)
+	answer.ErrorMessage = ptrUTF8String("452040000000010")
+	answer.ErrorReportingHost = ptrDiameterIdentity("server.example.com")
+	answer.FailedAvp = &FailedAVP{
+		AVP: []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})},
+	}
+	// answer.RedirectHost needs to be set manually (type: DiameterURI)
+	answer.RedirectHostUsage = ptrEnumerated(1)
+	answer.RedirectMaxCacheTime = ptrUnsigned32(1)
+	answer.ProxyInfo = []*ProxyInfo{
+		&ProxyInfo{
+			ProxyHost:  models_base.DiameterIdentity("client.example.com"),
+			ProxyState: ptrOctetString([]byte{0x01, 0x02, 0x03}),
+		},
+	}
+	answer.Avp = []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})}
+
+	// Set header identifiers for answer (must match request)
+	answer.Header.HopByHopID = 0x12345678
+	answer.Header.EndToEndID = 0x87654321
+
+	// Marshal request
+	requestData, err := request.Marshal()
+	if err != nil {
+		t.Fatalf("Failed to marshal request: %v", err)
+	}
+
+	// Marshal answer
+	answerData, err := answer.Marshal()
+	if err != nil {
+		t.Fatalf("Failed to marshal answer: %v", err)
+	}
+
+	// Write request-response pair to PCAP
+	err = writeDiameterPairToPcap(pcapFile, requestData, answerData, net.ParseIP("192.168.1.100"), net.ParseIP("192.168.1.1"))
+	if err != nil {
+		t.Fatalf("Failed to write PCAP: %v", err)
+	}
+
+	// Verify PCAP file
+	info, err := os.Stat(pcapFile)
+	if err != nil {
+		t.Fatalf("PCAP file not created: %v", err)
+	}
+	if info.Size() == 0 {
+		t.Fatal("PCAP file is empty")
+	}
+
+	t.Logf("PCAP file created: %s (%d bytes)", pcapFile, info.Size())
+	t.Logf("Open in Wireshark to view the request-response pair")
+}
+
+// TestST_Pair_PCAP tests PCAP file generation for ST request-response pair
+func TestST_Pair_PCAP(t *testing.T) {
+	// Create testdata directory
+	if err := os.MkdirAll("testdata", 0755); err != nil {
+		t.Fatalf("Failed to create testdata directory: %v", err)
+	}
+
+	// Create pcap file path
+	pcapFile := filepath.Join("testdata", "test_str_sta.pcap")
+	// PCAP files are kept for Wireshark analysis
+
+	// Create Request message
+	request := NewSessionTerminationRequest()
+	request.SessionId = models_base.UTF8String("client.example.com;1234567890;1")
+	request.OriginHost = models_base.DiameterIdentity("client.example.com")
+	request.OriginRealm = models_base.DiameterIdentity("client.example.com")
+	request.DestinationRealm = models_base.DiameterIdentity("server.example.com")
+	request.AuthApplicationId = models_base.Unsigned32(1)
+	request.TerminationCause = models_base.Enumerated(1)
+	request.UserName = ptrUTF8String("452040000000010")
+	request.DestinationHost = ptrDiameterIdentity("server.example.com")
+	request.Class = []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})}
+	request.OriginStateId = ptrUnsigned32(1)
+	request.ProxyInfo = []*ProxyInfo{
+		&ProxyInfo{
+			ProxyHost:  models_base.DiameterIdentity("client.example.com"),
+			ProxyState: ptrOctetString([]byte{0x01, 0x02, 0x03}),
+		},
+	}
+	request.RouteRecord = []models_base.DiameterIdentity{models_base.DiameterIdentity("client.example.com")}
+	request.Avp = []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})}
+
+	// Set header identifiers for request
+	request.Header.HopByHopID = 0x12345678
+	request.Header.EndToEndID = 0x87654321
+
+	// Create Answer message
+	answer := NewSessionTerminationAnswer()
+	answer.SessionId = models_base.UTF8String("client.example.com;1234567890;1")
+	answer.ResultCode = models_base.Unsigned32(2001) // DIAMETER_SUCCESS
+	answer.OriginHost = models_base.DiameterIdentity("server.example.com")
+	answer.OriginRealm = models_base.DiameterIdentity("server.example.com")
+	answer.UserName = ptrUTF8String("452040000000010")
+	answer.Class = []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})}
+	answer.ErrorMessage = ptrUTF8String("452040000000010")
+	answer.ErrorReportingHost = ptrDiameterIdentity("server.example.com")
+	answer.FailedAvp = &FailedAVP{
+		AVP: []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})},
+	}
+	answer.OriginStateId = ptrUnsigned32(1)
+	// answer.RedirectHost needs to be set manually (type: DiameterURI)
+	answer.RedirectHostUsage = ptrEnumerated(1)
+	answer.RedirectMaxCacheTime = ptrUnsigned32(1)
+	answer.ProxyInfo = []*ProxyInfo{
+		&ProxyInfo{
+			ProxyHost:  models_base.DiameterIdentity("client.example.com"),
+			ProxyState: ptrOctetString([]byte{0x01, 0x02, 0x03}),
+		},
+	}
+	answer.Avp = []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})}
+
+	// Set header identifiers for answer (must match request)
+	answer.Header.HopByHopID = 0x12345678
+	answer.Header.EndToEndID = 0x87654321
+
+	// Marshal request
+	requestData, err := request.Marshal()
+	if err != nil {
+		t.Fatalf("Failed to marshal request: %v", err)
+	}
+
+	// Marshal answer
+	answerData, err := answer.Marshal()
+	if err != nil {
+		t.Fatalf("Failed to marshal answer: %v", err)
+	}
+
+	// Write request-response pair to PCAP
+	err = writeDiameterPairToPcap(pcapFile, requestData, answerData, net.ParseIP("192.168.1.100"), net.ParseIP("192.168.1.1"))
+	if err != nil {
+		t.Fatalf("Failed to write PCAP: %v", err)
+	}
+
+	// Verify PCAP file
+	info, err := os.Stat(pcapFile)
+	if err != nil {
+		t.Fatalf("PCAP file not created: %v", err)
+	}
+	if info.Size() == 0 {
+		t.Fatal("PCAP file is empty")
+	}
+
+	t.Logf("PCAP file created: %s (%d bytes)", pcapFile, info.Size())
+	t.Logf("Open in Wireshark to view the request-response pair")
+}
+
 // TestAS_Pair_PCAP tests PCAP file generation for AS request-response pair
 func TestAS_Pair_PCAP(t *testing.T) {
 	// Create testdata directory
@@ -573,264 +831,6 @@ func TestDW_Pair_PCAP(t *testing.T) {
 		AVP: []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})},
 	}
 	answer.OriginStateId = ptrUnsigned32(1)
-	answer.Avp = []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})}
-
-	// Set header identifiers for answer (must match request)
-	answer.Header.HopByHopID = 0x12345678
-	answer.Header.EndToEndID = 0x87654321
-
-	// Marshal request
-	requestData, err := request.Marshal()
-	if err != nil {
-		t.Fatalf("Failed to marshal request: %v", err)
-	}
-
-	// Marshal answer
-	answerData, err := answer.Marshal()
-	if err != nil {
-		t.Fatalf("Failed to marshal answer: %v", err)
-	}
-
-	// Write request-response pair to PCAP
-	err = writeDiameterPairToPcap(pcapFile, requestData, answerData, net.ParseIP("192.168.1.100"), net.ParseIP("192.168.1.1"))
-	if err != nil {
-		t.Fatalf("Failed to write PCAP: %v", err)
-	}
-
-	// Verify PCAP file
-	info, err := os.Stat(pcapFile)
-	if err != nil {
-		t.Fatalf("PCAP file not created: %v", err)
-	}
-	if info.Size() == 0 {
-		t.Fatal("PCAP file is empty")
-	}
-
-	t.Logf("PCAP file created: %s (%d bytes)", pcapFile, info.Size())
-	t.Logf("Open in Wireshark to view the request-response pair")
-}
-
-// TestDP_Pair_PCAP tests PCAP file generation for DP request-response pair
-func TestDP_Pair_PCAP(t *testing.T) {
-	// Create testdata directory
-	if err := os.MkdirAll("testdata", 0755); err != nil {
-		t.Fatalf("Failed to create testdata directory: %v", err)
-	}
-
-	// Create pcap file path
-	pcapFile := filepath.Join("testdata", "test_dpr_dpa.pcap")
-	// PCAP files are kept for Wireshark analysis
-
-	// Create Request message
-	request := NewDisconnectPeerRequest()
-	request.OriginHost = models_base.DiameterIdentity("client.example.com")
-	request.OriginRealm = models_base.DiameterIdentity("client.example.com")
-	request.DisconnectCause = models_base.Enumerated(1)
-	request.Avp = []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})}
-
-	// Set header identifiers for request
-	request.Header.HopByHopID = 0x12345678
-	request.Header.EndToEndID = 0x87654321
-
-	// Create Answer message
-	answer := NewDisconnectPeerAnswer()
-	answer.ResultCode = models_base.Unsigned32(2001) // DIAMETER_SUCCESS
-	answer.OriginHost = models_base.DiameterIdentity("server.example.com")
-	answer.OriginRealm = models_base.DiameterIdentity("server.example.com")
-	answer.ErrorMessage = ptrUTF8String("452040000000010")
-	answer.FailedAvp = &FailedAVP{
-		AVP: []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})},
-	}
-	answer.Avp = []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})}
-
-	// Set header identifiers for answer (must match request)
-	answer.Header.HopByHopID = 0x12345678
-	answer.Header.EndToEndID = 0x87654321
-
-	// Marshal request
-	requestData, err := request.Marshal()
-	if err != nil {
-		t.Fatalf("Failed to marshal request: %v", err)
-	}
-
-	// Marshal answer
-	answerData, err := answer.Marshal()
-	if err != nil {
-		t.Fatalf("Failed to marshal answer: %v", err)
-	}
-
-	// Write request-response pair to PCAP
-	err = writeDiameterPairToPcap(pcapFile, requestData, answerData, net.ParseIP("192.168.1.100"), net.ParseIP("192.168.1.1"))
-	if err != nil {
-		t.Fatalf("Failed to write PCAP: %v", err)
-	}
-
-	// Verify PCAP file
-	info, err := os.Stat(pcapFile)
-	if err != nil {
-		t.Fatalf("PCAP file not created: %v", err)
-	}
-	if info.Size() == 0 {
-		t.Fatal("PCAP file is empty")
-	}
-
-	t.Logf("PCAP file created: %s (%d bytes)", pcapFile, info.Size())
-	t.Logf("Open in Wireshark to view the request-response pair")
-}
-
-// TestRA_Pair_PCAP tests PCAP file generation for RA request-response pair
-func TestRA_Pair_PCAP(t *testing.T) {
-	// Create testdata directory
-	if err := os.MkdirAll("testdata", 0755); err != nil {
-		t.Fatalf("Failed to create testdata directory: %v", err)
-	}
-
-	// Create pcap file path
-	pcapFile := filepath.Join("testdata", "test_rar_raa.pcap")
-	// PCAP files are kept for Wireshark analysis
-
-	// Create Request message
-	request := NewReAuthRequest()
-	request.SessionId = models_base.UTF8String("client.example.com;1234567890;1")
-	request.OriginHost = models_base.DiameterIdentity("client.example.com")
-	request.OriginRealm = models_base.DiameterIdentity("client.example.com")
-	request.DestinationRealm = models_base.DiameterIdentity("server.example.com")
-	request.DestinationHost = models_base.DiameterIdentity("server.example.com")
-	request.AuthApplicationId = models_base.Unsigned32(1)
-	request.ReAuthRequestType = models_base.Enumerated(1)
-	request.UserName = ptrUTF8String("452040000000010")
-	request.OriginStateId = ptrUnsigned32(1)
-	request.ProxyInfo = []*ProxyInfo{
-		&ProxyInfo{
-			ProxyHost:  models_base.DiameterIdentity("client.example.com"),
-			ProxyState: ptrOctetString([]byte{0x01, 0x02, 0x03}),
-		},
-	}
-	request.RouteRecord = []models_base.DiameterIdentity{models_base.DiameterIdentity("client.example.com")}
-	request.Avp = []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})}
-
-	// Set header identifiers for request
-	request.Header.HopByHopID = 0x12345678
-	request.Header.EndToEndID = 0x87654321
-
-	// Create Answer message
-	answer := NewReAuthAnswer()
-	answer.SessionId = models_base.UTF8String("client.example.com;1234567890;1")
-	answer.ResultCode = models_base.Unsigned32(2001) // DIAMETER_SUCCESS
-	answer.OriginHost = models_base.DiameterIdentity("server.example.com")
-	answer.OriginRealm = models_base.DiameterIdentity("server.example.com")
-	answer.UserName = ptrUTF8String("452040000000010")
-	answer.OriginStateId = ptrUnsigned32(1)
-	answer.ErrorMessage = ptrUTF8String("452040000000010")
-	answer.ErrorReportingHost = ptrDiameterIdentity("server.example.com")
-	answer.FailedAvp = &FailedAVP{
-		AVP: []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})},
-	}
-	// answer.RedirectHost needs to be set manually (type: DiameterURI)
-	answer.RedirectHostUsage = ptrEnumerated(1)
-	answer.RedirectMaxCacheTime = ptrUnsigned32(1)
-	answer.ProxyInfo = []*ProxyInfo{
-		&ProxyInfo{
-			ProxyHost:  models_base.DiameterIdentity("client.example.com"),
-			ProxyState: ptrOctetString([]byte{0x01, 0x02, 0x03}),
-		},
-	}
-	answer.Avp = []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})}
-
-	// Set header identifiers for answer (must match request)
-	answer.Header.HopByHopID = 0x12345678
-	answer.Header.EndToEndID = 0x87654321
-
-	// Marshal request
-	requestData, err := request.Marshal()
-	if err != nil {
-		t.Fatalf("Failed to marshal request: %v", err)
-	}
-
-	// Marshal answer
-	answerData, err := answer.Marshal()
-	if err != nil {
-		t.Fatalf("Failed to marshal answer: %v", err)
-	}
-
-	// Write request-response pair to PCAP
-	err = writeDiameterPairToPcap(pcapFile, requestData, answerData, net.ParseIP("192.168.1.100"), net.ParseIP("192.168.1.1"))
-	if err != nil {
-		t.Fatalf("Failed to write PCAP: %v", err)
-	}
-
-	// Verify PCAP file
-	info, err := os.Stat(pcapFile)
-	if err != nil {
-		t.Fatalf("PCAP file not created: %v", err)
-	}
-	if info.Size() == 0 {
-		t.Fatal("PCAP file is empty")
-	}
-
-	t.Logf("PCAP file created: %s (%d bytes)", pcapFile, info.Size())
-	t.Logf("Open in Wireshark to view the request-response pair")
-}
-
-// TestST_Pair_PCAP tests PCAP file generation for ST request-response pair
-func TestST_Pair_PCAP(t *testing.T) {
-	// Create testdata directory
-	if err := os.MkdirAll("testdata", 0755); err != nil {
-		t.Fatalf("Failed to create testdata directory: %v", err)
-	}
-
-	// Create pcap file path
-	pcapFile := filepath.Join("testdata", "test_str_sta.pcap")
-	// PCAP files are kept for Wireshark analysis
-
-	// Create Request message
-	request := NewSessionTerminationRequest()
-	request.SessionId = models_base.UTF8String("client.example.com;1234567890;1")
-	request.OriginHost = models_base.DiameterIdentity("client.example.com")
-	request.OriginRealm = models_base.DiameterIdentity("client.example.com")
-	request.DestinationRealm = models_base.DiameterIdentity("server.example.com")
-	request.AuthApplicationId = models_base.Unsigned32(1)
-	request.TerminationCause = models_base.Enumerated(1)
-	request.UserName = ptrUTF8String("452040000000010")
-	request.DestinationHost = ptrDiameterIdentity("server.example.com")
-	request.Class = []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})}
-	request.OriginStateId = ptrUnsigned32(1)
-	request.ProxyInfo = []*ProxyInfo{
-		&ProxyInfo{
-			ProxyHost:  models_base.DiameterIdentity("client.example.com"),
-			ProxyState: ptrOctetString([]byte{0x01, 0x02, 0x03}),
-		},
-	}
-	request.RouteRecord = []models_base.DiameterIdentity{models_base.DiameterIdentity("client.example.com")}
-	request.Avp = []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})}
-
-	// Set header identifiers for request
-	request.Header.HopByHopID = 0x12345678
-	request.Header.EndToEndID = 0x87654321
-
-	// Create Answer message
-	answer := NewSessionTerminationAnswer()
-	answer.SessionId = models_base.UTF8String("client.example.com;1234567890;1")
-	answer.ResultCode = models_base.Unsigned32(2001) // DIAMETER_SUCCESS
-	answer.OriginHost = models_base.DiameterIdentity("server.example.com")
-	answer.OriginRealm = models_base.DiameterIdentity("server.example.com")
-	answer.UserName = ptrUTF8String("452040000000010")
-	answer.Class = []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})}
-	answer.ErrorMessage = ptrUTF8String("452040000000010")
-	answer.ErrorReportingHost = ptrDiameterIdentity("server.example.com")
-	answer.FailedAvp = &FailedAVP{
-		AVP: []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})},
-	}
-	answer.OriginStateId = ptrUnsigned32(1)
-	// answer.RedirectHost needs to be set manually (type: DiameterURI)
-	answer.RedirectHostUsage = ptrEnumerated(1)
-	answer.RedirectMaxCacheTime = ptrUnsigned32(1)
-	answer.ProxyInfo = []*ProxyInfo{
-		&ProxyInfo{
-			ProxyHost:  models_base.DiameterIdentity("client.example.com"),
-			ProxyState: ptrOctetString([]byte{0x01, 0x02, 0x03}),
-		},
-	}
 	answer.Avp = []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})}
 
 	// Set header identifiers for answer (must match request)

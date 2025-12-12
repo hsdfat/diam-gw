@@ -4,153 +4,153 @@ package base
 
 // Protocol Constants
 const (
+	DIAMETER_APPLICATION_UNSUPPORTED   = 3007
+	DIAMETER_AUTHENTICATION_REJECTED   = 4001
+	DIAMETER_AUTHORIZATION_REJECTED    = 5003
+	DIAMETER_AVP_NOT_ALLOWED           = 5008
 	DIAMETER_AVP_OCCURS_TOO_MANY_TIMES = 5009
-	DIAMETER_UNKNOWN_PEER              = 3010
-	DIAMETER_SUCCESS                   = 2001
-	DIAMETER_TOO_BUSY                  = 3004
-	DIAMETER_OUT_OF_SPACE              = 4002
-	DIAMETER_UNKNOWN_SESSION_ID        = 5002
-	DIAMETER_UNABLE_TO_DELIVER         = 3002
+	DIAMETER_AVP_UNSUPPORTED           = 5001
+	DIAMETER_COMMAND_UNSUPPORTED       = 3001
+	DIAMETER_CONTRADICTING_AVPS        = 5007
 	DIAMETER_INVALID_AVP_BITS          = 3009
+	DIAMETER_INVALID_AVP_BIT_COMBO     = 5016
+	DIAMETER_INVALID_AVP_LENGTH        = 5014
 	DIAMETER_INVALID_AVP_VALUE         = 5004
 	DIAMETER_INVALID_BIT_IN_HEADER     = 5013
-	DIAMETER_AUTHENTICATION_REJECTED   = 4001
 	DIAMETER_INVALID_HDR_BITS          = 3008
-	DIAMETER_NO_COMMON_SECURITY        = 5017
-	DIAMETER_CONTRADICTING_AVPS        = 5007
-	DIAMETER_UNSUPPORTED_VERSION       = 5011
-	DIAMETER_INVALID_AVP_LENGTH        = 5014
 	DIAMETER_INVALID_MESSAGE_LENGTH    = 5015
-	DIAMETER_RESOURCES_EXCEEDED        = 5006
 	DIAMETER_LIMITED_SUCCESS           = 2002
-	DIAMETER_APPLICATION_UNSUPPORTED   = 3007
-	DIAMETER_AUTHORIZATION_REJECTED    = 5003
 	DIAMETER_LOOP_DETECTED             = 3005
 	DIAMETER_MISSING_AVP               = 5005
-	DIAMETER_UNABLE_TO_COMPLY          = 5012
-	DIAMETER_COMMAND_UNSUPPORTED       = 3001
+	DIAMETER_MULTI_ROUND_AUTH          = 1001
+	DIAMETER_NO_COMMON_APPLICATION     = 5010
+	DIAMETER_NO_COMMON_SECURITY        = 5017
+	DIAMETER_OUT_OF_SPACE              = 4002
 	DIAMETER_REALM_NOT_SERVED          = 3003
 	DIAMETER_REDIRECT_INDICATION       = 3006
-	DIAMETER_AVP_UNSUPPORTED           = 5001
-	DIAMETER_NO_COMMON_APPLICATION     = 5010
-	DIAMETER_INVALID_AVP_BIT_COMBO     = 5016
-	DIAMETER_MULTI_ROUND_AUTH          = 1001
-	DIAMETER_AVP_NOT_ALLOWED           = 5008
+	DIAMETER_RESOURCES_EXCEEDED        = 5006
+	DIAMETER_SUCCESS                   = 2001
+	DIAMETER_TOO_BUSY                  = 3004
+	DIAMETER_UNABLE_TO_COMPLY          = 5012
+	DIAMETER_UNABLE_TO_DELIVER         = 3002
+	DIAMETER_UNKNOWN_PEER              = 3010
+	DIAMETER_UNKNOWN_SESSION_ID        = 5002
+	DIAMETER_UNSUPPORTED_VERSION       = 5011
 )
 
 // AVP Codes
 const (
-	AVPCodeEVENTTIMESTAMP                        uint32 = 55
-	AVPCodeFIRMWAREREVISION                      uint32 = 267
 	AVPCode3GPP2MEID                             uint32 = 1471
-	AVPCodeDSAFLAGS                              uint32 = 1422
-	AVPCodeVISITEDPLMNID                         uint32 = 1407
-	AVPCodeXRES                                  uint32 = 1448
-	AVPCodeCANCELLATIONTYPE                      uint32 = 1420
-	AVPCodeSUBSCRIPTIONDATA                      uint32 = 1400
-	AVPCodeFAILEDAVP                             uint32 = 279
-	AVPCodeE2ESEQUENCE                           uint32 = 300
-	AVPCodeROUTERECORD                           uint32 = 282
-	AVPCodeALERTREASON                           uint32 = 1434
-	AVPCodeDSRFLAGS                              uint32 = 1421
-	AVPCodeULRFLAGS                              uint32 = 1405
-	AVPCodeSRES                                  uint32 = 1454
-	AVPCodeACCTINTERIMINTERVAL                   uint32 = 85
-	AVPCodeAUTHSESSIONSTATE                      uint32 = 277
-	AVPCodeACCOUNTINGREALTIMEREQUIRED            uint32 = 483
-	AVPCodeEXPERIMENTALRESULTCODE                uint32 = 298
-	AVPCodeAIRFLAGS                              uint32 = 1679
 	AVPCodeAMSISDN                               uint32 = 1643
-	AVPCodeSERVICESELECTION                      uint32 = 493
-	AVPCodeREDIRECTHOSTUSAGE                     uint32 = 261
-	AVPCodePUAFLAGS                              uint32 = 1442
+	AVPCodeAIRFLAGS                              uint32 = 1679
+	AVPCodeAMBR                                  uint32 = 1435
+	AVPCodeAPNCONFIGURATION                      uint32 = 1430
+	AVPCodeAPNCONFIGURATIONPROFILE               uint32 = 1429
+	AVPCodeAPNOIREPLACEMENT                      uint32 = 1427
+	AVPCodeAUTN                                  uint32 = 1449
+	AVPCodeACCESSRESTRICTIONDATA                 uint32 = 1426
+	AVPCodeACCOUNTINGREALTIMEREQUIRED            uint32 = 483
+	AVPCodeACCOUNTINGRECORDNUMBER                uint32 = 485
+	AVPCodeACCOUNTINGRECORDTYPE                  uint32 = 480
+	AVPCodeACCOUNTINGSUBSESSIONID                uint32 = 287
+	AVPCodeACCTAPPLICATIONID                     uint32 = 259
+	AVPCodeACCTINTERIMINTERVAL                   uint32 = 85
+	AVPCodeACCTMULTISESSIONID                    uint32 = 50
+	AVPCodeACCTSESSIONID                         uint32 = 44
+	AVPCodeALERTREASON                           uint32 = 1434
+	AVPCodeALLAPNCONFIGURATIONSINCLUDEDINDICATOR uint32 = 1428
+	AVPCodeAUTHAPPLICATIONID                     uint32 = 258
+	AVPCodeAUTHGRACEPERIOD                       uint32 = 276
+	AVPCodeAUTHREQUESTTYPE                       uint32 = 274
+	AVPCodeAUTHSESSIONSTATE                      uint32 = 277
+	AVPCodeAUTHENTICATIONINFO                    uint32 = 1413
+	AVPCodeAUTHORIZATIONLIFETIME                 uint32 = 291
+	AVPCodeCLRFLAGS                              uint32 = 1638
 	AVPCodeCSGSUBSCRIPTIONDATA                   uint32 = 1436
-	AVPCodeNUMBEROFREQUESTEDVECTORS              uint32 = 1410
+	AVPCodeCANCELLATIONTYPE                      uint32 = 1420
+	AVPCodeCLASS                                 uint32 = 25
+	AVPCodeCONFIDENTIALITYKEY                    uint32 = 1451
+	AVPCodeCONTEXTIDENTIFIER                     uint32 = 1423
+	AVPCodeDRMP                                  uint32 = 301
+	AVPCodeDSAFLAGS                              uint32 = 1422
+	AVPCodeDSRFLAGS                              uint32 = 1421
+	AVPCodeDESTINATIONHOST                       uint32 = 293
+	AVPCodeDESTINATIONREALM                      uint32 = 283
+	AVPCodeDISCONNECTCAUSE                       uint32 = 273
+	AVPCodeEUTRANVECTOR                          uint32 = 1414
+	AVPCodeE2ESEQUENCE                           uint32 = 300
+	AVPCodeEPSSUBSCRIBEDQOSPROFILE               uint32 = 1431
+	AVPCodeEQUIPMENTSTATUS                       uint32 = 1445
+	AVPCodeERRORDIAGNOSTIC                       uint32 = 1614
+	AVPCodeERRORMESSAGE                          uint32 = 281
+	AVPCodeERRORREPORTINGHOST                    uint32 = 294
+	AVPCodeEVENTTIMESTAMP                        uint32 = 55
+	AVPCodeEXPERIMENTALRESULT                    uint32 = 297
+	AVPCodeEXPERIMENTALRESULTCODE                uint32 = 298
+	AVPCodeFAILEDAVP                             uint32 = 279
+	AVPCodeFIRMWAREREVISION                      uint32 = 267
+	AVPCodeGERANVECTOR                           uint32 = 1416
+	AVPCodeHOSTIPADDRESS                         uint32 = 257
+	AVPCodeIDAFLAGS                              uint32 = 1441
+	AVPCodeIDRFLAGS                              uint32 = 1490
+	AVPCodeIMEI                                  uint32 = 1402
+	AVPCodeIMMEDIATERESPONSEPREFERRED            uint32 = 1412
+	AVPCodeINBANDSECURITYID                      uint32 = 299
+	AVPCodeINTEGRITYKEY                          uint32 = 1452
+	AVPCodeITEMNUMBER                            uint32 = 1419
+	AVPCodeKASME                                 uint32 = 1450
+	AVPCodeKC                                    uint32 = 1453
+	AVPCodeMIPHOMEAGENTADDRESS                   uint32 = 334
 	AVPCodeMIPHOMEAGENTHOST                      uint32 = 348
+	AVPCodeMIP6AGENTINFO                         uint32 = 486
+	AVPCodeMIP6HOMELINKPREFIX                    uint32 = 125
+	AVPCodeMSISDN                                uint32 = 701
+	AVPCodeMULTIROUNDTIMEOUT                     uint32 = 272
+	AVPCodeNORFLAGS                              uint32 = 1443
+	AVPCodeNUMBEROFREQUESTEDVECTORS              uint32 = 1410
+	AVPCodeOPERATORDETERMINEDBARRING             uint32 = 1425
 	AVPCodeORIGINHOST                            uint32 = 264
 	AVPCodeORIGINREALM                           uint32 = 296
-	AVPCodeITEMNUMBER                            uint32 = 1419
-	AVPCodeREQUESTEDEUTRANAUTHENTICATIONINFO     uint32 = 1408
-	AVPCodeCONFIDENTIALITYKEY                    uint32 = 1451
-	AVPCodeSGSNNUMBER                            uint32 = 1489
-	AVPCodeAMBR                                  uint32 = 1435
-	AVPCodeTERMINATIONCAUSE                      uint32 = 295
-	AVPCodeEXPERIMENTALRESULT                    uint32 = 297
-	AVPCodeREAUTHREQUESTTYPE                     uint32 = 285
-	AVPCodeIMMEDIATERESPONSEPREFERRED            uint32 = 1412
-	AVPCodeMSISDN                                uint32 = 701
-	AVPCodeERRORDIAGNOSTIC                       uint32 = 1614
-	AVPCodeTERMINALINFORMATION                   uint32 = 1401
-	AVPCodeSESSIONTIMEOUT                        uint32 = 27
-	AVPCodeAUTHGRACEPERIOD                       uint32 = 276
-	AVPCodeRESULTCODE                            uint32 = 268
-	AVPCodePROXYSTATE                            uint32 = 33
-	AVPCodeINBANDSECURITYID                      uint32 = 299
-	AVPCodeACCESSRESTRICTIONDATA                 uint32 = 1426
-	AVPCodeALLAPNCONFIGURATIONSINCLUDEDINDICATOR uint32 = 1428
-	AVPCodeREDIRECTMAXCACHETIME                  uint32 = 262
 	AVPCodeORIGINSTATEID                         uint32 = 278
-	AVPCodeRATTYPE                               uint32 = 1032
-	AVPCodeAPNCONFIGURATION                      uint32 = 1430
-	AVPCodeCONTEXTIDENTIFIER                     uint32 = 1423
-	AVPCodeINTEGRITYKEY                          uint32 = 1452
-	AVPCodeMULTIROUNDTIMEOUT                     uint32 = 272
-	AVPCodePRODUCTNAME                           uint32 = 269
-	AVPCodeACCOUNTINGSUBSESSIONID                uint32 = 287
-	AVPCodeGERANVECTOR                           uint32 = 1416
-	AVPCodeSUBSCRIBERSTATUS                      uint32 = 1424
-	AVPCodeEPSSUBSCRIBEDQOSPROFILE               uint32 = 1431
-	AVPCodeNORFLAGS                              uint32 = 1443
-	AVPCodeDESTINATIONHOST                       uint32 = 293
-	AVPCodeERRORMESSAGE                          uint32 = 281
-	AVPCodeUESRVCCCAPABILITY                     uint32 = 1615
-	AVPCodeOPERATORDETERMINEDBARRING             uint32 = 1425
-	AVPCodeUTRANVECTOR                           uint32 = 1415
-	AVPCodeAPNOIREPLACEMENT                      uint32 = 1427
-	AVPCodePROXYHOST                             uint32 = 280
-	AVPCodeMIP6AGENTINFO                         uint32 = 486
-	AVPCodeAUTHAPPLICATIONID                     uint32 = 258
-	AVPCodeSOFTWAREVERSION                       uint32 = 1403
-	AVPCodeAUTN                                  uint32 = 1449
-	AVPCodeAUTHENTICATIONINFO                    uint32 = 1413
-	AVPCodeKC                                    uint32 = 1453
-	AVPCodeIDAFLAGS                              uint32 = 1441
-	AVPCodeREDIRECTHOST                          uint32 = 292
-	AVPCodeSUPPORTEDVENDORID                     uint32 = 265
-	AVPCodeERRORREPORTINGHOST                    uint32 = 294
-	AVPCodeACCTAPPLICATIONID                     uint32 = 259
-	AVPCodeEQUIPMENTSTATUS                       uint32 = 1445
-	AVPCodeIDRFLAGS                              uint32 = 1490
-	AVPCodeREQUESTEDUTRANGERANAUTHENTICATIONINFO uint32 = 1409
-	AVPCodeRAND                                  uint32 = 1447
-	AVPCodeACCTMULTISESSIONID                    uint32 = 50
-	AVPCodePROXYINFO                             uint32 = 284
-	AVPCodeSESSIONBINDING                        uint32 = 270
-	AVPCodeKASME                                 uint32 = 1450
-	AVPCodeACCTSESSIONID                         uint32 = 44
-	AVPCodeVENDORID                              uint32 = 266
-	AVPCodeUSERNAME                              uint32 = 1
-	AVPCodeMIPHOMEAGENTADDRESS                   uint32 = 334
-	AVPCodeAUTHORIZATIONLIFETIME                 uint32 = 291
-	AVPCodeDISCONNECTCAUSE                       uint32 = 273
-	AVPCodeULAFLAGS                              uint32 = 1406
-	AVPCodeRESYNCHRONIZATIONINFO                 uint32 = 1411
-	AVPCodeSESSIONSERVERFAILOVER                 uint32 = 271
-	AVPCodeCLASS                                 uint32 = 25
-	AVPCodeSESSIONID                             uint32 = 263
-	AVPCodeACCOUNTINGRECORDNUMBER                uint32 = 485
-	AVPCodeDRMP                                  uint32 = 301
-	AVPCodeCLRFLAGS                              uint32 = 1638
+	AVPCodePUAFLAGS                              uint32 = 1442
 	AVPCodePURFLAGS                              uint32 = 1635
-	AVPCodeAPNCONFIGURATIONPROFILE               uint32 = 1429
-	AVPCodeAUTHREQUESTTYPE                       uint32 = 274
-	AVPCodeACCOUNTINGRECORDTYPE                  uint32 = 480
-	AVPCodeMIP6HOMELINKPREFIX                    uint32 = 125
-	AVPCodeHOSTIPADDRESS                         uint32 = 257
+	AVPCodePRODUCTNAME                           uint32 = 269
+	AVPCodePROXYHOST                             uint32 = 280
+	AVPCodePROXYINFO                             uint32 = 284
+	AVPCodePROXYSTATE                            uint32 = 33
+	AVPCodeRAND                                  uint32 = 1447
+	AVPCodeRATTYPE                               uint32 = 1032
+	AVPCodeREAUTHREQUESTTYPE                     uint32 = 285
+	AVPCodeRESYNCHRONIZATIONINFO                 uint32 = 1411
+	AVPCodeREDIRECTHOST                          uint32 = 292
+	AVPCodeREDIRECTHOSTUSAGE                     uint32 = 261
+	AVPCodeREDIRECTMAXCACHETIME                  uint32 = 262
+	AVPCodeREQUESTEDEUTRANAUTHENTICATIONINFO     uint32 = 1408
+	AVPCodeREQUESTEDUTRANGERANAUTHENTICATIONINFO uint32 = 1409
+	AVPCodeRESULTCODE                            uint32 = 268
+	AVPCodeROUTERECORD                           uint32 = 282
+	AVPCodeSGSNNUMBER                            uint32 = 1489
+	AVPCodeSRES                                  uint32 = 1454
+	AVPCodeSERVICESELECTION                      uint32 = 493
+	AVPCodeSESSIONBINDING                        uint32 = 270
+	AVPCodeSESSIONID                             uint32 = 263
+	AVPCodeSESSIONSERVERFAILOVER                 uint32 = 271
+	AVPCodeSESSIONTIMEOUT                        uint32 = 27
+	AVPCodeSOFTWAREVERSION                       uint32 = 1403
+	AVPCodeSUBSCRIBERSTATUS                      uint32 = 1424
+	AVPCodeSUBSCRIPTIONDATA                      uint32 = 1400
+	AVPCodeSUPPORTEDVENDORID                     uint32 = 265
+	AVPCodeTERMINALINFORMATION                   uint32 = 1401
+	AVPCodeTERMINATIONCAUSE                      uint32 = 295
+	AVPCodeUESRVCCCAPABILITY                     uint32 = 1615
+	AVPCodeULAFLAGS                              uint32 = 1406
+	AVPCodeULRFLAGS                              uint32 = 1405
+	AVPCodeUTRANVECTOR                           uint32 = 1415
+	AVPCodeUSERNAME                              uint32 = 1
+	AVPCodeVENDORID                              uint32 = 266
 	AVPCodeVENDORSPECIFICAPPLICATIONID           uint32 = 260
-	AVPCodeDESTINATIONREALM                      uint32 = 283
-	AVPCodeIMEI                                  uint32 = 1402
-	AVPCodeEUTRANVECTOR                          uint32 = 1414
+	AVPCodeVISITEDPLMNID                         uint32 = 1407
+	AVPCodeXRES                                  uint32 = 1448
 )
 
 // Vendor IDs
@@ -160,54 +160,20 @@ const (
 
 // Command Codes
 const (
-	CommandCodeCAPABILITIESEXCHANGEREQUEST uint32 = 257
-	CommandCodeCAPABILITIESEXCHANGEANSWER  uint32 = 257
-	CommandCodeDEVICEWATCHDOGREQUEST       uint32 = 280
-	CommandCodeDEVICEWATCHDOGANSWER        uint32 = 280
-	CommandCodeDISCONNECTPEERREQUEST       uint32 = 282
-	CommandCodeDISCONNECTPEERANSWER        uint32 = 282
-	CommandCodeREAUTHREQUEST               uint32 = 258
-	CommandCodeREAUTHANSWER                uint32 = 258
-	CommandCodeSESSIONTERMINATIONREQUEST   uint32 = 275
-	CommandCodeSESSIONTERMINATIONANSWER    uint32 = 275
-	CommandCodeABORTSESSIONREQUEST         uint32 = 274
 	CommandCodeABORTSESSIONANSWER          uint32 = 274
-	CommandCodeACCOUNTINGREQUEST           uint32 = 271
+	CommandCodeABORTSESSIONREQUEST         uint32 = 274
 	CommandCodeACCOUNTINGANSWER            uint32 = 271
-)
-
-// DisconnectCause represents the DisconnectCause enumerated type
-type DisconnectCause uint32
-
-// DisconnectCause values
-const (
-	DisconnectCause_REBOOTING                  DisconnectCause = 0
-	DisconnectCause_BUSY                       DisconnectCause = 1
-	DisconnectCause_DO_NOT_WANT_TO_TALK_TO_YOU DisconnectCause = 2
-)
-
-// ReAuthRequestType represents the ReAuthRequestType enumerated type
-type ReAuthRequestType uint32
-
-// ReAuthRequestType values
-const (
-	ReAuthRequestType_AUTHORIZE_ONLY         ReAuthRequestType = 0
-	ReAuthRequestType_AUTHORIZE_AUTHENTICATE ReAuthRequestType = 1
-)
-
-// TerminationCause represents the TerminationCause enumerated type
-type TerminationCause uint32
-
-// TerminationCause values
-const (
-	TerminationCause_DIAMETER_LOGOUT               TerminationCause = 1
-	TerminationCause_DIAMETER_SERVICE_NOT_PROVIDED TerminationCause = 2
-	TerminationCause_DIAMETER_BAD_ANSWER           TerminationCause = 3
-	TerminationCause_DIAMETER_ADMINISTRATIVE       TerminationCause = 4
-	TerminationCause_DIAMETER_LINK_BROKEN          TerminationCause = 5
-	TerminationCause_DIAMETER_AUTH_EXPIRED         TerminationCause = 6
-	TerminationCause_DIAMETER_USER_MOVED           TerminationCause = 7
-	TerminationCause_DIAMETER_SESSION_TIMEOUT      TerminationCause = 8
+	CommandCodeACCOUNTINGREQUEST           uint32 = 271
+	CommandCodeCAPABILITIESEXCHANGEANSWER  uint32 = 257
+	CommandCodeCAPABILITIESEXCHANGEREQUEST uint32 = 257
+	CommandCodeDEVICEWATCHDOGANSWER        uint32 = 280
+	CommandCodeDEVICEWATCHDOGREQUEST       uint32 = 280
+	CommandCodeDISCONNECTPEERANSWER        uint32 = 282
+	CommandCodeDISCONNECTPEERREQUEST       uint32 = 282
+	CommandCodeREAUTHANSWER                uint32 = 258
+	CommandCodeREAUTHREQUEST               uint32 = 258
+	CommandCodeSESSIONTERMINATIONANSWER    uint32 = 275
+	CommandCodeSESSIONTERMINATIONREQUEST   uint32 = 275
 )
 
 // AccountingRealtimeRequired represents the AccountingRealtimeRequired enumerated type
@@ -216,8 +182,19 @@ type AccountingRealtimeRequired uint32
 // AccountingRealtimeRequired values
 const (
 	AccountingRealtimeRequired_DELIVER_AND_GRANT AccountingRealtimeRequired = 1
-	AccountingRealtimeRequired_GRANT_AND_STORE   AccountingRealtimeRequired = 2
 	AccountingRealtimeRequired_GRANT_AND_LOSE    AccountingRealtimeRequired = 3
+	AccountingRealtimeRequired_GRANT_AND_STORE   AccountingRealtimeRequired = 2
+)
+
+// AccountingRecordType represents the AccountingRecordType enumerated type
+type AccountingRecordType uint32
+
+// AccountingRecordType values
+const (
+	AccountingRecordType_EVENT_RECORD   AccountingRecordType = 1
+	AccountingRecordType_INTERIM_RECORD AccountingRecordType = 3
+	AccountingRecordType_START_RECORD   AccountingRecordType = 2
+	AccountingRecordType_STOP_RECORD    AccountingRecordType = 4
 )
 
 // AuthRequestType represents the AuthRequestType enumerated type
@@ -225,8 +202,8 @@ type AuthRequestType uint32
 
 // AuthRequestType values
 const (
-	AuthRequestType_AUTHORIZE_AUTHENTICATE AuthRequestType = 3
 	AuthRequestType_AUTHENTICATE_ONLY      AuthRequestType = 1
+	AuthRequestType_AUTHORIZE_AUTHENTICATE AuthRequestType = 3
 	AuthRequestType_AUTHORIZE_ONLY         AuthRequestType = 2
 )
 
@@ -235,8 +212,18 @@ type AuthSessionState uint32
 
 // AuthSessionState values
 const (
-	AuthSessionState_STATE_MAINTAINED    AuthSessionState = 0
 	AuthSessionState_NO_STATE_MAINTAINED AuthSessionState = 1
+	AuthSessionState_STATE_MAINTAINED    AuthSessionState = 0
+)
+
+// DisconnectCause represents the DisconnectCause enumerated type
+type DisconnectCause uint32
+
+// DisconnectCause values
+const (
+	DisconnectCause_BUSY                       DisconnectCause = 1
+	DisconnectCause_DO_NOT_WANT_TO_TALK_TO_YOU DisconnectCause = 2
+	DisconnectCause_REBOOTING                  DisconnectCause = 0
 )
 
 // InbandSecurityId represents the InbandSecurityId enumerated type
@@ -248,15 +235,13 @@ const (
 	InbandSecurityId_TLS                InbandSecurityId = 1
 )
 
-// AccountingRecordType represents the AccountingRecordType enumerated type
-type AccountingRecordType uint32
+// ReAuthRequestType represents the ReAuthRequestType enumerated type
+type ReAuthRequestType uint32
 
-// AccountingRecordType values
+// ReAuthRequestType values
 const (
-	AccountingRecordType_EVENT_RECORD   AccountingRecordType = 1
-	AccountingRecordType_START_RECORD   AccountingRecordType = 2
-	AccountingRecordType_INTERIM_RECORD AccountingRecordType = 3
-	AccountingRecordType_STOP_RECORD    AccountingRecordType = 4
+	ReAuthRequestType_AUTHORIZE_AUTHENTICATE ReAuthRequestType = 1
+	ReAuthRequestType_AUTHORIZE_ONLY         ReAuthRequestType = 0
 )
 
 // RedirectHostUsage represents the RedirectHostUsage enumerated type
@@ -264,13 +249,13 @@ type RedirectHostUsage uint32
 
 // RedirectHostUsage values
 const (
-	RedirectHostUsage_ALL_SESSION           RedirectHostUsage = 1
-	RedirectHostUsage_ALL_REALM             RedirectHostUsage = 2
-	RedirectHostUsage_REALM_AND_APPLICATION RedirectHostUsage = 3
 	RedirectHostUsage_ALL_APPLICATION       RedirectHostUsage = 4
 	RedirectHostUsage_ALL_HOST              RedirectHostUsage = 5
+	RedirectHostUsage_ALL_REALM             RedirectHostUsage = 2
+	RedirectHostUsage_ALL_SESSION           RedirectHostUsage = 1
 	RedirectHostUsage_ALL_USER              RedirectHostUsage = 6
 	RedirectHostUsage_DONT_CACHE            RedirectHostUsage = 0
+	RedirectHostUsage_REALM_AND_APPLICATION RedirectHostUsage = 3
 )
 
 // SessionServerFailover represents the SessionServerFailover enumerated type
@@ -278,8 +263,23 @@ type SessionServerFailover uint32
 
 // SessionServerFailover values
 const (
+	SessionServerFailover_ALLOW_SERVICE           SessionServerFailover = 2
 	SessionServerFailover_REFUSE_SERVICE          SessionServerFailover = 0
 	SessionServerFailover_TRY_AGAIN               SessionServerFailover = 1
-	SessionServerFailover_ALLOW_SERVICE           SessionServerFailover = 2
 	SessionServerFailover_TRY_AGAIN_ALLOW_SERVICE SessionServerFailover = 3
+)
+
+// TerminationCause represents the TerminationCause enumerated type
+type TerminationCause uint32
+
+// TerminationCause values
+const (
+	TerminationCause_DIAMETER_ADMINISTRATIVE       TerminationCause = 4
+	TerminationCause_DIAMETER_AUTH_EXPIRED         TerminationCause = 6
+	TerminationCause_DIAMETER_BAD_ANSWER           TerminationCause = 3
+	TerminationCause_DIAMETER_LINK_BROKEN          TerminationCause = 5
+	TerminationCause_DIAMETER_LOGOUT               TerminationCause = 1
+	TerminationCause_DIAMETER_SERVICE_NOT_PROVIDED TerminationCause = 2
+	TerminationCause_DIAMETER_SESSION_TIMEOUT      TerminationCause = 8
+	TerminationCause_DIAMETER_USER_MOVED           TerminationCause = 7
 )
