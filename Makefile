@@ -1,4 +1,4 @@
-.PHONY: all generate test clean build install
+.PHONY: all generate test clean build install build-dra build-examples
 
 # Default target
 all: generate test
@@ -80,6 +80,32 @@ build:
 	go build -o bin/diameter-codegen cmd/diameter-codegen/main.go
 	@echo "Built: bin/diameter-codegen"
 
+# Build DRA simulator
+build-dra:
+	@echo "Building DRA simulator..."
+	@mkdir -p bin
+	go build -o bin/dra-simulator simulator/dra/*.go
+	@echo "Built: bin/dra-simulator"
+	@echo ""
+	@echo "Usage: bin/dra-simulator [options]"
+	@echo "  -host string         DRA listening host (default \"0.0.0.0\")"
+	@echo "  -port int            DRA listening port (default 3868)"
+	@echo "  -origin-host string  DRA Origin-Host (default \"dra.example.com\")"
+	@echo "  -origin-realm string DRA Origin-Realm (default \"example.com\")"
+	@echo "  -verbose             Enable verbose logging"
+
+# Build all examples
+build-examples:
+	@echo "Building examples..."
+	@mkdir -p bin
+	@echo "Building basic example..."
+	go build -o bin/basic-example examples/basic/*.go
+	@echo "Building S13 client example..."
+	go build -o bin/s13-client examples/s13_client/*.go
+	@echo "Building simple pool example..."
+	go build -o bin/simple-pool examples/simple_pool/*.go
+	@echo "All examples built in bin/"
+
 # Install the code generator
 install:
 	@echo "Installing diameter-codegen..."
@@ -90,7 +116,8 @@ install:
 clean:
 	@echo "Cleaning generated files..."
 	rm -rf commands/base commands/s6a commands/s13
-	rm -f bin/diameter-codegen
+	rm -f bin/diameter-codegen bin/dra-simulator
+	rm -f bin/basic-example bin/s13-client bin/simple-pool
 	rm -f coverage.out coverage.html
 	rm -rf testdata
 	rm -rf **/testdata
@@ -121,8 +148,10 @@ help:
 	@echo "  test                       - Run all tests"
 	@echo "  test-coverage              - Run tests with coverage report"
 	@echo "  build                      - Build the code generator binary"
+	@echo "  build-dra                  - Build DRA simulator binary"
+	@echo "  build-examples             - Build all example binaries"
 	@echo "  install                    - Install code generator to GOPATH/bin"
-	@echo "  clean                      - Remove generated files"
+	@echo "  clean                      - Remove generated files and binaries"
 	@echo "  fmt                        - Format Go code"
 	@echo "  lint                       - Run linter"
 	@echo "  help                       - Show this help message"
@@ -139,3 +168,7 @@ help:
 	@echo "  PCAP files are saved to commands/*/testdata/ directories"
 	@echo "  These files can be opened in Wireshark for protocol analysis"
 	@echo "  Files are pre-generated and can be committed to version control"
+	@echo ""
+	@echo "DRA Simulator:"
+	@echo "  Use 'make build-dra' to build the DRA simulator"
+	@echo "  Run with: bin/dra-simulator -help for options"
