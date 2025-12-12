@@ -1134,206 +1134,6 @@ func TestAccountingAnswer_PCAP(t *testing.T) {
 	t.Logf("Open in Wireshark to view the Answer message")
 }
 
-// TestST_Pair_PCAP tests PCAP file generation for ST request-response pair
-func TestST_Pair_PCAP(t *testing.T) {
-	// Create testdata directory
-	if err := os.MkdirAll("testdata", 0755); err != nil {
-		t.Fatalf("Failed to create testdata directory: %v", err)
-	}
-
-	// Create pcap file path
-	pcapFile := filepath.Join("testdata", "test_st_pair.pcap")
-	// PCAP files are kept for Wireshark analysis
-
-	// Create Request message
-	request := NewSessionTerminationRequest()
-	request.SessionId = models_base.UTF8String("client.example.com;1234567890;1")
-	request.OriginHost = models_base.DiameterIdentity("client.example.com")
-	request.OriginRealm = models_base.DiameterIdentity("client.example.com")
-	request.DestinationRealm = models_base.DiameterIdentity("server.example.com")
-	request.AuthApplicationId = models_base.Unsigned32(1)
-	request.TerminationCause = models_base.Enumerated(1)
-
-	// Set header identifiers for request
-	request.Header.HopByHopID = 0x12345678
-	request.Header.EndToEndID = 0x87654321
-
-	// Create Answer message
-	answer := NewSessionTerminationAnswer()
-	answer.SessionId = models_base.UTF8String("client.example.com;1234567890;1")
-	answer.ResultCode = models_base.Unsigned32(2001) // DIAMETER_SUCCESS
-	answer.OriginHost = models_base.DiameterIdentity("server.example.com")
-	answer.OriginRealm = models_base.DiameterIdentity("server.example.com")
-
-	// Set header identifiers for answer (must match request)
-	answer.Header.HopByHopID = 0x12345678
-	answer.Header.EndToEndID = 0x87654321
-
-	// Marshal request
-	requestData, err := request.Marshal()
-	if err != nil {
-		t.Fatalf("Failed to marshal request: %v", err)
-	}
-
-	// Marshal answer
-	answerData, err := answer.Marshal()
-	if err != nil {
-		t.Fatalf("Failed to marshal answer: %v", err)
-	}
-
-	// Write request-response pair to PCAP
-	err = writeDiameterPairToPcap(pcapFile, requestData, answerData, net.ParseIP("192.168.1.100"), net.ParseIP("192.168.1.1"))
-	if err != nil {
-		t.Fatalf("Failed to write PCAP: %v", err)
-	}
-
-	// Verify PCAP file
-	info, err := os.Stat(pcapFile)
-	if err != nil {
-		t.Fatalf("PCAP file not created: %v", err)
-	}
-	if info.Size() == 0 {
-		t.Fatal("PCAP file is empty")
-	}
-
-	t.Logf("PCAP file created: %s (%d bytes)", pcapFile, info.Size())
-	t.Logf("Open in Wireshark to view the request-response pair")
-}
-
-// TestAS_Pair_PCAP tests PCAP file generation for AS request-response pair
-func TestAS_Pair_PCAP(t *testing.T) {
-	// Create testdata directory
-	if err := os.MkdirAll("testdata", 0755); err != nil {
-		t.Fatalf("Failed to create testdata directory: %v", err)
-	}
-
-	// Create pcap file path
-	pcapFile := filepath.Join("testdata", "test_as_pair.pcap")
-	// PCAP files are kept for Wireshark analysis
-
-	// Create Request message
-	request := NewAbortSessionRequest()
-	request.SessionId = models_base.UTF8String("client.example.com;1234567890;1")
-	request.OriginHost = models_base.DiameterIdentity("client.example.com")
-	request.OriginRealm = models_base.DiameterIdentity("client.example.com")
-	request.DestinationRealm = models_base.DiameterIdentity("server.example.com")
-	request.DestinationHost = models_base.DiameterIdentity("server.example.com")
-	request.AuthApplicationId = models_base.Unsigned32(1)
-
-	// Set header identifiers for request
-	request.Header.HopByHopID = 0x12345678
-	request.Header.EndToEndID = 0x87654321
-
-	// Create Answer message
-	answer := NewAbortSessionAnswer()
-	answer.SessionId = models_base.UTF8String("client.example.com;1234567890;1")
-	answer.ResultCode = models_base.Unsigned32(2001) // DIAMETER_SUCCESS
-	answer.OriginHost = models_base.DiameterIdentity("server.example.com")
-	answer.OriginRealm = models_base.DiameterIdentity("server.example.com")
-
-	// Set header identifiers for answer (must match request)
-	answer.Header.HopByHopID = 0x12345678
-	answer.Header.EndToEndID = 0x87654321
-
-	// Marshal request
-	requestData, err := request.Marshal()
-	if err != nil {
-		t.Fatalf("Failed to marshal request: %v", err)
-	}
-
-	// Marshal answer
-	answerData, err := answer.Marshal()
-	if err != nil {
-		t.Fatalf("Failed to marshal answer: %v", err)
-	}
-
-	// Write request-response pair to PCAP
-	err = writeDiameterPairToPcap(pcapFile, requestData, answerData, net.ParseIP("192.168.1.100"), net.ParseIP("192.168.1.1"))
-	if err != nil {
-		t.Fatalf("Failed to write PCAP: %v", err)
-	}
-
-	// Verify PCAP file
-	info, err := os.Stat(pcapFile)
-	if err != nil {
-		t.Fatalf("PCAP file not created: %v", err)
-	}
-	if info.Size() == 0 {
-		t.Fatal("PCAP file is empty")
-	}
-
-	t.Logf("PCAP file created: %s (%d bytes)", pcapFile, info.Size())
-	t.Logf("Open in Wireshark to view the request-response pair")
-}
-
-// TestA_Pair_PCAP tests PCAP file generation for A request-response pair
-func TestA_Pair_PCAP(t *testing.T) {
-	// Create testdata directory
-	if err := os.MkdirAll("testdata", 0755); err != nil {
-		t.Fatalf("Failed to create testdata directory: %v", err)
-	}
-
-	// Create pcap file path
-	pcapFile := filepath.Join("testdata", "test_a_pair.pcap")
-	// PCAP files are kept for Wireshark analysis
-
-	// Create Request message
-	request := NewAccountingRequest()
-	request.SessionId = models_base.UTF8String("client.example.com;1234567890;1")
-	request.OriginHost = models_base.DiameterIdentity("client.example.com")
-	request.OriginRealm = models_base.DiameterIdentity("client.example.com")
-	request.DestinationRealm = models_base.DiameterIdentity("server.example.com")
-	request.AccountingRecordType = models_base.Enumerated(1)
-	request.AccountingRecordNumber = models_base.Unsigned32(1)
-
-	// Set header identifiers for request
-	request.Header.HopByHopID = 0x12345678
-	request.Header.EndToEndID = 0x87654321
-
-	// Create Answer message
-	answer := NewAccountingAnswer()
-	answer.SessionId = models_base.UTF8String("client.example.com;1234567890;1")
-	answer.ResultCode = models_base.Unsigned32(2001) // DIAMETER_SUCCESS
-	answer.OriginHost = models_base.DiameterIdentity("server.example.com")
-	answer.OriginRealm = models_base.DiameterIdentity("server.example.com")
-	answer.AccountingRecordType = models_base.Enumerated(1)
-	answer.AccountingRecordNumber = models_base.Unsigned32(1)
-
-	// Set header identifiers for answer (must match request)
-	answer.Header.HopByHopID = 0x12345678
-	answer.Header.EndToEndID = 0x87654321
-
-	// Marshal request
-	requestData, err := request.Marshal()
-	if err != nil {
-		t.Fatalf("Failed to marshal request: %v", err)
-	}
-
-	// Marshal answer
-	answerData, err := answer.Marshal()
-	if err != nil {
-		t.Fatalf("Failed to marshal answer: %v", err)
-	}
-
-	// Write request-response pair to PCAP
-	err = writeDiameterPairToPcap(pcapFile, requestData, answerData, net.ParseIP("192.168.1.100"), net.ParseIP("192.168.1.1"))
-	if err != nil {
-		t.Fatalf("Failed to write PCAP: %v", err)
-	}
-
-	// Verify PCAP file
-	info, err := os.Stat(pcapFile)
-	if err != nil {
-		t.Fatalf("PCAP file not created: %v", err)
-	}
-	if info.Size() == 0 {
-		t.Fatal("PCAP file is empty")
-	}
-
-	t.Logf("PCAP file created: %s (%d bytes)", pcapFile, info.Size())
-	t.Logf("Open in Wireshark to view the request-response pair")
-}
-
 // TestCE_Pair_PCAP tests PCAP file generation for CE request-response pair
 func TestCE_Pair_PCAP(t *testing.T) {
 	// Create testdata directory
@@ -1559,6 +1359,206 @@ func TestRA_Pair_PCAP(t *testing.T) {
 	answer.ResultCode = models_base.Unsigned32(2001) // DIAMETER_SUCCESS
 	answer.OriginHost = models_base.DiameterIdentity("server.example.com")
 	answer.OriginRealm = models_base.DiameterIdentity("server.example.com")
+
+	// Set header identifiers for answer (must match request)
+	answer.Header.HopByHopID = 0x12345678
+	answer.Header.EndToEndID = 0x87654321
+
+	// Marshal request
+	requestData, err := request.Marshal()
+	if err != nil {
+		t.Fatalf("Failed to marshal request: %v", err)
+	}
+
+	// Marshal answer
+	answerData, err := answer.Marshal()
+	if err != nil {
+		t.Fatalf("Failed to marshal answer: %v", err)
+	}
+
+	// Write request-response pair to PCAP
+	err = writeDiameterPairToPcap(pcapFile, requestData, answerData, net.ParseIP("192.168.1.100"), net.ParseIP("192.168.1.1"))
+	if err != nil {
+		t.Fatalf("Failed to write PCAP: %v", err)
+	}
+
+	// Verify PCAP file
+	info, err := os.Stat(pcapFile)
+	if err != nil {
+		t.Fatalf("PCAP file not created: %v", err)
+	}
+	if info.Size() == 0 {
+		t.Fatal("PCAP file is empty")
+	}
+
+	t.Logf("PCAP file created: %s (%d bytes)", pcapFile, info.Size())
+	t.Logf("Open in Wireshark to view the request-response pair")
+}
+
+// TestST_Pair_PCAP tests PCAP file generation for ST request-response pair
+func TestST_Pair_PCAP(t *testing.T) {
+	// Create testdata directory
+	if err := os.MkdirAll("testdata", 0755); err != nil {
+		t.Fatalf("Failed to create testdata directory: %v", err)
+	}
+
+	// Create pcap file path
+	pcapFile := filepath.Join("testdata", "test_st_pair.pcap")
+	// PCAP files are kept for Wireshark analysis
+
+	// Create Request message
+	request := NewSessionTerminationRequest()
+	request.SessionId = models_base.UTF8String("client.example.com;1234567890;1")
+	request.OriginHost = models_base.DiameterIdentity("client.example.com")
+	request.OriginRealm = models_base.DiameterIdentity("client.example.com")
+	request.DestinationRealm = models_base.DiameterIdentity("server.example.com")
+	request.AuthApplicationId = models_base.Unsigned32(1)
+	request.TerminationCause = models_base.Enumerated(1)
+
+	// Set header identifiers for request
+	request.Header.HopByHopID = 0x12345678
+	request.Header.EndToEndID = 0x87654321
+
+	// Create Answer message
+	answer := NewSessionTerminationAnswer()
+	answer.SessionId = models_base.UTF8String("client.example.com;1234567890;1")
+	answer.ResultCode = models_base.Unsigned32(2001) // DIAMETER_SUCCESS
+	answer.OriginHost = models_base.DiameterIdentity("server.example.com")
+	answer.OriginRealm = models_base.DiameterIdentity("server.example.com")
+
+	// Set header identifiers for answer (must match request)
+	answer.Header.HopByHopID = 0x12345678
+	answer.Header.EndToEndID = 0x87654321
+
+	// Marshal request
+	requestData, err := request.Marshal()
+	if err != nil {
+		t.Fatalf("Failed to marshal request: %v", err)
+	}
+
+	// Marshal answer
+	answerData, err := answer.Marshal()
+	if err != nil {
+		t.Fatalf("Failed to marshal answer: %v", err)
+	}
+
+	// Write request-response pair to PCAP
+	err = writeDiameterPairToPcap(pcapFile, requestData, answerData, net.ParseIP("192.168.1.100"), net.ParseIP("192.168.1.1"))
+	if err != nil {
+		t.Fatalf("Failed to write PCAP: %v", err)
+	}
+
+	// Verify PCAP file
+	info, err := os.Stat(pcapFile)
+	if err != nil {
+		t.Fatalf("PCAP file not created: %v", err)
+	}
+	if info.Size() == 0 {
+		t.Fatal("PCAP file is empty")
+	}
+
+	t.Logf("PCAP file created: %s (%d bytes)", pcapFile, info.Size())
+	t.Logf("Open in Wireshark to view the request-response pair")
+}
+
+// TestAS_Pair_PCAP tests PCAP file generation for AS request-response pair
+func TestAS_Pair_PCAP(t *testing.T) {
+	// Create testdata directory
+	if err := os.MkdirAll("testdata", 0755); err != nil {
+		t.Fatalf("Failed to create testdata directory: %v", err)
+	}
+
+	// Create pcap file path
+	pcapFile := filepath.Join("testdata", "test_as_pair.pcap")
+	// PCAP files are kept for Wireshark analysis
+
+	// Create Request message
+	request := NewAbortSessionRequest()
+	request.SessionId = models_base.UTF8String("client.example.com;1234567890;1")
+	request.OriginHost = models_base.DiameterIdentity("client.example.com")
+	request.OriginRealm = models_base.DiameterIdentity("client.example.com")
+	request.DestinationRealm = models_base.DiameterIdentity("server.example.com")
+	request.DestinationHost = models_base.DiameterIdentity("server.example.com")
+	request.AuthApplicationId = models_base.Unsigned32(1)
+
+	// Set header identifiers for request
+	request.Header.HopByHopID = 0x12345678
+	request.Header.EndToEndID = 0x87654321
+
+	// Create Answer message
+	answer := NewAbortSessionAnswer()
+	answer.SessionId = models_base.UTF8String("client.example.com;1234567890;1")
+	answer.ResultCode = models_base.Unsigned32(2001) // DIAMETER_SUCCESS
+	answer.OriginHost = models_base.DiameterIdentity("server.example.com")
+	answer.OriginRealm = models_base.DiameterIdentity("server.example.com")
+
+	// Set header identifiers for answer (must match request)
+	answer.Header.HopByHopID = 0x12345678
+	answer.Header.EndToEndID = 0x87654321
+
+	// Marshal request
+	requestData, err := request.Marshal()
+	if err != nil {
+		t.Fatalf("Failed to marshal request: %v", err)
+	}
+
+	// Marshal answer
+	answerData, err := answer.Marshal()
+	if err != nil {
+		t.Fatalf("Failed to marshal answer: %v", err)
+	}
+
+	// Write request-response pair to PCAP
+	err = writeDiameterPairToPcap(pcapFile, requestData, answerData, net.ParseIP("192.168.1.100"), net.ParseIP("192.168.1.1"))
+	if err != nil {
+		t.Fatalf("Failed to write PCAP: %v", err)
+	}
+
+	// Verify PCAP file
+	info, err := os.Stat(pcapFile)
+	if err != nil {
+		t.Fatalf("PCAP file not created: %v", err)
+	}
+	if info.Size() == 0 {
+		t.Fatal("PCAP file is empty")
+	}
+
+	t.Logf("PCAP file created: %s (%d bytes)", pcapFile, info.Size())
+	t.Logf("Open in Wireshark to view the request-response pair")
+}
+
+// TestA_Pair_PCAP tests PCAP file generation for A request-response pair
+func TestA_Pair_PCAP(t *testing.T) {
+	// Create testdata directory
+	if err := os.MkdirAll("testdata", 0755); err != nil {
+		t.Fatalf("Failed to create testdata directory: %v", err)
+	}
+
+	// Create pcap file path
+	pcapFile := filepath.Join("testdata", "test_a_pair.pcap")
+	// PCAP files are kept for Wireshark analysis
+
+	// Create Request message
+	request := NewAccountingRequest()
+	request.SessionId = models_base.UTF8String("client.example.com;1234567890;1")
+	request.OriginHost = models_base.DiameterIdentity("client.example.com")
+	request.OriginRealm = models_base.DiameterIdentity("client.example.com")
+	request.DestinationRealm = models_base.DiameterIdentity("server.example.com")
+	request.AccountingRecordType = models_base.Enumerated(1)
+	request.AccountingRecordNumber = models_base.Unsigned32(1)
+
+	// Set header identifiers for request
+	request.Header.HopByHopID = 0x12345678
+	request.Header.EndToEndID = 0x87654321
+
+	// Create Answer message
+	answer := NewAccountingAnswer()
+	answer.SessionId = models_base.UTF8String("client.example.com;1234567890;1")
+	answer.ResultCode = models_base.Unsigned32(2001) // DIAMETER_SUCCESS
+	answer.OriginHost = models_base.DiameterIdentity("server.example.com")
+	answer.OriginRealm = models_base.DiameterIdentity("server.example.com")
+	answer.AccountingRecordType = models_base.Enumerated(1)
+	answer.AccountingRecordNumber = models_base.Unsigned32(1)
 
 	// Set header identifiers for answer (must match request)
 	answer.Header.HopByHopID = 0x12345678
