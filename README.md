@@ -18,12 +18,16 @@ This project provides:
 Test the client with 4 DRA simulators featuring priority-based routing and automatic failover:
 
 ```bash
-# Containerized (recommended)
-./podman-flow.sh
+# Containerized integration test (recommended)
+./test-integration.sh
 
-# Host-based
+# DWR failure threshold tests
+./test-dwr.sh list      # List available tests
+./test-dwr.sh all       # Run all tests
+
+# Host-based testing with DRA manager
 make build-dra build-examples
-./run-4-dras.sh start
+./tools/run-4-dras.sh start
 ./bin/multi-dra-test
 ```
 
@@ -99,9 +103,15 @@ diam-gw/
 ├── examples/                # Example applications
 │   ├── multi_dra_test/      # Host-based multi-DRA test
 │   └── multi_dra_test_container/ # Container multi-DRA test
+├── tests/                   # Test suites
+│   ├── dwr-failover/        # DWR failure threshold testing
+│   ├── integration/         # Integration tests
+│   └── verification/        # Setup verification scripts
+├── tools/                   # Development tools
+│   └── run-4-dras.sh        # Host-based DRA management
 ├── docker-compose.yml       # Container orchestration
-├── podman-flow.sh          # Automated test flow
-└── run-4-dras.sh           # Host-based DRA management
+├── test-integration.sh      # Wrapper for integration tests
+└── test-dwr.sh             # Wrapper for DWR tests
 ```
 
 ## Installation
@@ -259,11 +269,20 @@ make test
 
 ## Documentation
 
+### Testing
 - **[TESTING.md](TESTING.md)** - Complete multi-DRA testing guide
-- **[BUGFIX.md](BUGFIX.md)** - Known issues and fixes
+- **[tests/dwr-failover/README.md](tests/dwr-failover/README.md)** - DWR failure threshold testing
+- **[tests/integration/README.md](tests/integration/README.md)** - Integration tests
+- **[tests/verification/README.md](tests/verification/README.md)** - Setup verification
+
+### Components
 - **[client/README.md](client/README.md)** - Client library documentation
 - **[simulator/dra/README.md](simulator/dra/README.md)** - DRA simulator documentation
 - **[examples/README.md](examples/README.md)** - Example applications
+- **[tools/README.md](tools/README.md)** - Development tools
+
+### Other
+- **[BUGFIX.md](BUGFIX.md)** - Known issues and fixes
 
 ## Supported Protocols
 

@@ -137,6 +137,40 @@ lint:
 	@echo "Running linter..."
 	golangci-lint run || true
 
+# Docker/Podman compose test targets
+.PHONY: test-compose test-dwr-failover test-dwr-all compose-up compose-down compose-logs
+
+# Test with docker-compose (standard multi-DRA setup)
+test-compose:
+	@echo "Running multi-DRA integration tests with docker-compose..."
+	./test-dwr-failover.sh all
+
+# Test DWR failover scenarios
+test-dwr-failover:
+	@echo "Testing DWR failover scenarios..."
+	./test-dwr-failover.sh test3
+
+# Run all DWR tests with custom settings
+test-dwr-all:
+	@echo "Running comprehensive DWR tests..."
+	DWR_INTERVAL=10s DWR_TIMEOUT=5s MAX_DWR_FAILURES=3 ./test-dwr-failover.sh all
+
+# Start compose services (for manual testing)
+compose-up:
+	@echo "Starting services with docker-compose..."
+	docker-compose -f docker-compose-dwr-test.yml up -d --build
+	@echo "Services started. Run 'make compose-logs' to view logs"
+
+# Stop compose services
+compose-down:
+	@echo "Stopping services..."
+	docker-compose -f docker-compose-dwr-test.yml down
+
+# Show compose logs
+compose-logs:
+	@echo "Showing service logs..."
+	docker-compose -f docker-compose-dwr-test.yml logs -f
+
 # Show help
 help:
 	@echo "Diameter Gateway - Code Generator"
@@ -160,6 +194,14 @@ help:
 	@echo "  lint                       - Run linter"
 	@echo "  help                       - Show this help message"
 	@echo ""
+	@echo "Integration Testing:"
+	@echo "  test-compose               - Run multi-DRA integration tests with docker-compose"
+	@echo "  test-dwr-failover          - Test DWR failover threshold scenarios"
+	@echo "  test-dwr-all               - Run all DWR tests with custom configuration"
+	@echo "  compose-up                 - Start docker-compose services"
+	@echo "  compose-down               - Stop docker-compose services"
+	@echo "  compose-logs               - Show docker-compose logs"
+	@echo ""
 	@echo "Test Generation:"
 	@echo "  Generated tests include:"
 	@echo "    - Unit tests for message creation and initialization"
@@ -176,3 +218,10 @@ help:
 	@echo "DRA Simulator:"
 	@echo "  Use 'make build-dra' to build the DRA simulator"
 	@echo "  Run with: bin/dra-simulator -help for options"
+	@echo ""
+	@echo "DWR Failover Testing:"
+	@echo "  Use 'make test-dwr-failover' to test the DWR failure threshold feature"
+	@echo "  Configurable via environment variables:"
+	@echo "    DWR_INTERVAL       - Interval between DWR messages (default: 10s)"
+	@echo "    DWR_TIMEOUT        - Timeout waiting for DWA (default: 5s)"
+	@echo "    MAX_DWR_FAILURES   - Max failures before reconnect (default: 3)"

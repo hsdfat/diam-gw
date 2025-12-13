@@ -38,9 +38,12 @@ type Connection struct {
 	activityMu   sync.RWMutex
 
 	// Heartbeat
-	dwrTicker *time.Ticker
-	dwrStop   chan struct{}
-	dwrStopMu sync.Mutex
+	dwrTicker        *time.Ticker
+	dwrStop          chan struct{}
+	dwrStopMu        sync.Mutex
+	dwrFailureCount  atomic.Int32
+	dwrLastFailTime  time.Time
+	dwrLastFailTimeMu sync.RWMutex
 
 	// Message channels
 	sendCh chan []byte
@@ -181,6 +184,9 @@ func (c *Connection) connect() error {
 	logger.Log.Infow("Connection established successfully", "conn_id", c.id)
 	c.setState(StateOpen)
 	c.updateActivity()
+
+	// Reset DWR failure counter on successful connection
+	c.dwrFailureCount.Store(0)
 
 	// Start watchdog timer
 	c.startWatchdog()
@@ -351,11 +357,11 @@ func (c *Connection) sendDWR() error {
 		case dwaData := <-respCh:
 			if err := c.handleDWA(dwaData); err != nil {
 				logger.Log.Errorw("Failed to handle DWA", "conn_id", c.id, "error", err)
-				c.handleFailure(err)
+				c.handleDWRFailure(err)
 			}
 		case <-time.After(c.config.DWRTimeout):
-			logger.Log.Warn("DWR timeout", "conn_id", c.id)
-			c.handleFailure(ErrConnectionTimeout{Operation: "DWR/DWA", Timeout: c.config.DWRTimeout.String()})
+			err := ErrConnectionTimeout{Operation: "DWR/DWA", Timeout: c.config.DWRTimeout.String()}
+			c.handleDWRFailure(err)
 		case <-c.ctx.Done():
 		}
 	}()
@@ -379,7 +385,36 @@ func (c *Connection) handleDWA(data []byte) error {
 	c.setState(StateOpen)
 	c.updateActivity()
 
+	// Reset DWR failure counter on successful response
+	c.dwrFailureCount.Store(0)
+
 	return nil
+}
+
+// handleDWRFailure handles DWR/DWA failures with threshold-based reconnection
+func (c *Connection) handleDWRFailure(err error) {
+	// Increment failure counter
+	failureCount := c.dwrFailureCount.Add(1)
+
+	// Update last failure time
+	c.dwrLastFailTimeMu.Lock()
+	c.dwrLastFailTime = time.Now()
+	c.dwrLastFailTimeMu.Unlock()
+
+	logger.Log.Warnw("DWR failure",
+		"conn_id", c.id,
+		"error", err,
+		"failure_count", failureCount,
+		"max_failures", c.config.MaxDWRFailures)
+
+	// Check if we've exceeded the failure threshold
+	if int(failureCount) >= c.config.MaxDWRFailures {
+		logger.Log.Errorw("DWR failure threshold exceeded, triggering reconnection",
+			"conn_id", c.id,
+			"failure_count", failureCount,
+			"max_failures", c.config.MaxDWRFailures)
+		c.handleFailure(fmt.Errorf("exceeded max DWR failures (%d): %w", c.config.MaxDWRFailures, err))
+	}
 }
 
 // handleDWR processes Device-Watchdog-Request (from peer)
@@ -622,11 +657,20 @@ func (c *Connection) startHealthMonitor() {
 				return
 			case <-ticker.C:
 				// Check for connection timeout in DWR_SENT state
+				// This is a safety net in case the DWR timeout handler doesn't fire
 				if c.GetState() == StateDWRSent {
-					if time.Since(c.getLastActivity()) > c.config.DWRTimeout*2 {
-						logger.Log.Errorw("Health check failed: DWR timeout exceeded", "conn_id", c.id)
-						c.handleFailure(fmt.Errorf("health check timeout"))
-						return
+					failureCount := c.dwrFailureCount.Load()
+					if int(failureCount) >= c.config.MaxDWRFailures {
+						timeSinceLastFail := time.Since(c.getDWRLastFailTime())
+						// If we've exceeded max failures and it's been more than DWRTimeout since last failure
+						// trigger reconnection (safety net)
+						if timeSinceLastFail > c.config.DWRTimeout {
+							logger.Log.Errorw("Health check failed: DWR failure threshold exceeded",
+								"conn_id", c.id,
+								"failure_count", failureCount)
+							c.handleFailure(fmt.Errorf("health check: exceeded max DWR failures (%d)", c.config.MaxDWRFailures))
+							return
+						}
 					}
 				}
 			}
@@ -730,6 +774,12 @@ func (c *Connection) getLastActivity() time.Time {
 	c.activityMu.RLock()
 	defer c.activityMu.RUnlock()
 	return c.lastActivity
+}
+
+func (c *Connection) getDWRLastFailTime() time.Time {
+	c.dwrLastFailTimeMu.RLock()
+	defer c.dwrLastFailTimeMu.RUnlock()
+	return c.dwrLastFailTime
 }
 
 func (c *Connection) getLocalAddr() net.IP {

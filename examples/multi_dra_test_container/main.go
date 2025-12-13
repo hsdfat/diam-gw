@@ -33,6 +33,16 @@ func getEnvInt(key string, defaultValue int) int {
 	return defaultValue
 }
 
+// getEnvDuration gets environment variable as duration with default value
+func getEnvDuration(key string, defaultValue time.Duration) time.Duration {
+	if value := os.Getenv(key); value != "" {
+		if duration, err := time.ParseDuration(value); err == nil {
+			return duration
+		}
+	}
+	return defaultValue
+}
+
 func main() {
 	fmt.Println("╔══════════════════════════════════════════════════════════════╗")
 	fmt.Println("║  Multi-DRA Priority-Based Client (Containerized)            ║")
@@ -62,6 +72,11 @@ func main() {
 	config.OriginRealm = "example.com"
 	config.ConnectionsPerDRA = 1
 	config.HealthCheckInterval = 5 * time.Second
+
+	// Read DWR configuration from environment variables
+	config.DWRInterval = getEnvDuration("DWR_INTERVAL", 10*time.Second)
+	config.DWRTimeout = getEnvDuration("DWR_TIMEOUT", 5*time.Second)
+	config.MaxDWRFailures = getEnvInt("MAX_DWR_FAILURES", 3)
 
 	config.DRAs = []*client.DRAServerConfig{
 		{

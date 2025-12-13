@@ -22,6 +22,7 @@ type DRAConfig struct {
 	CERTimeout     time.Duration // CER/CEA exchange timeout
 	DWRInterval    time.Duration // Interval between watchdog requests
 	DWRTimeout     time.Duration // Watchdog timeout
+	MaxDWRFailures int           // Maximum consecutive DWR failures before reconnecting
 
 	// Reconnection strategy
 	ReconnectInterval time.Duration // Initial reconnect delay
@@ -44,6 +45,7 @@ func DefaultConfig() *DRAConfig {
 		CERTimeout:        5 * time.Second,
 		DWRInterval:       30 * time.Second,
 		DWRTimeout:        10 * time.Second,
+		MaxDWRFailures:    3,
 		ReconnectInterval: 5 * time.Second,
 		MaxReconnectDelay: 5 * time.Minute,
 		ReconnectBackoff:  1.5,
@@ -80,6 +82,9 @@ func (c *DRAConfig) Validate() error {
 	}
 	if c.DWRTimeout >= c.DWRInterval {
 		return ErrInvalidConfig{Field: "DWRTimeout", Reason: "must be less than DWRInterval"}
+	}
+	if c.MaxDWRFailures <= 0 {
+		return ErrInvalidConfig{Field: "MaxDWRFailures", Reason: "must be greater than 0"}
 	}
 	return nil
 }

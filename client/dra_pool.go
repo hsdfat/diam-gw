@@ -39,6 +39,7 @@ type DRAPoolConfig struct {
 	CERTimeout        time.Duration
 	DWRInterval       time.Duration
 	DWRTimeout        time.Duration
+	MaxDWRFailures    int           // Maximum consecutive DWR failures before reconnecting
 	HealthCheckInterval time.Duration
 
 	// Reconnection strategy
@@ -143,6 +144,7 @@ func NewDRAPool(ctx context.Context, config *DRAPoolConfig) (*DRAPool, error) {
 			CERTimeout:        config.CERTimeout,
 			DWRInterval:       config.DWRInterval,
 			DWRTimeout:        config.DWRTimeout,
+			MaxDWRFailures:    config.MaxDWRFailures,
 			ReconnectInterval: config.ReconnectInterval,
 			MaxReconnectDelay: config.MaxReconnectDelay,
 			ReconnectBackoff:  config.ReconnectBackoff,
@@ -553,6 +555,7 @@ func DefaultDRAPoolConfig() *DRAPoolConfig {
 		CERTimeout:          5 * time.Second,
 		DWRInterval:         30 * time.Second,
 		DWRTimeout:          10 * time.Second,
+		MaxDWRFailures:      3,
 		HealthCheckInterval: 10 * time.Second,
 		ReconnectInterval:   5 * time.Second,
 		MaxReconnectDelay:   5 * time.Minute,
