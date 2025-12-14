@@ -9,9 +9,8 @@ COMPOSE_FILE="docker-compose.performance-test.yml"
 DURATION=${DURATION:-60}
 TARGET_RATE=${TARGET_RATE:-1000}
 RAMP_UP=${RAMP_UP:-10}
-S13_RATIO=${S13_RATIO:-40}
-S6A_RATIO=${S6A_RATIO:-40}
-GX_RATIO=${GX_RATIO:-20}
+S13_RATIO=${S13_RATIO:-50}
+S6A_RATIO=${S6A_RATIO:-50}
 
 # Parse command line arguments
 while [[ $# -gt 0 ]]; do
@@ -44,7 +43,6 @@ done
 # Calculate per-interface rates
 S13_RATE=$((TARGET_RATE * S13_RATIO / 100))
 S6A_RATE=$((TARGET_RATE * S6A_RATIO / 100))
-GX_RATE=$((TARGET_RATE * GX_RATIO / 100))
 
 echo "==================================================================="
 echo "  Diameter Gateway Performance Test (Podman)"
@@ -57,12 +55,11 @@ echo "  Ramp-up Time: ${RAMP_UP} seconds"
 echo "  Interface Distribution:"
 echo "    - S13: ${S13_RATIO}% (${S13_RATE} req/s)"
 echo "    - S6a: ${S6A_RATIO}% (${S6A_RATE} req/s)"
-echo "    - Gx:  ${GX_RATIO}% (${GX_RATE} req/s)"
 echo ""
 echo "Test Components:"
 echo "  - 1 DRA (Load Generator)"
 echo "  - 1 Gateway"
-echo "  - 12 Applications (4 per interface)"
+echo "  - 8 Applications (4 S13 + 4 S6a)"
 echo "==================================================================="
 echo ""
 
@@ -81,7 +78,6 @@ export DURATION
 export RAMP_UP
 export S13_RATE
 export S6A_RATE
-export GX_RATE
 
 # Start services
 echo "[3/6] Starting services..."
@@ -132,8 +128,7 @@ podman exec dra-perf /usr/bin/env \
     RAMP_UP_TIME=$RAMP_UP \
     S13_RATE=$S13_RATE \
     S6A_RATE=$S6A_RATE \
-    GX_RATE=$GX_RATE \
-    /bin/sh -c 'echo "Performance test started with DURATION=$TEST_DURATION RAMP_UP=$RAMP_UP_TIME S13=$S13_RATE S6A=$S6A_RATE GX=$GX_RATE"'
+    /bin/sh -c 'echo "Performance test started with DURATION=$TEST_DURATION RAMP_UP=$RAMP_UP_TIME S13=$S13_RATE S6A=$S6A_RATE"'
 
 # Monitor progress
 SUSTAIN_TIME=$((DURATION - RAMP_UP))

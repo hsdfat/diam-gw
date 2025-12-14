@@ -18,19 +18,20 @@ import (
 type Gateway struct {
 	config    *Config
 	appServer *server.Server  // Server to accept application connections
+	appPool   *client.DRAPool // Client pool to connect to applications (NEW for bidirectional)
 	draPool   *client.DRAPool // Client pool to connect to DRAs
 	ctx       context.Context
 	cancel    context.CancelFunc
 	wg        sync.WaitGroup
 	stats     Stats
 	// Message routing maps
-	draToAppMap      map[uint32]*server.Connection // H2H ID -> App Connection
-	appToDraMap      map[uint32]uint32             // App H2H ID -> DRA H2H ID
+	draToAppMap      map[uint32]interface{} // H2H ID -> App Connection (either *server.Connection or app pool)
+	appToDraMap      map[uint32]uint32      // App H2H ID -> DRA H2H ID
 	routingMu        sync.RWMutex
 	// Connection affinity: track which app connection sent which request
-	requestToConnMap map[uint32]*server.Connection // Request H2H -> Originating App Connection
+	requestToConnMap map[uint32]interface{} // Request H2H -> Originating App Connection (either *server.Connection or app pool)
 	// Interface-based routing: map app IDs to app connections
-	interfaceRouting map[uint32][]*server.Connection // App ID -> List of connections supporting it
+	interfaceRouting map[uint32][]*server.Connection // App ID -> List of connections supporting it (server mode only)
 	interfaceRouteMu sync.RWMutex
 }
 
@@ -38,6 +39,7 @@ type Gateway struct {
 type Config struct {
 	Name            string
 	AppServerConfig *server.ServerConfig
+	AppPoolConfig   *client.DRAPoolConfig // NEW: Client pool to connect TO applications
 	DRAPoolConfig   *client.DRAPoolConfig
 	MessageTimeout  time.Duration
 	EnableMetrics   bool
@@ -100,8 +102,22 @@ func New(config *Config) (*Gateway, error) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 
-	// Create application server
-	appServer := server.NewServer(config.AppServerConfig, logger.Log)
+	// Create application server (optional - for apps connecting TO gateway)
+	var appServer *server.Server
+	if config.AppServerConfig != nil {
+		appServer = server.NewServer(config.AppServerConfig, logger.Log)
+	}
+
+	// Create application client pool (optional - for gateway connecting TO apps)
+	var appPool *client.DRAPool
+	if config.AppPoolConfig != nil {
+		var err error
+		appPool, err = client.NewDRAPool(ctx, config.AppPoolConfig)
+		if err != nil {
+			cancel()
+			return nil, fmt.Errorf("failed to create app pool: %w", err)
+		}
+	}
 
 	// Create DRA pool
 	draPool, err := client.NewDRAPool(ctx, config.DRAPoolConfig)
@@ -113,12 +129,13 @@ func New(config *Config) (*Gateway, error) {
 	gw := &Gateway{
 		config:           config,
 		appServer:        appServer,
+		appPool:          appPool,
 		draPool:          draPool,
 		ctx:              ctx,
 		cancel:           cancel,
-		draToAppMap:      make(map[uint32]*server.Connection),
+		draToAppMap:      make(map[uint32]interface{}),
 		appToDraMap:      make(map[uint32]uint32),
-		requestToConnMap: make(map[uint32]*server.Connection),
+		requestToConnMap: make(map[uint32]interface{}),
 		interfaceRouting: make(map[uint32][]*server.Connection),
 		stats: Stats{
 			AppToDRAMetrics: metrics.NewMessageTypeMetrics(),
@@ -139,18 +156,47 @@ func (gw *Gateway) Start() error {
 	}
 	logger.Log.Infow("DRA pool started")
 
-	// Start application server
-	if err := gw.appServer.Start(); err != nil {
-		gw.draPool.Close()
-		return fmt.Errorf("failed to start application server: %w", err)
+	// Start application pool (if configured - gateway connecting TO apps)
+	if gw.appPool != nil {
+		if err := gw.appPool.Start(); err != nil {
+			gw.draPool.Close()
+			return fmt.Errorf("failed to start app pool: %w", err)
+		}
+		logger.Log.Infow("Application pool started (bidirectional mode)")
 	}
-	logger.Log.Infow("Application server started", "address", gw.config.AppServerConfig.ListenAddress)
+
+	// Start application server (if configured - apps connecting TO gateway)
+	if gw.appServer != nil {
+		if err := gw.appServer.Start(); err != nil {
+			if gw.appPool != nil {
+				gw.appPool.Close()
+			}
+			gw.draPool.Close()
+			return fmt.Errorf("failed to start application server: %w", err)
+		}
+		logger.Log.Infow("Application server started", "address", gw.config.AppServerConfig.ListenAddress)
+	}
 
 	// Start message routers
-	gw.wg.Add(3)
+	routerCount := 2
+	if gw.appServer != nil {
+		routerCount = 3 // Add monitor connections only if server mode
+	}
+	if gw.appPool != nil {
+		routerCount++ // Add app pool receiver
+	}
+
+	gw.wg.Add(routerCount)
 	go gw.routeAppToDRA()
 	go gw.routeDRAToApp()
-	go gw.monitorConnections() // Monitor app connections for interface updates
+
+	if gw.appServer != nil {
+		go gw.monitorConnections() // Monitor app connections for interface updates
+	}
+
+	if gw.appPool != nil {
+		go gw.routeAppPoolToDRA() // Route messages from app pool to DRA
+	}
 
 	// Start metrics reporter
 	if gw.config.EnableMetrics {
@@ -179,13 +225,21 @@ func (gw *Gateway) monitorConnections() {
 	}
 }
 
-// updateInterfaceRouting rebuilds the interface routing map based on current connections
+// updateInterfaceRouting rebuilds the interface routing map based on current active connections
 func (gw *Gateway) updateInterfaceRouting() {
-	conns := gw.appServer.GetAllConnections()
+	allConns := gw.appServer.GetAllConnections()
+
+	// Filter for only active connections
+	activeConns := make([]*server.Connection, 0, len(allConns))
+	for _, conn := range allConns {
+		if conn.GetState() == client.StateOpen {
+			activeConns = append(activeConns, conn)
+		}
+	}
 
 	newRouting := make(map[uint32][]*server.Connection)
 
-	for _, conn := range conns {
+	for _, conn := range activeConns {
 		appIDs := conn.GetSupportedAppIDs()
 		for _, appID := range appIDs {
 			newRouting[appID] = append(newRouting[appID], conn)
@@ -198,7 +252,9 @@ func (gw *Gateway) updateInterfaceRouting() {
 
 	// Log interface summary
 	if len(newRouting) > 0 {
-		logger.Log.Debugw("Interface routing updated", "total_connections", len(conns))
+		logger.Log.Debugw("Interface routing updated",
+			"total_connections", len(allConns),
+			"active_connections", len(activeConns))
 		for appID, connsForApp := range newRouting {
 			interfaceName := getInterfaceName(appID)
 			logger.Log.Debugw("Interface routing",
@@ -209,7 +265,7 @@ func (gw *Gateway) updateInterfaceRouting() {
 	}
 }
 
-// getConnectionForInterface returns a connection supporting the given application ID
+// getConnectionForInterface returns an active connection supporting the given application ID
 func (gw *Gateway) getConnectionForInterface(appID uint32) *server.Connection {
 	gw.interfaceRouteMu.RLock()
 	defer gw.interfaceRouteMu.RUnlock()
@@ -219,9 +275,14 @@ func (gw *Gateway) getConnectionForInterface(appID uint32) *server.Connection {
 		return nil
 	}
 
-	// Simple round-robin: return first available
-	// TODO: Implement load balancing
-	return conns[0]
+	// Find first active connection
+	for _, conn := range conns {
+		if conn.GetState() == client.StateOpen {
+			return conn
+		}
+	}
+
+	return nil
 }
 
 // getInterfaceName returns human-readable interface name
@@ -296,8 +357,17 @@ func (gw *Gateway) Stop() error {
 	gw.cancel()
 
 	// Stop application server
-	if err := gw.appServer.Stop(); err != nil {
-		logger.Log.Errorw("Failed to stop application server", "error", err)
+	if gw.appServer != nil {
+		if err := gw.appServer.Stop(); err != nil {
+			logger.Log.Errorw("Failed to stop application server", "error", err)
+		}
+	}
+
+	// Stop application pool
+	if gw.appPool != nil {
+		if err := gw.appPool.Close(); err != nil {
+			logger.Log.Errorw("Failed to stop application pool", "error", err)
+		}
 	}
 
 	// Stop DRA pool
@@ -328,10 +398,14 @@ func (gw *Gateway) GetStats() map[string]interface{} {
 	}
 }
 
-// routeAppToDRA routes messages from applications to DRA
+// routeAppToDRA routes messages from application server to DRA
 func (gw *Gateway) routeAppToDRA() {
 	defer gw.wg.Done()
 	defer logger.Log.Infow("App->DRA router exited")
+
+	if gw.appServer == nil {
+		return
+	}
 
 	for {
 		select {
@@ -350,6 +424,41 @@ func (gw *Gateway) routeAppToDRA() {
 				// Count application messages only (exclude protocol messages)
 				if len(msgCtx.Message) >= 20 {
 					cmdCode := binary.BigEndian.Uint32(msgCtx.Message[4:8]) & 0x00FFFFFF
+					if cmdCode != 257 && cmdCode != 280 && cmdCode != 282 { // Not CER/CEA, DWR/DWA, DPR/DPA
+						gw.stats.AppToDRAApp.Add(1)
+					}
+				}
+			}
+		}
+	}
+}
+
+// routeAppPoolToDRA routes messages from application pool to DRA
+func (gw *Gateway) routeAppPoolToDRA() {
+	defer gw.wg.Done()
+	defer logger.Log.Infow("AppPool->DRA router exited")
+
+	if gw.appPool == nil {
+		return
+	}
+
+	for {
+		select {
+		case <-gw.ctx.Done():
+			return
+		case msg, ok := <-gw.appPool.Receive():
+			if !ok {
+				return
+			}
+
+			if err := gw.forwardAppPoolToDRA(msg); err != nil {
+				logger.Log.Errorw("Failed to forward AppPool->DRA", "error", err)
+				gw.stats.RoutingErrors.Add(1)
+			} else {
+				gw.stats.AppToDRA.Add(1)
+				// Count application messages only (exclude protocol messages)
+				if len(msg) >= 20 {
+					cmdCode := binary.BigEndian.Uint32(msg[4:8]) & 0x00FFFFFF
 					if cmdCode != 257 && cmdCode != 280 && cmdCode != 282 { // Not CER/CEA, DWR/DWA, DPR/DPA
 						gw.stats.AppToDRAApp.Add(1)
 					}
@@ -433,6 +542,74 @@ func (gw *Gateway) forwardAppToDRA(msgCtx *server.MessageContext) error {
 	return nil
 }
 
+// forwardAppPoolToDRA forwards a message from application pool to DRA
+func (gw *Gateway) forwardAppPoolToDRA(msg []byte) error {
+	if len(msg) < 20 {
+		return fmt.Errorf("message too short")
+	}
+
+	// Parse message header
+	msgInfo, err := client.ParseMessageHeader(msg)
+	if err != nil {
+		return fmt.Errorf("failed to parse header: %w", err)
+	}
+
+	// Track per-message-type metric
+	gw.stats.AppToDRAMetrics.Increment(msgInfo.CommandCode)
+
+	logger.Log.Debugw("AppPool->DRA",
+		"command_code", msgInfo.CommandCode,
+		"command_name", metrics.CommandCodeToName(msgInfo.CommandCode),
+		"is_request", msgInfo.Flags.Request,
+		"h2h", msgInfo.HopByHopID)
+
+	// Check if this is a request or response
+	if msgInfo.Flags.Request {
+		// Store mapping for routing response back to app pool
+		origH2H := msgInfo.HopByHopID
+
+		// Modify H2H ID to gateway's own ID to track the request
+		newH2H := gw.getNextHopByHopID()
+		binary.BigEndian.PutUint32(msg[12:16], newH2H)
+
+		// Store routing info - use app pool marker (nil connection)
+		gw.routingMu.Lock()
+		gw.draToAppMap[newH2H] = gw.appPool        // Map gateway H2H -> App Pool
+		gw.appToDraMap[origH2H] = newH2H           // Map app H2H -> Gateway H2H
+		gw.requestToConnMap[newH2H] = gw.appPool   // Connection affinity to pool
+		gw.routingMu.Unlock()
+
+		logger.Log.Debugw("Request routing from app pool",
+			"app_h2h", origH2H,
+			"gw_h2h", newH2H)
+	}
+
+	// Forward to DRA pool
+	if err := gw.draPool.Send(msg); err != nil {
+		// Restore original H2H if send failed
+		if msgInfo.Flags.Request {
+			gw.routingMu.Lock()
+			origH2H := uint32(0)
+			for appH2H, draH2H := range gw.appToDraMap {
+				if draH2H == msgInfo.HopByHopID {
+					origH2H = appH2H
+					break
+				}
+			}
+			if origH2H != 0 {
+				binary.BigEndian.PutUint32(msg[12:16], origH2H)
+				delete(gw.appToDraMap, origH2H)
+				delete(gw.draToAppMap, msgInfo.HopByHopID)
+				delete(gw.requestToConnMap, msgInfo.HopByHopID)
+			}
+			gw.routingMu.Unlock()
+		}
+		return fmt.Errorf("failed to send to DRA: %w", err)
+	}
+
+	return nil
+}
+
 // routeDRAToApp routes messages from DRA to applications
 func (gw *Gateway) routeDRAToApp() {
 	defer gw.wg.Done()
@@ -487,52 +664,87 @@ func (gw *Gateway) forwardDRAToApp(msg []byte) error {
 
 	// Check if this is a request from DRA (e.g., MICR, AIR, etc.)
 	if msgInfo.Flags.Request {
-		// DRA initiating request - use interface-based routing
+		// DRA initiating request - try app pool first, then server connections
 		logger.Log.Infow("DRA initiated request",
 			"command_code", msgInfo.CommandCode,
 			"command_name", metrics.CommandCodeToName(msgInfo.CommandCode))
 
 		// Store the DRA's H2H for routing response back
 		draH2H := msgInfo.HopByHopID
+		newH2H := gw.getNextHopByHopID()
+		binary.BigEndian.PutUint32(msg[12:16], newH2H)
 
 		// Determine interface (Application-ID) based on command code
 		appID := gw.getApplicationIDForCommand(msgInfo.CommandCode)
 		interfaceName := getInterfaceName(appID)
 
-		// Try interface-based routing first
-		var appConn *server.Connection
-		if appID != 0 {
-			appConn = gw.getConnectionForInterface(appID)
-			if appConn != nil {
-				logger.Log.Infow("Interface-based routing",
-					"interface", interfaceName,
-					"app_id", appID,
-					"target_app", appConn.GetOriginHost())
-			}
-		}
-
-		// Fallback to first available connection if no interface match
-		if appConn == nil {
-			conns := gw.appServer.GetAllConnections()
-			if len(conns) == 0 {
-				return fmt.Errorf("no application connections available")
-			}
-			appConn = conns[0]
-			logger.Log.Infow("Fallback routing (no interface match)",
+		// Strategy: Prefer app pool (bidirectional) over server connections
+		if gw.appPool != nil {
+			// Use app pool for bidirectional architecture
+			logger.Log.Infow("Routing to app pool (bidirectional mode)",
 				"interface", interfaceName,
-				"target_app", appConn.GetOriginHost())
+				"app_id", appID)
+
+			// Store routing with app pool marker
+			gw.routingMu.Lock()
+			gw.draToAppMap[newH2H] = gw.appPool
+			gw.appToDraMap[newH2H] = draH2H
+			gw.requestToConnMap[newH2H] = gw.appPool
+			gw.routingMu.Unlock()
+
+			// Send to application pool
+			if err := gw.appPool.Send(msg); err != nil {
+				gw.routingMu.Lock()
+				delete(gw.draToAppMap, newH2H)
+				delete(gw.appToDraMap, newH2H)
+				delete(gw.requestToConnMap, newH2H)
+				gw.routingMu.Unlock()
+				return fmt.Errorf("failed to send to app pool: %w", err)
+			}
+
+			return nil
 		}
 
-		// Modify H2H to track this request
-		newH2H := gw.getNextHopByHopID()
-		binary.BigEndian.PutUint32(msg[12:16], newH2H)
+		// Fallback to server mode: Try interface-based routing
+		var appConn *server.Connection
+		if gw.appServer != nil {
+			if appID != 0 {
+				appConn = gw.getConnectionForInterface(appID)
+				if appConn != nil {
+					logger.Log.Infow("Interface-based routing (server mode)",
+						"interface", interfaceName,
+						"app_id", appID,
+						"target_app", appConn.GetOriginHost())
+				}
+			}
+
+			// Fallback to first available active connection if no interface match
+			if appConn == nil {
+				conns := gw.appServer.GetAllConnections()
+				// Find first active connection
+				for _, conn := range conns {
+					if conn.GetState() == client.StateOpen {
+						appConn = conn
+						break
+					}
+				}
+				if appConn != nil {
+					logger.Log.Infow("Fallback routing (no interface match)",
+						"interface", interfaceName,
+						"target_app", appConn.GetOriginHost())
+				}
+			}
+		}
+
+		if appConn == nil {
+			return fmt.Errorf("no active application connections available (no app pool or server connections)")
+		}
 
 		// Store routing with CONNECTION AFFINITY
-		// When app responds, it must go back through the SAME connection
 		gw.routingMu.Lock()
-		gw.draToAppMap[newH2H] = appConn         // Map new H2H -> App Connection
-		gw.appToDraMap[newH2H] = draH2H          // Map new H2H -> DRA H2H
-		gw.requestToConnMap[newH2H] = appConn    // Connection affinity
+		gw.draToAppMap[newH2H] = appConn
+		gw.appToDraMap[newH2H] = draH2H
+		gw.requestToConnMap[newH2H] = appConn
 		gw.routingMu.Unlock()
 
 		logger.Log.Debugw("DRA request routing with affinity",
@@ -555,9 +767,9 @@ func (gw *Gateway) forwardDRAToApp(msg []byte) error {
 	}
 
 	// This is a response from DRA to an app-initiated request
-	// Use CONNECTION AFFINITY - route back to the SAME connection that sent the request
+	// Use CONNECTION AFFINITY - route back to the SAME connection/pool that sent the request
 	gw.routingMu.Lock()
-	appConn, exists := gw.requestToConnMap[msgInfo.HopByHopID]
+	appTarget, exists := gw.requestToConnMap[msgInfo.HopByHopID]
 
 	// Find original app H2H
 	var origAppH2H uint32
@@ -576,22 +788,37 @@ func (gw *Gateway) forwardDRAToApp(msg []byte) error {
 	delete(gw.requestToConnMap, msgInfo.HopByHopID)
 	gw.routingMu.Unlock()
 
-	if !exists || appConn == nil {
+	if !exists || appTarget == nil {
 		return fmt.Errorf("no application connection found for H2H %d (connection affinity)", msgInfo.HopByHopID)
 	}
 
 	// Restore original application's H2H ID
 	if origAppH2H != 0 {
 		binary.BigEndian.PutUint32(msg[12:16], origAppH2H)
+	}
+
+	// Check if target is app pool or server connection
+	if pool, ok := appTarget.(*client.DRAPool); ok {
+		// Send to app pool
+		logger.Log.Debugw("Response routing to app pool",
+			"gw_h2h", msgInfo.HopByHopID,
+			"app_h2h", origAppH2H)
+
+		if err := pool.Send(msg); err != nil {
+			return fmt.Errorf("failed to send to app pool: %w", err)
+		}
+	} else if conn, ok := appTarget.(*server.Connection); ok {
+		// Send to server connection
 		logger.Log.Debugw("Response routing with connection affinity",
 			"gw_h2h", msgInfo.HopByHopID,
 			"app_h2h", origAppH2H,
-			"app_conn", appConn.GetOriginHost())
-	}
+			"app_conn", conn.GetOriginHost())
 
-	// Forward to the SAME application connection that sent the request
-	if err := appConn.Send(msg); err != nil {
-		return fmt.Errorf("failed to send to application: %w", err)
+		if err := conn.Send(msg); err != nil {
+			return fmt.Errorf("failed to send to application: %w", err)
+		}
+	} else {
+		return fmt.Errorf("unknown application target type")
 	}
 
 	return nil
