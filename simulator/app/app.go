@@ -12,6 +12,7 @@ import (
 
 	"github.com/hsdfat8/diam-gw/client"
 	"github.com/hsdfat8/diam-gw/commands/s13"
+	"github.com/hsdfat8/diam-gw/commands/s6a"
 	"github.com/hsdfat8/diam-gw/models_base"
 	"github.com/hsdfat8/diam-gw/pkg/logger"
 )
@@ -146,9 +147,8 @@ func processMessage(pool *client.ConnectionPool, msg []byte, log logger.Logger, 
 	switch msgInfo.CommandCode {
 	case 324: // MICR (ME-Identity-Check-Request)
 		return handleMICR(pool, msg, msgInfo, log, originHost, originRealm)
-	case 316: // AIR (Authentication-Information-Request)
-		log.Info("Received AIR (Authentication-Information-Request) - not implemented")
-		return nil
+	case 318: // AIR (Authentication-Information-Request)
+		return handleAIR(pool, msg, msgInfo, log, originHost, originRealm)
 	case 272: // CCR (Credit-Control-Request)
 		log.Info("Received CCR (Credit-Control-Request) - not implemented")
 		return nil
@@ -198,6 +198,48 @@ func handleMICR(pool *client.ConnectionPool, msg []byte, msgInfo *client.Message
 	}
 
 	log.Info("Sent MICA response with result code 2001")
+	return nil
+}
+
+func handleAIR(pool *client.ConnectionPool, msg []byte, msgInfo *client.MessageInfo, log logger.Logger, originHost, originRealm string) error {
+	log.Info("Handling AIR (Authentication-Information-Request)")
+
+	// Parse AIR
+	air := &s6a.AuthenticationInformationRequest{}
+	if err := air.Unmarshal(msg); err != nil {
+		log.Error("Failed to unmarshal AIR: %v", err)
+		return err
+	}
+
+	log.Info("AIR from %s, SessionId=%s, IMSI=%s", string(air.OriginHost), string(air.SessionId), string(air.UserName))
+
+	// Create AIA response
+	aia := s6a.NewAuthenticationInformationAnswer()
+	aia.Header.HopByHopID = msgInfo.HopByHopID
+	aia.Header.EndToEndID = msgInfo.EndToEndID
+	aia.SessionId = air.SessionId
+	aia.AuthSessionState = 1 // NO_STATE_MAINTAINED
+	aia.OriginHost = models_base.DiameterIdentity(originHost)
+	aia.OriginRealm = models_base.DiameterIdentity(originRealm)
+	resultCode := models_base.Unsigned32(2001) // DIAMETER_SUCCESS
+	aia.ResultCode = &resultCode
+
+	// Optionally add authentication vectors (simplified example)
+	// In a real implementation, you would generate proper RAND, AUTN, XRES, KASME values
+	// For now, we just send a successful response without auth info
+
+	aiaBytes, err := aia.Marshal()
+	if err != nil {
+		log.Error("Failed to marshal AIA: %v", err)
+		return err
+	}
+
+	// Send response
+	if err := pool.Send(aiaBytes); err != nil {
+		return err
+	}
+
+	log.Info("Sent AIA response with result code 2001")
 	return nil
 }
 
