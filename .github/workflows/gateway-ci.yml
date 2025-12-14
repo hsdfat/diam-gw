@@ -228,7 +228,7 @@ jobs:
 
     - name: Create Performance Report
       run: |
-        cat > performance-report.md << 'EOF'
+        cat > performance-report.md << EOF
         # ${{ steps.metrics.outputs.grade_emoji }} Performance Test Report - Grade: ${{ steps.metrics.outputs.grade }}
 
         ## Test Configuration
