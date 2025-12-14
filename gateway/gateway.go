@@ -25,9 +25,9 @@ type Gateway struct {
 	wg        sync.WaitGroup
 	stats     Stats
 	// Message routing maps
-	draToAppMap      map[uint32]interface{} // H2H ID -> App Connection (either *server.Connection or app pool)
-	appToDraMap      map[uint32]uint32      // App H2H ID -> DRA H2H ID
-	routingMu        sync.RWMutex
+	draToAppMap map[uint32]interface{} // H2H ID -> App Connection (either *server.Connection or app pool)
+	appToDraMap map[uint32]uint32      // App H2H ID -> DRA H2H ID
+	routingMu   sync.RWMutex
 	// Connection affinity: track which app connection sent which request
 	requestToConnMap map[uint32]interface{} // Request H2H -> Originating App Connection (either *server.Connection or app pool)
 	// Interface-based routing: map app IDs to app connections
@@ -505,9 +505,9 @@ func (gw *Gateway) forwardAppToDRA(msgCtx *server.MessageContext) error {
 		// Store routing info with CONNECTION AFFINITY
 		// This ensures the DRA response comes back to the same app connection
 		gw.routingMu.Lock()
-		gw.draToAppMap[newH2H] = appConn           // Map gateway H2H -> App Connection
-		gw.appToDraMap[origH2H] = newH2H           // Map app H2H -> Gateway H2H
-		gw.requestToConnMap[newH2H] = appConn      // Connection affinity tracking
+		gw.draToAppMap[newH2H] = appConn      // Map gateway H2H -> App Connection
+		gw.appToDraMap[origH2H] = newH2H      // Map app H2H -> Gateway H2H
+		gw.requestToConnMap[newH2H] = appConn // Connection affinity tracking
 		gw.routingMu.Unlock()
 
 		logger.Log.Debugw("Request routing with connection affinity",
@@ -574,9 +574,9 @@ func (gw *Gateway) forwardAppPoolToDRA(msg []byte) error {
 
 		// Store routing info - use app pool marker (nil connection)
 		gw.routingMu.Lock()
-		gw.draToAppMap[newH2H] = gw.appPool        // Map gateway H2H -> App Pool
-		gw.appToDraMap[origH2H] = newH2H           // Map app H2H -> Gateway H2H
-		gw.requestToConnMap[newH2H] = gw.appPool   // Connection affinity to pool
+		gw.draToAppMap[newH2H] = gw.appPool      // Map gateway H2H -> App Pool
+		gw.appToDraMap[origH2H] = newH2H         // Map app H2H -> Gateway H2H
+		gw.requestToConnMap[newH2H] = gw.appPool // Connection affinity to pool
 		gw.routingMu.Unlock()
 
 		logger.Log.Debugw("Request routing from app pool",
@@ -850,15 +850,30 @@ func (gw *Gateway) metricsLoop() {
 
 // logMetrics logs current metrics
 func (gw *Gateway) logMetrics() {
-	appConns := gw.appServer.GetAllConnections()
-	draStats := gw.draPool.GetStats()
+	// Safely get application connections with nil check
+	var appConnCount int
+	if gw.appServer != nil {
+		appConns := gw.appServer.GetAllConnections()
+		appConnCount = len(appConns)
+	}
+
+	// Safely get DRA stats with nil check
+	var draStats interface{}
+	if gw.draPool != nil {
+		draStats = gw.draPool.GetStats()
+	}
 
 	logger.Log.Infow("=== Gateway Metrics ===")
-	logger.Log.Infow("Application Connections", "count", len(appConns))
-	logger.Log.Infow("DRA Status",
-		"active", draStats.ActiveDRAs,
-		"total", draStats.TotalDRAs,
-		"priority", draStats.CurrentPriority)
+	logger.Log.Infow("Application Connections", "count", appConnCount)
+
+	if draStats != nil {
+		stats := draStats.(*client.DRAPoolStats)
+		logger.Log.Infow("DRA Status",
+			"active", stats.ActiveDRAs,
+			"total", stats.TotalDRAs,
+			"priority", stats.CurrentPriority)
+	}
+
 	logger.Log.Infow("Messages (Total)",
 		"app_to_dra", gw.stats.AppToDRA.Load(),
 		"dra_to_app", gw.stats.DRAToApp.Load())
@@ -875,6 +890,10 @@ func (gw *Gateway) logMetrics() {
 	gw.routingMu.RUnlock()
 
 	// Log per-message-type metrics
-	logger.Log.Infow(metrics.CompactMetrics("App->DRA", gw.stats.AppToDRAMetrics))
-	logger.Log.Infow(metrics.CompactMetrics("DRA->App", gw.stats.DRAToAppMetrics))
+	if gw.stats.AppToDRAMetrics != nil {
+		logger.Log.Infow(metrics.CompactMetrics("App->DRA", gw.stats.AppToDRAMetrics))
+	}
+	if gw.stats.DRAToAppMetrics != nil {
+		logger.Log.Infow(metrics.CompactMetrics("DRA->App", gw.stats.DRAToAppMetrics))
+	}
 }
