@@ -1,0 +1,271 @@
+version: '3.8'
+
+services:
+  # DRA Simulator - Load Generator for performance testing
+  dra-perf:
+    image: diam-gw-dra:latest
+    build:
+      context: .
+      dockerfile: Dockerfile.dra
+    container_name: dra-perf
+    hostname: dra-perf
+    command: [
+      "--port", "3869",
+      "--origin-host", "dra-perf.example.com",
+      "--origin-realm", "example.com",
+      "--send-micr",
+      "--micr-delay", "2s"
+    ]
+    ports:
+      - "3869:3869"
+    networks:
+      - diameter-perf
+    healthcheck:
+      test: ["CMD", "nc", "-z", "localhost", "3869"]
+      interval: 2s
+      timeout: 1s
+      retries: 10
+
+  # Gateway - Performance Testing Configuration
+  gateway-perf:
+    image: diam-gw-gateway:latest
+    build:
+      context: .
+      dockerfile: Dockerfile.gateway
+    container_name: gateway-perf
+    hostname: gateway-perf
+    command: [
+      "--app-listen", "0.0.0.0:3868",
+      "--dra-addrs", "dra-perf:3869",
+      "--dra-priorities", "1",
+      "--dra-conns", "4",
+      "--origin-host", "gateway-perf.example.com",
+      "--origin-realm", "example.com",
+      "--log-level", "info"
+    ]
+    depends_on:
+      dra-perf:
+        condition: service_healthy
+    ports:
+      - "3868:3868"
+    networks:
+      - diameter-perf
+    healthcheck:
+      test: ["CMD", "nc", "-z", "localhost", "3868"]
+      interval: 2s
+      timeout: 1s
+      retries: 10
+
+  # S13 Applications - Pool of 4 apps
+  app-s13-1:
+    image: diam-gw-app:latest
+    build:
+      context: .
+      dockerfile: Dockerfile.app
+    container_name: app-s13-1
+    hostname: app-s13-1
+    environment:
+      - APP_GATEWAY=gateway-perf:3868
+      - APP_CONNECTIONS=2
+      - APP_ORIGIN_HOST=app-s13-1.example.com
+      - APP_ORIGIN_REALM=example.com
+      - APP_INTERFACES=S13
+      - APP_LOG_LEVEL=error
+    depends_on:
+      gateway-perf:
+        condition: service_healthy
+    networks:
+      - diameter-perf
+
+  app-s13-2:
+    image: diam-gw-app:latest
+    container_name: app-s13-2
+    hostname: app-s13-2
+    environment:
+      - APP_GATEWAY=gateway-perf:3868
+      - APP_CONNECTIONS=2
+      - APP_ORIGIN_HOST=app-s13-2.example.com
+      - APP_ORIGIN_REALM=example.com
+      - APP_INTERFACES=S13
+      - APP_LOG_LEVEL=error
+    depends_on:
+      gateway-perf:
+        condition: service_healthy
+    networks:
+      - diameter-perf
+
+  app-s13-3:
+    image: diam-gw-app:latest
+    container_name: app-s13-3
+    hostname: app-s13-3
+    environment:
+      - APP_GATEWAY=gateway-perf:3868
+      - APP_CONNECTIONS=2
+      - APP_ORIGIN_HOST=app-s13-3.example.com
+      - APP_ORIGIN_REALM=example.com
+      - APP_INTERFACES=S13
+      - APP_LOG_LEVEL=error
+    depends_on:
+      gateway-perf:
+        condition: service_healthy
+    networks:
+      - diameter-perf
+
+  app-s13-4:
+    image: diam-gw-app:latest
+    container_name: app-s13-4
+    hostname: app-s13-4
+    environment:
+      - APP_GATEWAY=gateway-perf:3868
+      - APP_CONNECTIONS=2
+      - APP_ORIGIN_HOST=app-s13-4.example.com
+      - APP_ORIGIN_REALM=example.com
+      - APP_INTERFACES=S13
+      - APP_LOG_LEVEL=error
+    depends_on:
+      gateway-perf:
+        condition: service_healthy
+    networks:
+      - diameter-perf
+
+  # S6a Applications - Pool of 4 apps
+  app-s6a-1:
+    image: diam-gw-app:latest
+    container_name: app-s6a-1
+    hostname: app-s6a-1
+    environment:
+      - APP_GATEWAY=gateway-perf:3868
+      - APP_CONNECTIONS=2
+      - APP_ORIGIN_HOST=app-s6a-1.example.com
+      - APP_ORIGIN_REALM=example.com
+      - APP_INTERFACES=S6a
+      - APP_LOG_LEVEL=error
+    depends_on:
+      gateway-perf:
+        condition: service_healthy
+    networks:
+      - diameter-perf
+
+  app-s6a-2:
+    image: diam-gw-app:latest
+    container_name: app-s6a-2
+    hostname: app-s6a-2
+    environment:
+      - APP_GATEWAY=gateway-perf:3868
+      - APP_CONNECTIONS=2
+      - APP_ORIGIN_HOST=app-s6a-2.example.com
+      - APP_ORIGIN_REALM=example.com
+      - APP_INTERFACES=S6a
+      - APP_LOG_LEVEL=error
+    depends_on:
+      gateway-perf:
+        condition: service_healthy
+    networks:
+      - diameter-perf
+
+  app-s6a-3:
+    image: diam-gw-app:latest
+    container_name: app-s6a-3
+    hostname: app-s6a-3
+    environment:
+      - APP_GATEWAY=gateway-perf:3868
+      - APP_CONNECTIONS=2
+      - APP_ORIGIN_HOST=app-s6a-3.example.com
+      - APP_ORIGIN_REALM=example.com
+      - APP_INTERFACES=S6a
+      - APP_LOG_LEVEL=error
+    depends_on:
+      gateway-perf:
+        condition: service_healthy
+    networks:
+      - diameter-perf
+
+  app-s6a-4:
+    image: diam-gw-app:latest
+    container_name: app-s6a-4
+    hostname: app-s6a-4
+    environment:
+      - APP_GATEWAY=gateway-perf:3868
+      - APP_CONNECTIONS=2
+      - APP_ORIGIN_HOST=app-s6a-4.example.com
+      - APP_ORIGIN_REALM=example.com
+      - APP_INTERFACES=S6a
+      - APP_LOG_LEVEL=error
+    depends_on:
+      gateway-perf:
+        condition: service_healthy
+    networks:
+      - diameter-perf
+
+  # Gx Applications - Pool of 4 apps
+  app-gx-1:
+    image: diam-gw-app:latest
+    container_name: app-gx-1
+    hostname: app-gx-1
+    environment:
+      - APP_GATEWAY=gateway-perf:3868
+      - APP_CONNECTIONS=2
+      - APP_ORIGIN_HOST=app-gx-1.example.com
+      - APP_ORIGIN_REALM=example.com
+      - APP_INTERFACES=Gx
+      - APP_LOG_LEVEL=error
+    depends_on:
+      gateway-perf:
+        condition: service_healthy
+    networks:
+      - diameter-perf
+
+  app-gx-2:
+    image: diam-gw-app:latest
+    container_name: app-gx-2
+    hostname: app-gx-2
+    environment:
+      - APP_GATEWAY=gateway-perf:3868
+      - APP_CONNECTIONS=2
+      - APP_ORIGIN_HOST=app-gx-2.example.com
+      - APP_ORIGIN_REALM=example.com
+      - APP_INTERFACES=Gx
+      - APP_LOG_LEVEL=error
+    depends_on:
+      gateway-perf:
+        condition: service_healthy
+    networks:
+      - diameter-perf
+
+  app-gx-3:
+    image: diam-gw-app:latest
+    container_name: app-gx-3
+    hostname: app-gx-3
+    environment:
+      - APP_GATEWAY=gateway-perf:3868
+      - APP_CONNECTIONS=2
+      - APP_ORIGIN_HOST=app-gx-3.example.com
+      - APP_ORIGIN_REALM=example.com
+      - APP_INTERFACES=Gx
+      - APP_LOG_LEVEL=error
+    depends_on:
+      gateway-perf:
+        condition: service_healthy
+    networks:
+      - diameter-perf
+
+  app-gx-4:
+    image: diam-gw-app:latest
+    container_name: app-gx-4
+    hostname: app-gx-4
+    environment:
+      - APP_GATEWAY=gateway-perf:3868
+      - APP_CONNECTIONS=2
+      - APP_ORIGIN_HOST=app-gx-4.example.com
+      - APP_ORIGIN_REALM=example.com
+      - APP_INTERFACES=Gx
+      - APP_LOG_LEVEL=error
+    depends_on:
+      gateway-perf:
+        condition: service_healthy
+    networks:
+      - diameter-perf
+
+networks:
+  diameter-perf:
+    driver: bridge

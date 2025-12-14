@@ -22,3 +22,16 @@ func SetLevel(level string) {
 func WithFields(args ...any) logger.LoggerI {
 	return Log.With(args...).(logger.LoggerI)
 }
+
+// Logger is an alias for the underlying logger interface
+type Logger = logger.LoggerI
+
+// New creates a new logger with a name and level
+func New(name, level string) Logger {
+	l := logger.NewLogger()
+	if level != "" {
+		// Set level if provided
+		logger.SetLevel(level)
+	}
+	return l.With("component", name).(logger.LoggerI)
+}

@@ -18,6 +18,14 @@ const (
 	MessageTypeDPA DiameterMessageType = 282 // Disconnect-Peer-Answer
 )
 
+// MessageFlags represents Diameter message flags
+type MessageFlags struct {
+	Request   bool
+	Proxiable bool
+	Error     bool
+	Retrans   bool
+}
+
 // MessageInfo holds parsed information from a Diameter message header
 type MessageInfo struct {
 	Version       uint8
@@ -26,6 +34,7 @@ type MessageInfo struct {
 	ApplicationID uint32
 	HopByHopID    uint32
 	EndToEndID    uint32
+	Flags         MessageFlags
 	IsRequest     bool
 	IsProxiable   bool
 	IsError       bool
@@ -53,6 +62,12 @@ func ParseMessageHeader(data []byte) (*MessageInfo, error) {
 	info.IsProxiable = (flags & 0x40) != 0
 	info.IsError = (flags & 0x20) != 0
 	info.IsRetrans = (flags & 0x10) != 0
+
+	// Also set Flags struct
+	info.Flags.Request = info.IsRequest
+	info.Flags.Proxiable = info.IsProxiable
+	info.Flags.Error = info.IsError
+	info.Flags.Retrans = info.IsRetrans
 
 	// Validate version
 	if info.Version != 1 {

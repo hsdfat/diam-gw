@@ -32,6 +32,10 @@ type DRAConfig struct {
 	// Buffer sizes
 	SendBufferSize int // Send channel buffer size
 	RecvBufferSize int // Receive channel buffer size
+
+	// Application IDs to advertise in CER
+	AuthAppIDs []uint32 // Auth-Application-IDs
+	AcctAppIDs []uint32 // Acct-Application-IDs
 }
 
 // DefaultConfig returns a DRAConfig with sensible defaults

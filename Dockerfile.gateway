@@ -1,4 +1,4 @@
-# Dockerfile for DRA Simulator
+# Dockerfile for Gateway
 FROM golang:1.25-alpine AS builder
 
 # Install build dependencies
@@ -14,8 +14,8 @@ RUN go mod download
 # Copy source code
 COPY . .
 
-# Build DRA binary
-RUN CGO_ENABLED=0 GOOS=linux go build -o /dra-bin ./simulator/dra/*.go
+# Build gateway binary
+RUN CGO_ENABLED=0 GOOS=linux go build -o /gateway-bin ./cmd/gateway/main.go
 
 # Final stage
 FROM alpine:latest
@@ -25,10 +25,10 @@ RUN apk --no-cache add ca-certificates netcat-openbsd
 WORKDIR /root/
 
 # Copy binary from builder
-COPY --from=builder /dra-bin ./dra
+COPY --from=builder /gateway-bin ./gateway
 
 # Expose port
-EXPOSE 3869
+EXPOSE 3868
 
-# Run DRA
-ENTRYPOINT ["./dra"]
+# Run gateway
+ENTRYPOINT ["./gateway"]

@@ -210,9 +210,25 @@ func (c *Connection) performHandshake() error {
 		cer.HostIpAddress = []models_base.Address{models_base.Address(localAddr)}
 	}
 
-	// Set Auth-Application-Id for S13
-	cer.AuthApplicationId = []models_base.Unsigned32{
-		models_base.Unsigned32(s13.S13_APPLICATION_ID),
+	// Set Auth-Application-IDs from config (default to S13 if not specified)
+	if len(c.config.AuthAppIDs) > 0 {
+		cer.AuthApplicationId = make([]models_base.Unsigned32, len(c.config.AuthAppIDs))
+		for i, id := range c.config.AuthAppIDs {
+			cer.AuthApplicationId[i] = models_base.Unsigned32(id)
+		}
+	} else {
+		// Default to S13
+		cer.AuthApplicationId = []models_base.Unsigned32{
+			models_base.Unsigned32(s13.S13_APPLICATION_ID),
+		}
+	}
+
+	// Set Acct-Application-IDs from config if specified
+	if len(c.config.AcctAppIDs) > 0 {
+		cer.AcctApplicationId = make([]models_base.Unsigned32, len(c.config.AcctAppIDs))
+		for i, id := range c.config.AcctAppIDs {
+			cer.AcctApplicationId[i] = models_base.Unsigned32(id)
+		}
 	}
 
 	// Set identifiers

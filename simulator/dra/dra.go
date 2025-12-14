@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/hsdfat8/diam-gw/commands/base"
+	"github.com/hsdfat8/diam-gw/commands/s13"
 	"github.com/hsdfat8/diam-gw/models_base"
 	"github.com/hsdfat8/diam-gw/pkg/logger"
 )
@@ -422,6 +423,10 @@ func (c *ClientConnection) handleMessage(data []byte) error {
 		if isRequest {
 			return c.handleDPR(data)
 		}
+	case 324: // MICR/MICA (S13)
+		if !isRequest {
+			return c.handleMICA(data)
+		}
 	default:
 		// Application message
 		if c.dra.config.EnableRouting && c.dra.router != nil {
@@ -690,4 +695,119 @@ func (c *ClientConnection) Close() {
 		// Remove from DRA
 		c.dra.removeConnection(c.id)
 	})
+}
+
+// handleMICA handles ME-Identity-Check-Answer
+func (c *ClientConnection) handleMICA(data []byte) error {
+	logger.Log.Infow("MICA received", "conn_id", c.id)
+
+	// Parse MICA
+	mica := &s13.MEIdentityCheckAnswer{}
+	if err := mica.Unmarshal(data); err != nil {
+		logger.Log.Errorw("Failed to unmarshal MICA", "conn_id", c.id, "error", err)
+		return fmt.Errorf("failed to unmarshal MICA: %w", err)
+	}
+
+	logger.Log.Infow("MICA processed",
+		"conn_id", c.id,
+		"session_id", mica.SessionId,
+		"result_code", mica.ResultCode,
+		"equipment_status", func() string {
+			if mica.EquipmentStatus != nil {
+				return fmt.Sprintf("%d", *mica.EquipmentStatus)
+			}
+			return "nil"
+		}())
+
+	return nil
+}
+
+// SendMICR sends a ME-Identity-Check-Request to the client
+func (c *ClientConnection) SendMICR(imei string) error {
+	if !c.handshakeComplete.Load() {
+		return fmt.Errorf("handshake not complete")
+	}
+
+	// Get peer identity
+	peerHost := c.peerHost.Load()
+	if peerHost == nil {
+		return fmt.Errorf("peer host not set")
+	}
+	peerRealm := c.peerRealm.Load()
+	if peerRealm == nil {
+		return fmt.Errorf("peer realm not set")
+	}
+
+	// Create MICR
+	micr := s13.NewMEIdentityCheckRequest()
+	micr.SessionId = models_base.UTF8String(fmt.Sprintf("%s;%d;%d",
+		c.dra.config.OriginHost, time.Now().Unix(), time.Now().UnixNano()))
+	micr.AuthSessionState = models_base.Enumerated(1) // NO_STATE_MAINTAINED
+	micr.OriginHost = models_base.DiameterIdentity(c.dra.config.OriginHost)
+	micr.OriginRealm = models_base.DiameterIdentity(c.dra.config.OriginRealm)
+
+	// Set destination host and realm
+	destHost := models_base.DiameterIdentity(peerHost.(string))
+	micr.DestinationHost = &destHost
+	micr.DestinationRealm = models_base.DiameterIdentity(peerRealm.(string))
+
+	// Set Terminal Information
+	imeiValue := models_base.UTF8String(imei)
+	micr.TerminalInformation = &s13.TerminalInformation{
+		Imei: &imeiValue,
+	}
+
+	// Generate H2H and E2E IDs
+	micr.Header.HopByHopID = uint32(time.Now().UnixNano() & 0xFFFFFFFF)
+	micr.Header.EndToEndID = uint32(time.Now().UnixNano() & 0xFFFFFFFF)
+
+	// Marshal MICR
+	micrData, err := micr.Marshal()
+	if err != nil {
+		return fmt.Errorf("failed to marshal MICR: %w", err)
+	}
+
+	// Send MICR
+	select {
+	case c.sendCh <- micrData:
+		logger.Log.Infow("MICR sent", "conn_id", c.id, "imei", imei, "session_id", micr.SessionId)
+		return nil
+	case <-c.dra.ctx.Done():
+		return c.dra.ctx.Err()
+	case <-time.After(5 * time.Second):
+		return fmt.Errorf("timeout sending MICR")
+	}
+}
+
+// BroadcastMICR sends a MICR to all connected clients
+func (d *DRA) BroadcastMICR(imei string) error {
+	d.connMu.RLock()
+	defer d.connMu.RUnlock()
+
+	if len(d.conns) == 0 {
+		return fmt.Errorf("no connected clients")
+	}
+
+	var lastErr error
+	for _, conn := range d.conns {
+		if err := conn.SendMICR(imei); err != nil {
+			logger.Log.Errorw("Failed to send MICR to client", "conn_id", conn.id, "error", err)
+			lastErr = err
+		}
+	}
+
+	return lastErr
+}
+
+// GetFirstConnection returns the first connected client
+func (d *DRA) GetFirstConnection() *ClientConnection {
+	d.connMu.RLock()
+	defer d.connMu.RUnlock()
+
+	for _, conn := range d.conns {
+		if conn.handshakeComplete.Load() {
+			return conn
+		}
+	}
+	return nil
 }

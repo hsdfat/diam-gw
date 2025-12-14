@@ -28,6 +28,9 @@ var (
 	writeTimeout    = flag.Duration("write-timeout", 30*time.Second, "Connection write timeout")
 	dwrInterval     = flag.Duration("dwr-interval", 30*time.Second, "Device Watchdog Request interval")
 	verbose         = flag.Bool("verbose", false, "Enable verbose logging")
+	sendMICR        = flag.Bool("send-micr", false, "Send MICR test message after client connects")
+	micrIMEI        = flag.String("micr-imei", "123456789012345", "IMEI to use in test MICR")
+	micrDelay       = flag.Duration("micr-delay", 5*time.Second, "Delay before sending MICR after client connects")
 )
 
 func main() {
@@ -89,6 +92,26 @@ func main() {
 		"port", config.Port,
 		"origin_host", config.OriginHost,
 		"origin_realm", config.OriginRealm)
+
+	// Send MICR test if enabled
+	if *sendMICR {
+		go func() {
+			time.Sleep(*micrDelay)
+			logger.Log.Infow("Attempting to send test MICR", "imei", *micrIMEI)
+
+			conn := dra.GetFirstConnection()
+			if conn == nil {
+				logger.Log.Warnw("No client connections available for MICR test")
+				return
+			}
+
+			if err := conn.SendMICR(*micrIMEI); err != nil {
+				logger.Log.Errorw("Failed to send test MICR", "error", err)
+			} else {
+				logger.Log.Infow("Test MICR sent successfully", "imei", *micrIMEI)
+			}
+		}()
+	}
 
 	// Wait for shutdown signal
 	sigChan := make(chan os.Signal, 1)

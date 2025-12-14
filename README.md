@@ -1,5 +1,10 @@
 # Diameter Gateway - Client & Code Generator
 
+[![CI/CD](https://github.com/hsdfat8/diam-gw/actions/workflows/gateway-ci.yml/badge.svg)](https://github.com/hsdfat8/diam-gw/actions/workflows/gateway-ci.yml)
+[![Performance](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/hsdfat8/diam-gw/main/.github/badges/performance.json)](https://github.com/hsdfat8/diam-gw/actions/workflows/gateway-ci.yml)
+[![Grade](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/hsdfat8/diam-gw/main/.github/badges/grade.json)](https://github.com/hsdfat8/diam-gw/actions/workflows/gateway-ci.yml)
+[![Go Report Card](https://goreportcard.com/badge/github.com/hsdfat8/diam-gw)](https://goreportcard.com/report/github.com/hsdfat8/diam-gw)
+
 A comprehensive Diameter protocol implementation in Go with code generation tools, production-ready client with priority-based routing, and DRA simulator for testing.
 
 ## Overview
@@ -13,25 +18,25 @@ This project provides:
 
 ## Quick Start
 
-### Multi-DRA Testing
+### Testing
 
-Test the client with 4 DRA simulators featuring priority-based routing and automatic failover:
+The gateway includes comprehensive testing for all features:
 
 ```bash
-# Containerized integration test (recommended)
-./test-integration.sh
+# Multi-application interface test (60s)
+./tests/multi-app/test-multi-app-podman.sh
+
+# Performance test (30s, 100 req/s)
+./tests/performance/test-performance-podman.sh --duration 30 --rate 100
 
 # DWR failure threshold tests
-./test-dwr.sh list      # List available tests
-./test-dwr.sh all       # Run all tests
+./test-dwr.sh all
 
-# Host-based testing with DRA manager
-make build-dra build-examples
-./tools/run-4-dras.sh start
-./bin/multi-dra-test
+# Integration tests
+./test-integration.sh
 ```
 
-See **[TESTING.md](TESTING.md)** for complete guide.
+See **[TESTING.md](TESTING.md)** for complete testing guide.
 
 ### Using the Client
 
@@ -104,6 +109,8 @@ diam-gw/
 │   ├── multi_dra_test/      # Host-based multi-DRA test
 │   └── multi_dra_test_container/ # Container multi-DRA test
 ├── tests/                   # Test suites
+│   ├── multi-app/           # Multi-application interface tests
+│   ├── performance/         # Performance tests
 │   ├── dwr-failover/        # DWR failure threshold testing
 │   ├── integration/         # Integration tests
 │   └── verification/        # Setup verification scripts
@@ -267,22 +274,46 @@ make build-examples
 make test
 ```
 
+## CI/CD Pipeline
+
+The project includes comprehensive GitHub Actions workflows for automated testing and performance monitoring:
+
+### Automated Testing
+- **Build & Unit Tests**: Go tests with race detection and coverage reporting
+- **Multi-App Test**: Interface-based routing validation with 4 applications
+- **Performance Test**: Throughput and latency testing with 12 applications
+- **Automatic Reports**: Performance metrics posted to PRs
+
+### Performance Monitoring
+- Real-time performance badges showing throughput and grade
+- Configurable test parameters (duration, rate)
+- Automated performance regression detection
+- Historical performance tracking
+
+See **[.github/CICD.md](.github/CICD.md)** for complete CI/CD documentation.
+
+### Manual Workflow Triggers
+```bash
+# Run performance test with custom parameters
+gh workflow run gateway-ci.yml \
+  -f performance_duration=120 \
+  -f performance_rate=2000
+```
+
 ## Documentation
 
 ### Testing
-- **[TESTING.md](TESTING.md)** - Complete multi-DRA testing guide
-- **[tests/dwr-failover/README.md](tests/dwr-failover/README.md)** - DWR failure threshold testing
-- **[tests/integration/README.md](tests/integration/README.md)** - Integration tests
-- **[tests/verification/README.md](tests/verification/README.md)** - Setup verification
+- **[TESTING.md](TESTING.md)** - Complete testing guide (multi-app, performance, DWR, integration)
+- **[tests/README.md](tests/README.md)** - Test suite overview
+
+### CI/CD
+- **[.github/CICD.md](.github/CICD.md)** - CI/CD pipeline documentation
 
 ### Components
 - **[client/README.md](client/README.md)** - Client library documentation
 - **[simulator/dra/README.md](simulator/dra/README.md)** - DRA simulator documentation
 - **[examples/README.md](examples/README.md)** - Example applications
 - **[tools/README.md](tools/README.md)** - Development tools
-
-### Other
-- **[BUGFIX.md](BUGFIX.md)** - Known issues and fixes
 
 ## Supported Protocols
 
