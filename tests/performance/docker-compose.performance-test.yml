@@ -5,7 +5,7 @@ services:
   dra-perf:
     image: diam-gw-dra:latest
     build:
-      context: .
+      context: ../..
       dockerfile: Dockerfile.dra
     container_name: dra-perf
     hostname: dra-perf
@@ -30,7 +30,7 @@ services:
   gateway-perf:
     image: diam-gw-gateway:latest
     build:
-      context: .
+      context: ../..
       dockerfile: Dockerfile.gateway
     container_name: gateway-perf
     hostname: gateway-perf
@@ -60,7 +60,7 @@ services:
   app-s13-1:
     image: diam-gw-app:latest
     build:
-      context: .
+      context: ../..
       dockerfile: Dockerfile.app
     container_name: app-s13-1
     hostname: app-s13-1

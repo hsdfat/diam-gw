@@ -7,7 +7,7 @@ services:
   # Priority 1 DRAs (Primary) - Configured with custom DWR settings
   dra-1:
     build:
-      context: .
+      context: ../..
       dockerfile: Dockerfile.dra
     container_name: dra-1
     hostname: dra-1.example.com
@@ -44,7 +44,7 @@ services:
 
   dra-2:
     build:
-      context: .
+      context: ../..
       dockerfile: Dockerfile.dra
     container_name: dra-2
     hostname: dra-2.example.com
@@ -82,7 +82,7 @@ services:
   # Priority 2 DRAs (Backup)
   dra-3:
     build:
-      context: .
+      context: ../..
       dockerfile: Dockerfile.dra
     container_name: dra-3
     hostname: dra-3.example.com
@@ -119,7 +119,7 @@ services:
 
   dra-4:
     build:
-      context: .
+      context: ../..
       dockerfile: Dockerfile.dra
     container_name: dra-4
     hostname: dra-4.example.com
@@ -157,7 +157,7 @@ services:
   # Test Client - Configured with DWR failure threshold settings
   client-dwr-test:
     build:
-      context: .
+      context: ../..
       dockerfile: Dockerfile.client
     container_name: diameter-client-dwr-test
     hostname: client.example.com

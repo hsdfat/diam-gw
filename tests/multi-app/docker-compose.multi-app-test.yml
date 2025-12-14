@@ -5,7 +5,7 @@ services:
   dra:
     image: diam-gw-dra:latest
     build:
-      context: .
+      context: ../..
       dockerfile: Dockerfile.dra
     container_name: dra
     hostname: dra
@@ -30,7 +30,7 @@ services:
   gateway:
     image: diam-gw-gateway:latest
     build:
-      context: .
+      context: ../..
       dockerfile: Dockerfile.gateway
     container_name: gateway
     hostname: gateway
@@ -60,7 +60,7 @@ services:
   app1-s13:
     image: diam-gw-app:latest
     build:
-      context: .
+      context: ../..
       dockerfile: Dockerfile.app
     container_name: app1-s13
     hostname: app1
