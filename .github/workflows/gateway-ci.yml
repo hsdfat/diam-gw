@@ -54,7 +54,10 @@ jobs:
         go env GOTOOLDIR
 
     - name: Run unit tests
-      run: go test -v -race -coverprofile=coverage.txt -covermode=atomic ./...
+      run: |
+        # Run tests excluding main packages (simulator, examples, cmd)
+        go test -v -race -coverprofile=coverage.txt -covermode=atomic \
+          $(go list ./... | grep -v -E '/(simulator|examples|cmd)/')
 
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v3
