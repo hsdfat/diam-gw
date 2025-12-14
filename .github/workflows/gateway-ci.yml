@@ -64,7 +64,7 @@ jobs:
       run: CGO_ENABLED=0 GOOS=linux go build -o bin/app ./simulator/app/*.go
 
     - name: Upload build artifacts
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: binaries
         path: bin/
@@ -110,7 +110,7 @@ jobs:
 
     - name: Upload test logs
       if: always()
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: multi-app-test-logs
         path: test-logs/
@@ -227,7 +227,7 @@ jobs:
         EOF
 
     - name: Upload Performance Report
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: performance-report
         path: performance-report.md
@@ -247,7 +247,7 @@ jobs:
 
     - name: Upload performance logs
       if: always()
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: performance-test-logs
         path: perf-logs/
@@ -299,7 +299,7 @@ jobs:
 
     steps:
     - name: Download performance report
-      uses: actions/download-artifact@v3
+      uses: actions/download-artifact@v4
       with:
         name: performance-report
       continue-on-error: true
