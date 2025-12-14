@@ -76,6 +76,13 @@ echo "[2/6] Building images with Podman..."
 podman-compose -f $COMPOSE_FILE build
 echo ""
 
+# Export environment variables for docker-compose
+export DURATION
+export RAMP_UP
+export S13_RATE
+export S6A_RATE
+export GX_RATE
+
 # Start services
 echo "[3/6] Starting services..."
 podman-compose -f $COMPOSE_FILE up -d
@@ -194,10 +201,26 @@ echo ""
 
 # Calculate approximate throughput from gateway metrics
 echo "=== Throughput Summary ==="
-TOTAL_MSG=$(podman logs gateway-perf 2>&1 | grep "Messages.*app_to_dra\|dra_to_app" | tail -1 | grep -oE '[0-9]+' | head -2 | awk '{sum+=$1} END {print sum}')
-if [ -n "$TOTAL_MSG" ] && [ "$TOTAL_MSG" -gt 0 ]; then
-    ACTUAL_RATE=$((TOTAL_MSG / DURATION))
-    echo "Total Messages: $TOTAL_MSG"
+
+# Extract application-only message counts (excluding CER/CEA, DWR/DWA)
+APP_TO_DRA=$(podman logs gateway-perf 2>&1 | grep "Messages (Application Only)" | tail -1 | grep -oE 'app_to_dra":[0-9]+' | grep -oE '[0-9]+' || echo "0")
+DRA_TO_APP=$(podman logs gateway-perf 2>&1 | grep "Messages (Application Only)" | tail -1 | grep -oE 'dra_to_app":[0-9]+' | grep -oE '[0-9]+' || echo "0")
+
+# Also try alternate log format
+if [ "$APP_TO_DRA" = "0" ]; then
+    APP_TO_DRA=$(podman logs gateway-perf 2>&1 | grep "app_to_dra_app" | tail -1 | grep -oE '[0-9]+' || echo "0")
+fi
+if [ "$DRA_TO_APP" = "0" ]; then
+    DRA_TO_APP=$(podman logs gateway-perf 2>&1 | grep "dra_to_app_app" | tail -1 | grep -oE '[0-9]+' || echo "0")
+fi
+
+TOTAL_APP_MSG=$((APP_TO_DRA + DRA_TO_APP))
+
+if [ -n "$TOTAL_APP_MSG" ] && [ "$TOTAL_APP_MSG" -gt 0 ]; then
+    ACTUAL_RATE=$((TOTAL_APP_MSG / DURATION))
+    echo "Application Messages (excluding protocol): $TOTAL_APP_MSG"
+    echo "  - App to DRA: $APP_TO_DRA"
+    echo "  - DRA to App: $DRA_TO_APP"
     echo "Actual Throughput: ~${ACTUAL_RATE} msg/s"
     echo "Target Throughput: ${TARGET_RATE} req/s"
 
@@ -207,7 +230,7 @@ if [ -n "$TOTAL_MSG" ] && [ "$TOTAL_MSG" -gt 0 ]; then
         echo "✗ Throughput below target"
     fi
 else
-    echo "Unable to calculate throughput from logs"
+    echo "Unable to calculate throughput from logs (check gateway logs for application message counts)"
 fi
 echo ""
 

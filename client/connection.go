@@ -295,7 +295,8 @@ func (c *Connection) startWatchdog() {
 		return // Already running
 	}
 
-	c.dwrTicker = time.NewTicker(c.config.DWRInterval)
+	ticker := time.NewTicker(c.config.DWRInterval)
+	c.dwrTicker = ticker
 	c.dwrStop = make(chan struct{})
 
 	c.wg.Add(1)
@@ -308,7 +309,7 @@ func (c *Connection) startWatchdog() {
 				return
 			case <-c.dwrStop:
 				return
-			case <-c.dwrTicker.C:
+			case <-ticker.C:
 				if err := c.sendDWR(); err != nil {
 					logger.Log.Errorw("Failed to send DWR", "conn_id", c.id, "error", err)
 					c.handleFailure(err)

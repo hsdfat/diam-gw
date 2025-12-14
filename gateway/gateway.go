@@ -46,8 +46,10 @@ type Config struct {
 
 // Stats tracks gateway statistics
 type Stats struct {
-	AppToDRA       atomic.Uint64
-	DRAToApp       atomic.Uint64
+	AppToDRA       atomic.Uint64 // Total messages including protocol
+	DRAToApp       atomic.Uint64 // Total messages including protocol
+	AppToDRAApp    atomic.Uint64 // Application messages only (excluding CER/CEA, DWR/DWA)
+	DRAToAppApp    atomic.Uint64 // Application messages only (excluding CER/CEA, DWR/DWA)
 	TotalAppConns  atomic.Uint64
 	ActiveAppConns atomic.Uint64
 	RoutingErrors  atomic.Uint64
@@ -318,6 +320,8 @@ func (gw *Gateway) GetStats() map[string]interface{} {
 	return map[string]interface{}{
 		"app_to_dra":             gw.stats.AppToDRA.Load(),
 		"dra_to_app":             gw.stats.DRAToApp.Load(),
+		"app_to_dra_app":         gw.stats.AppToDRAApp.Load(),
+		"dra_to_app_app":         gw.stats.DRAToAppApp.Load(),
 		"total_app_connections":  gw.stats.TotalAppConns.Load(),
 		"active_app_connections": gw.stats.ActiveAppConns.Load(),
 		"routing_errors":         gw.stats.RoutingErrors.Load(),
@@ -343,6 +347,13 @@ func (gw *Gateway) routeAppToDRA() {
 				gw.stats.RoutingErrors.Add(1)
 			} else {
 				gw.stats.AppToDRA.Add(1)
+				// Count application messages only (exclude protocol messages)
+				if len(msgCtx.Message) >= 20 {
+					cmdCode := binary.BigEndian.Uint32(msgCtx.Message[4:8]) & 0x00FFFFFF
+					if cmdCode != 257 && cmdCode != 280 && cmdCode != 282 { // Not CER/CEA, DWR/DWA, DPR/DPA
+						gw.stats.AppToDRAApp.Add(1)
+					}
+				}
 			}
 		}
 	}
@@ -441,6 +452,13 @@ func (gw *Gateway) routeDRAToApp() {
 				gw.stats.RoutingErrors.Add(1)
 			} else {
 				gw.stats.DRAToApp.Add(1)
+				// Count application messages only (exclude protocol messages)
+				if len(msg) >= 20 {
+					cmdCode := binary.BigEndian.Uint32(msg[4:8]) & 0x00FFFFFF
+					if cmdCode != 257 && cmdCode != 280 && cmdCode != 282 { // Not CER/CEA, DWR/DWA, DPR/DPA
+						gw.stats.DRAToAppApp.Add(1)
+					}
+				}
 			}
 		}
 	}
@@ -614,9 +632,12 @@ func (gw *Gateway) logMetrics() {
 		"active", draStats.ActiveDRAs,
 		"total", draStats.TotalDRAs,
 		"priority", draStats.CurrentPriority)
-	logger.Log.Infow("Messages",
+	logger.Log.Infow("Messages (Total)",
 		"app_to_dra", gw.stats.AppToDRA.Load(),
 		"dra_to_app", gw.stats.DRAToApp.Load())
+	logger.Log.Infow("Messages (Application Only)",
+		"app_to_dra", gw.stats.AppToDRAApp.Load(),
+		"dra_to_app", gw.stats.DRAToAppApp.Load())
 	logger.Log.Infow("Routing Errors", "count", gw.stats.RoutingErrors.Load())
 
 	// Log routing map sizes

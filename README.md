@@ -18,25 +18,36 @@ This project provides:
 
 ## Quick Start
 
-### Testing
+### Testing & Performance
 
-The gateway includes comprehensive testing for all features:
+The gateway includes comprehensive testing and performance benchmarking:
 
 ```bash
-# Multi-application interface test (60s)
-./tests/multi-app/test-multi-app-podman.sh
+# Multi-application interface test
+cd tests/multi-app
+./test-multi-app-podman.sh
 
-# Performance test (30s, 100 req/s)
-./tests/performance/test-performance-podman.sh --duration 30 --rate 100
+# Single performance test (1000 req/s baseline)
+cd tests/performance
+./test-performance-podman.sh --duration 60 --rate 1000
 
-# DWR failure threshold tests
-./test-dwr.sh all
+# Find maximum throughput (quick ~5 min)
+./quick-benchmark.sh
 
-# Integration tests
-./test-integration.sh
+# Detailed maximum throughput benchmark (~15-30 min)
+./benchmark-max-throughput.sh
+
+# Profile at specific rate to find bottlenecks
+./profile-gateway.sh --rate 5000 --duration 60
 ```
 
-See **[TESTING.md](TESTING.md)** for complete testing guide.
+**Performance Testing:**
+- ✅ **Real Load Generation**: S13 (MICR) and S6a (AIR) actual Diameter requests
+- ✅ **Accurate Metrics**: Application messages only (excludes protocol overhead)
+- ✅ **Automated CI/CD**: Performance regression testing on every commit
+- ✅ **Grade System**: A (≥95%), B (80-95%), C (<80%), F (errors)
+
+See **[BENCHMARKING.md](tests/performance/BENCHMARKING.md)** for complete benchmarking guide.
 
 ### Using the Client
 
@@ -96,6 +107,7 @@ diam-gw/
 │   └── connection.go         # Single connection management
 ├── simulator/dra/            # DRA simulator
 │   ├── dra.go               # Main DRA implementation
+│   ├── load_generator.go    # Performance test load generator
 │   ├── session.go           # Session management
 │   └── router.go            # Message routing
 ├── codegen/                  # Code generator
@@ -302,12 +314,19 @@ gh workflow run gateway-ci.yml \
 
 ## Documentation
 
-### Testing
+### Testing & Performance
 - **[TESTING.md](TESTING.md)** - Complete testing guide (multi-app, performance, DWR, integration)
+- **[BENCHMARKING.md](tests/performance/BENCHMARKING.md)** - Comprehensive benchmarking guide
+- **[MAXIMUM_THROUGHPUT_TESTING.md](MAXIMUM_THROUGHPUT_TESTING.md)** - Quick reference for finding max capacity
+- **[PERFORMANCE_TEST_FIXES.md](PERFORMANCE_TEST_FIXES.md)** - Recent performance improvements
 - **[tests/README.md](tests/README.md)** - Test suite overview
 
 ### CI/CD
 - **[.github/CICD.md](.github/CICD.md)** - CI/CD pipeline documentation
+- Automated performance testing on every commit
+- Real-time performance badges and grade tracking
+- Performance regression detection
+- Historical performance data tracking
 
 ### Components
 - **[client/README.md](client/README.md)** - Client library documentation
@@ -349,7 +368,10 @@ Part of the Diameter Gateway implementation.
 ---
 
 **Quick Links:**
-- [Multi-DRA Testing Guide](TESTING.md)
-- [Client Library](client/)
-- [DRA Simulator](simulator/dra/)
-- [Examples](examples/)
+- [Testing Guide](TESTING.md) - Multi-app, integration, DWR tests
+- [Benchmarking Guide](tests/performance/BENCHMARKING.md) - Find maximum throughput
+- [Performance Fixes](PERFORMANCE_TEST_FIXES.md) - Recent improvements & load generator
+- [Client Library](client/) - Production-ready Diameter client
+- [DRA Simulator](simulator/dra/) - Full-featured testing DRA
+- [Examples](examples/) - Sample applications
+- [CI/CD Pipeline](.github/CICD.md) - Automated testing & deployment

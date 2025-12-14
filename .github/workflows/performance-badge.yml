@@ -57,39 +57,48 @@ jobs:
       id: parse
       run: |
         # Extract metrics from markdown report
-        ACTUAL_RATE=$(grep "Actual Rate:" performance-report.md | grep -oE '[0-9]+' | head -1 || echo "0")
-        GRADE=$(grep "Overall Grade" -A 1 performance-report.md | tail -1 | sed 's/\*\*//g' || echo "Unknown")
+        ACTUAL_RATE=$(grep "| \*\*Actual Rate\*\*" performance-report.md | grep -oE '[0-9]+' | head -1 || echo "0")
+        SUCCESS_PCT=$(grep "| \*\*Success Rate\*\*" performance-report.md | grep -oE '[0-9]+' | head -1 || echo "0")
+        GRADE=$(grep "Performance Grade:" performance-report.md | grep -oE '\*\*[A-F]\*\*' | sed 's/\*//g' || echo "N/A")
+
+        echo "Found metrics: rate=$ACTUAL_RATE, success=$SUCCESS_PCT%, grade=$GRADE"
 
         # Determine badge color based on grade
         case "$GRADE" in
-          *A*)
+          A)
             COLOR="brightgreen"
+            MESSAGE="${ACTUAL_RATE} req/s (${SUCCESS_PCT}%)"
             ;;
-          *B*)
+          B)
             COLOR="green"
+            MESSAGE="${ACTUAL_RATE} req/s (${SUCCESS_PCT}%)"
             ;;
-          *C*)
+          C)
             COLOR="yellow"
+            MESSAGE="${ACTUAL_RATE} req/s (${SUCCESS_PCT}%)"
             ;;
           *)
             COLOR="red"
+            MESSAGE="${ACTUAL_RATE} req/s"
             ;;
         esac
 
         echo "rate=$ACTUAL_RATE" >> $GITHUB_OUTPUT
+        echo "success_pct=$SUCCESS_PCT" >> $GITHUB_OUTPUT
         echo "grade=$GRADE" >> $GITHUB_OUTPUT
         echo "color=$COLOR" >> $GITHUB_OUTPUT
+        echo "message=$MESSAGE" >> $GITHUB_OUTPUT
 
     - name: Create performance badge
       run: |
         mkdir -p .github/badges
 
-        # Create badge JSON for shields.io
+        # Create badge JSON for shields.io endpoint
         cat > .github/badges/performance.json << EOF
         {
           "schemaVersion": 1,
           "label": "performance",
-          "message": "${{ steps.parse.outputs.rate }} req/s",
+          "message": "${{ steps.parse.outputs.message }}",
           "color": "${{ steps.parse.outputs.color }}"
         }
         EOF
@@ -98,17 +107,37 @@ jobs:
         {
           "schemaVersion": 1,
           "label": "grade",
-          "message": "${{ steps.parse.outputs.grade }}",
+          "message": "Grade ${{ steps.parse.outputs.grade }}",
           "color": "${{ steps.parse.outputs.color }}"
         }
         EOF
 
-    - name: Commit badges
+        # Save performance history
+        mkdir -p .github/performance-history
+        TIMESTAMP=$(date -u '+%Y-%m-%d %H:%M:%S')
+        COMMIT="${{ github.event.workflow_run.head_sha }}"
+        COMMIT_SHORT=$(echo $COMMIT | cut -c1-7)
+
+        # Create/append to history CSV
+        if [ ! -f .github/performance-history/history.csv ]; then
+          echo "timestamp,commit,rate,success_pct,grade" > .github/performance-history/history.csv
+        fi
+
+        echo "${TIMESTAMP},${COMMIT_SHORT},${{ steps.parse.outputs.rate }},${{ steps.parse.outputs.success_pct }},${{ steps.parse.outputs.grade }}" >> .github/performance-history/history.csv
+
+        # Keep only last 100 entries
+        tail -100 .github/performance-history/history.csv > .github/performance-history/history.tmp
+        mv .github/performance-history/history.tmp .github/performance-history/history.csv
+
+    - name: Commit badges and history
       run: |
         git config --local user.email "github-actions[bot]@users.noreply.github.com"
         git config --local user.name "github-actions[bot]"
-        git add .github/badges/
-        git diff --staged --quiet || git commit -m "Update performance badges [skip ci]"
+        git add .github/badges/ .github/performance-history/
+        git diff --staged --quiet || git commit -m "Update performance badges and history [skip ci]
+
+        Performance: ${{ steps.parse.outputs.rate }} req/s (${{ steps.parse.outputs.success_pct }}%)
+        Grade: ${{ steps.parse.outputs.grade }}"
         git push
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

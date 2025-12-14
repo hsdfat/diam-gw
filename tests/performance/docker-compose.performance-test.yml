@@ -12,10 +12,15 @@ services:
     command: [
       "--port", "3869",
       "--origin-host", "dra-perf.example.com",
-      "--origin-realm", "example.com",
-      "--send-micr",
-      "--micr-delay", "2s"
+      "--origin-realm", "example.com"
     ]
+    environment:
+      # Performance test configuration - set by test script
+      - TEST_DURATION=${DURATION:-60}
+      - RAMP_UP_TIME=${RAMP_UP:-10}
+      - S13_RATE=${S13_RATE:-400}
+      - S6A_RATE=${S6A_RATE:-400}
+      - GX_RATE=${GX_RATE:-200}
     ports:
       - "3869:3869"
     networks:

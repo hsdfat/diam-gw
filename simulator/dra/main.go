@@ -93,8 +93,59 @@ func main() {
 		"origin_host", config.OriginHost,
 		"origin_realm", config.OriginRealm)
 
-	// Send MICR test if enabled
-	if *sendMICR {
+	// Check for performance test mode (environment variables)
+	var loadGen *LoadGenerator
+	if testDuration := os.Getenv("TEST_DURATION"); testDuration != "" {
+		logger.Log.Infow("Performance test mode detected", "duration", testDuration)
+
+		// Parse configuration from environment
+		duration, err := time.ParseDuration(testDuration + "s")
+		if err != nil {
+			duration = 60 * time.Second
+		}
+
+		rampUpTime, _ := time.ParseDuration(os.Getenv("RAMP_UP_TIME") + "s")
+		if rampUpTime == 0 {
+			rampUpTime = 10 * time.Second
+		}
+
+		s13Rate := 0
+		if s13Str := os.Getenv("S13_RATE"); s13Str != "" {
+			fmt.Sscanf(s13Str, "%d", &s13Rate)
+		}
+
+		s6aRate := 0
+		if s6aStr := os.Getenv("S6A_RATE"); s6aStr != "" {
+			fmt.Sscanf(s6aStr, "%d", &s6aRate)
+		}
+
+		gxRate := 0
+		if gxStr := os.Getenv("GX_RATE"); gxStr != "" {
+			fmt.Sscanf(gxStr, "%d", &gxRate)
+		}
+
+		lgConfig := LoadGeneratorConfig{
+			Duration:      duration,
+			RampUpTime:    rampUpTime,
+			S13RatePerSec: s13Rate,
+			S6aRatePerSec: s6aRate,
+			GxRatePerSec:  gxRate,
+		}
+
+		// Wait for client connection
+		logger.Log.Infow("Waiting for gateway connection before starting load test...")
+		time.Sleep(*micrDelay) // Use existing delay
+
+		if dra.GetFirstConnection() == nil {
+			logger.Log.Errorw("No gateway connection available for load test")
+		} else {
+			loadGen = NewLoadGenerator(dra, lgConfig)
+			if err := loadGen.Start(); err != nil {
+				logger.Log.Errorw("Failed to start load generator", "error", err)
+			}
+		}
+	} else if *sendMICR {
+		// Send MICR test if enabled (backward compatibility)
 		go func() {
 			time.Sleep(*micrDelay)
 			logger.Log.Infow("Attempting to send test MICR", "imei", *micrIMEI)
@@ -119,6 +170,12 @@ func main() {
 
 	<-sigChan
 	logger.Log.Infow("Shutdown signal received, stopping DRA...")
+
+	// Stop load generator if running
+	if loadGen != nil {
+		loadGen.Stop()
+		loadGen.Wait()
+	}
 
 	// Graceful shutdown
 	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 30*time.Second)

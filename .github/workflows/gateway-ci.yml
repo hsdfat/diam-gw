@@ -173,69 +173,135 @@ jobs:
       run: |
         cd tests/performance
 
-        # Extract metrics from test output
+        # Extract error metrics
         ROUTING_ERRORS=$(grep "Routing Errors:" performance-output.txt | awk '{print $3}' || echo "0")
         AFFINITY_VIOLATIONS=$(grep "Affinity Violations:" performance-output.txt | awk '{print $3}' || echo "0")
         CONNECTION_ERRORS=$(grep "Connection Errors:" performance-output.txt | awk '{print $3}' || echo "0")
 
-        # Try to extract throughput
-        TOTAL_MSG=$(grep "Total Messages:" performance-output.txt | awk '{print $3}' || echo "N/A")
-        ACTUAL_RATE=$(grep "Actual Throughput:" performance-output.txt | awk '{print $3}' || echo "N/A")
-        TARGET_RATE=$(grep "Target Throughput:" performance-output.txt | awk '{print $3}' || echo "N/A")
+        # Extract application message counts (new format)
+        APP_TO_DRA=$(grep "App to DRA:" performance-output.txt | awk '{print $4}' || echo "0")
+        DRA_TO_APP=$(grep "DRA to App:" performance-output.txt | awk '{print $4}' || echo "0")
 
-        # Extract grade
-        GRADE=$(grep "Grade:" performance-output.txt | awk '{print $3}' || echo "Unknown")
+        # Calculate total application messages
+        TOTAL_APP_MSG=$((APP_TO_DRA + DRA_TO_APP))
+
+        # Extract throughput
+        ACTUAL_RATE=$(grep "Actual Throughput:" performance-output.txt | grep -oE '[0-9]+' | head -1 || echo "0")
+        TARGET_RATE=$(grep "Target Throughput:" performance-output.txt | grep -oE '[0-9]+' | head -1 || echo "1000")
+
+        # Calculate success percentage
+        if [ "$TARGET_RATE" -gt 0 ]; then
+          SUCCESS_PCT=$((ACTUAL_RATE * 100 / TARGET_RATE))
+        else
+          SUCCESS_PCT=0
+        fi
+
+        # Determine grade
+        if [ "$ROUTING_ERRORS" -eq 0 ] && [ "$CONNECTION_ERRORS" -eq 0 ]; then
+          if [ "$SUCCESS_PCT" -ge 95 ]; then
+            GRADE="A"
+            GRADE_EMOJI="🟢"
+          elif [ "$SUCCESS_PCT" -ge 80 ]; then
+            GRADE="B"
+            GRADE_EMOJI="🟡"
+          else
+            GRADE="C"
+            GRADE_EMOJI="🟠"
+          fi
+        else
+          GRADE="F"
+          GRADE_EMOJI="🔴"
+        fi
 
         # Output to GitHub
         echo "routing_errors=$ROUTING_ERRORS" >> $GITHUB_OUTPUT
         echo "affinity_violations=$AFFINITY_VIOLATIONS" >> $GITHUB_OUTPUT
         echo "connection_errors=$CONNECTION_ERRORS" >> $GITHUB_OUTPUT
-        echo "total_messages=$TOTAL_MSG" >> $GITHUB_OUTPUT
+        echo "app_to_dra=$APP_TO_DRA" >> $GITHUB_OUTPUT
+        echo "dra_to_app=$DRA_TO_APP" >> $GITHUB_OUTPUT
+        echo "total_messages=$TOTAL_APP_MSG" >> $GITHUB_OUTPUT
         echo "actual_rate=$ACTUAL_RATE" >> $GITHUB_OUTPUT
         echo "target_rate=$TARGET_RATE" >> $GITHUB_OUTPUT
+        echo "success_pct=$SUCCESS_PCT" >> $GITHUB_OUTPUT
         echo "grade=$GRADE" >> $GITHUB_OUTPUT
+        echo "grade_emoji=$GRADE_EMOJI" >> $GITHUB_OUTPUT
 
     - name: Create Performance Report
       run: |
         cat > performance-report.md << 'EOF'
-        # Performance Test Report
+        # ${{ steps.metrics.outputs.grade_emoji }} Performance Test Report - Grade: ${{ steps.metrics.outputs.grade }}
 
         ## Test Configuration
-        - **Duration**: ${{ github.event.inputs.performance_duration || '60' }}s
-        - **Target Rate**: ${{ github.event.inputs.performance_rate || '1000' }} req/s
-        - **Branch**: ${{ github.ref_name }}
-        - **Commit**: ${{ github.sha }}
-        - **Run ID**: ${{ github.run_id }}
+        | Parameter | Value |
+        |-----------|-------|
+        | **Duration** | ${{ github.event.inputs.performance_duration || '60' }}s |
+        | **Target Rate** | ${{ github.event.inputs.performance_rate || '1000' }} req/s |
+        | **Branch** | ${{ github.ref_name }} |
+        | **Commit** | `${{ github.sha }}` |
+        | **Run ID** | [${{ github.run_id }}](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}) |
+        | **Triggered By** | ${{ github.event_name }} |
 
-        ## Results
+        ## Results Summary
 
-        ### Throughput
-        - **Total Messages**: ${{ steps.metrics.outputs.total_messages }}
-        - **Actual Rate**: ${{ steps.metrics.outputs.actual_rate }} req/s
-        - **Target Rate**: ${{ steps.metrics.outputs.target_rate }} req/s
+        ### 📊 Throughput Performance
+        | Metric | Value |
+        |--------|-------|
+        | **Target Rate** | ${{ steps.metrics.outputs.target_rate }} req/s |
+        | **Actual Rate** | ${{ steps.metrics.outputs.actual_rate }} req/s |
+        | **Success Rate** | ${{ steps.metrics.outputs.success_pct }}% |
+        | **Total App Messages** | ${{ steps.metrics.outputs.total_messages }} |
+        | **App → DRA** | ${{ steps.metrics.outputs.app_to_dra }} |
+        | **DRA → App** | ${{ steps.metrics.outputs.dra_to_app }} |
 
-        ### Error Analysis
-        - **Routing Errors**: ${{ steps.metrics.outputs.routing_errors }}
-        - **Affinity Violations**: ${{ steps.metrics.outputs.affinity_violations }}
-        - **Connection Errors**: ${{ steps.metrics.outputs.connection_errors }}
+        ### 🎯 Performance Grade: **${{ steps.metrics.outputs.grade }}**
 
-        ### Overall Grade
-        **${{ steps.metrics.outputs.grade }}**
+        #### Grade Scale:
+        - **A** (🟢): ≥95% throughput, zero errors - Excellent!
+        - **B** (🟡): 80-95% throughput, zero errors - Good
+        - **C** (🟠): <80% throughput, zero errors - Needs optimization
+        - **F** (🔴): Any errors detected - Needs fixes
 
-        ## Interface Distribution
-        - S13: 40% (Equipment Check)
-        - S6a: 40% (Authentication)
-        - Gx: 20% (Policy Control)
+        ### ⚠️ Error Analysis
+        | Error Type | Count |
+        |------------|-------|
+        | **Routing Errors** | ${{ steps.metrics.outputs.routing_errors }} |
+        | **Affinity Violations** | ${{ steps.metrics.outputs.affinity_violations }} |
+        | **Connection Errors** | ${{ steps.metrics.outputs.connection_errors }} |
 
-        ## Test Setup
-        - 1 DRA (Load Generator)
-        - 1 Gateway
-        - 12 Applications (4 per interface)
-        - Total: 24 concurrent connections
+        ## Test Configuration Details
+
+        ### Interface Distribution
+        | Interface | Percentage | Purpose |
+        |-----------|-----------|---------|
+        | **S13** | 40% | Equipment Check (MICR) |
+        | **S6a** | 40% | Authentication (AIR) |
+        | **Gx** | 20% | Policy Control (CCR) |
+
+        ### Test Infrastructure
+        - **DRA Instances**: 1 (Load Generator)
+        - **Gateway Instances**: 1
+        - **Application Instances**: 12 (4 per interface)
+        - **DRA Connections**: 4
+        - **Total Connections**: 24
+
+        ## Load Pattern
+        - **Ramp-up**: 0 → target rate over 10 seconds
+        - **Sustained**: Target rate for remaining duration
+        - **Message Types**: Actual Diameter requests (not protocol overhead)
+
+        ## 📝 Notes
+        - Application messages are counted separately from protocol messages (CER/CEA, DWR/DWA)
+        - Load generator sends actual MICR and AIR requests with realistic data
+        - Metrics show bi-directional message flow (requests + answers)
+
+        ## 📂 Artifacts
+        - [Performance Logs](../artifacts/performance-test-logs) - Gateway, DRA, and application logs
+        - [Test Output](../artifacts/performance-test-logs/performance-output.txt) - Complete test output
 
         ---
 
         *Generated on: $(date -u '+%Y-%m-%d %H:%M:%S UTC')*
+        *Workflow Run: [#${{ github.run_number }}](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})*
         EOF
 
     - name: Upload Performance Report
@@ -248,7 +314,13 @@ jobs:
     - name: Collect performance logs
       if: always()
       run: |
+        cd tests/performance
         mkdir -p perf-logs
+
+        # Copy test output
+        cp performance-output.txt perf-logs/ 2>/dev/null || true
+
+        # Collect container logs
         docker logs gateway-perf > perf-logs/gateway.log 2>&1 || true
         docker logs dra-perf > perf-logs/dra.log 2>&1 || true
         for i in {1..4}; do
@@ -262,8 +334,20 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: performance-test-logs
-        path: perf-logs/
+        path: tests/performance/perf-logs/
         retention-days: 7
+
+    - name: Add Performance Results to Job Summary
+      if: always()
+      run: |
+        cat performance-report.md >> $GITHUB_STEP_SUMMARY
+
+        # Add quick stats
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "## Quick Stats" >> $GITHUB_STEP_SUMMARY
+        echo "- Throughput: ${{ steps.metrics.outputs.actual_rate }}/${{ steps.metrics.outputs.target_rate }} req/s (${{ steps.metrics.outputs.success_pct }}%)" >> $GITHUB_STEP_SUMMARY
+        echo "- Errors: ${{ steps.metrics.outputs.routing_errors }} routing, ${{ steps.metrics.outputs.connection_errors }} connection" >> $GITHUB_STEP_SUMMARY
+        echo "- Grade: **${{ steps.metrics.outputs.grade }}** ${{ steps.metrics.outputs.grade_emoji }}" >> $GITHUB_STEP_SUMMARY
 
     - name: Comment PR with Performance Results
       if: github.event_name == 'pull_request'
@@ -283,25 +367,55 @@ jobs:
     - name: Check Performance Thresholds
       run: |
         ROUTING_ERRORS=${{ steps.metrics.outputs.routing_errors }}
+        CONNECTION_ERRORS=${{ steps.metrics.outputs.connection_errors }}
+        SUCCESS_PCT=${{ steps.metrics.outputs.success_pct }}
         ACTUAL_RATE=${{ steps.metrics.outputs.actual_rate }}
         TARGET_RATE=${{ steps.metrics.outputs.target_rate }}
+        GRADE="${{ steps.metrics.outputs.grade }}"
+
+        echo "Performance Test Results:"
+        echo "  Grade: $GRADE"
+        echo "  Throughput: ${ACTUAL_RATE}/${TARGET_RATE} req/s (${SUCCESS_PCT}%)"
+        echo "  Errors: ${ROUTING_ERRORS} routing, ${CONNECTION_ERRORS} connection"
+        echo ""
 
         # Fail if there are any routing errors
-        if [ "$ROUTING_ERRORS" != "0" ] && [ "$ROUTING_ERRORS" != "N/A" ]; then
+        if [ "$ROUTING_ERRORS" != "0" ]; then
           echo "❌ FAILED: Routing errors detected: $ROUTING_ERRORS"
+          echo "Review logs for error details"
+          exit 1
+        fi
+
+        # Fail if there are connection errors
+        if [ "$CONNECTION_ERRORS" != "0" ]; then
+          echo "❌ FAILED: Connection errors detected: $CONNECTION_ERRORS"
+          echo "Check DRA pool and application connections"
           exit 1
         fi
 
         # Warn if throughput is below 95% of target (but don't fail)
-        if [ "$ACTUAL_RATE" != "N/A" ] && [ "$TARGET_RATE" != "N/A" ]; then
-          THRESHOLD=$((TARGET_RATE * 95 / 100))
-          if [ "$ACTUAL_RATE" -lt "$THRESHOLD" ]; then
-            echo "⚠️  WARNING: Throughput below 95% threshold"
-            echo "   Actual: $ACTUAL_RATE req/s, Expected: >=$THRESHOLD req/s"
-          fi
+        if [ "$SUCCESS_PCT" -lt 95 ]; then
+          echo "⚠️  WARNING: Throughput below 95% threshold (${SUCCESS_PCT}%)"
+          echo "   Actual: $ACTUAL_RATE req/s"
+          echo "   Target: $TARGET_RATE req/s"
+          echo "   Consider:"
+          echo "     - Increasing DRA connections (--dra-conns)"
+          echo "     - Increasing application connections"
+          echo "     - Tuning buffer sizes"
+          echo ""
+          echo "   This is a warning, not a failure."
         fi
 
-        echo "✅ Performance test passed"
+        if [ "$GRADE" = "A" ]; then
+          echo "✅ Performance test PASSED with grade A - Excellent!"
+        elif [ "$GRADE" = "B" ]; then
+          echo "✅ Performance test PASSED with grade B - Good"
+        elif [ "$GRADE" = "C" ]; then
+          echo "⚠️  Performance test passed with grade C - Needs optimization"
+        else
+          echo "❌ FAILED: Grade F"
+          exit 1
+        fi
 
   summary:
     name: Test Summary
