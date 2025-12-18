@@ -10,10 +10,10 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/hsdfat8/diam-gw/client"
-	"github.com/hsdfat8/diam-gw/gateway"
-	"github.com/hsdfat8/diam-gw/pkg/logger"
-	"github.com/hsdfat8/diam-gw/server"
+	"github.com/hsdfat/diam-gw/client"
+	"github.com/hsdfat/diam-gw/gateway"
+	"github.com/hsdfat/diam-gw/pkg/logger"
+	"github.com/hsdfat/diam-gw/server"
 )
 
 func main() {
@@ -54,7 +54,7 @@ func main() {
 
 	// Create gateway configuration
 	config := &gateway.Config{
-		Name: "diameter-gateway",
+		Name:            "diameter-gateway",
 		AppServerConfig: nil, // Will be set below if appListen is specified
 		AppPoolConfig:   nil, // Will be set below if appAddrs is specified
 		DRAPoolConfig: &client.DRAPoolConfig{

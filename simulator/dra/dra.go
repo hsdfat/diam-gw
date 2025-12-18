@@ -10,10 +10,10 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/hsdfat8/diam-gw/commands/base"
-	"github.com/hsdfat8/diam-gw/commands/s13"
-	"github.com/hsdfat8/diam-gw/models_base"
-	"github.com/hsdfat8/diam-gw/pkg/logger"
+	"github.com/hsdfat/diam-gw/commands/base"
+	"github.com/hsdfat/diam-gw/commands/s13"
+	"github.com/hsdfat/diam-gw/models_base"
+	"github.com/hsdfat/diam-gw/pkg/logger"
 )
 
 // DRA represents a Diameter Routing Agent simulator

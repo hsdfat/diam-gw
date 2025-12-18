@@ -6,7 +6,7 @@ import (
 	"bytes"
 	"testing"
 
-	"github.com/hsdfat8/diam-gw/models_base"
+	"github.com/hsdfat/diam-gw/models_base"
 )
 
 // TestUpdateLocationRequest_Creation tests basic creation and initialization

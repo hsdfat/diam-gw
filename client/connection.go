@@ -10,10 +10,10 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/hsdfat8/diam-gw/commands/base"
-	"github.com/hsdfat8/diam-gw/commands/s13"
-	"github.com/hsdfat8/diam-gw/models_base"
-	"github.com/hsdfat8/diam-gw/pkg/logger"
+	"github.com/hsdfat/diam-gw/commands/base"
+	"github.com/hsdfat/diam-gw/commands/s13"
+	"github.com/hsdfat/diam-gw/models_base"
+	"github.com/hsdfat/diam-gw/pkg/logger"
 )
 
 // Connection represents a single Diameter connection to a DRA
@@ -38,11 +38,11 @@ type Connection struct {
 	activityMu   sync.RWMutex
 
 	// Heartbeat
-	dwrTicker        *time.Ticker
-	dwrStop          chan struct{}
-	dwrStopMu        sync.Mutex
-	dwrFailureCount  atomic.Int32
-	dwrLastFailTime  time.Time
+	dwrTicker         *time.Ticker
+	dwrStop           chan struct{}
+	dwrStopMu         sync.Mutex
+	dwrFailureCount   atomic.Int32
+	dwrLastFailTime   time.Time
 	dwrLastFailTimeMu sync.RWMutex
 
 	// Message channels

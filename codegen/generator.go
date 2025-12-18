@@ -139,7 +139,7 @@ func (g *Generator) Generate() (string, error) {
 	buf.WriteString("\t\"encoding/binary\"\n")
 	buf.WriteString("\t\"fmt\"\n")
 	buf.WriteString("\n")
-	buf.WriteString("\t\"github.com/hsdfat8/diam-gw/models_base\"\n")
+	buf.WriteString("\t\"github.com/hsdfat/diam-gw/models_base\"\n")
 	buf.WriteString(")\n\n")
 
 	// Generate type definitions
@@ -1238,7 +1238,7 @@ func (g *Generator) GenerateTest() (string, error) {
 	buf.WriteString("\t\"github.com/google/gopacket\"\n")
 	buf.WriteString("\t\"github.com/google/gopacket/layers\"\n")
 	buf.WriteString("\t\"github.com/google/gopacket/pcapgo\"\n")
-	buf.WriteString("\t\"github.com/hsdfat8/diam-gw/models_base\"\n")
+	buf.WriteString("\t\"github.com/hsdfat/diam-gw/models_base\"\n")
 	buf.WriteString(")\n\n")
 
 	// Generate pcap helper functions
@@ -2563,7 +2563,7 @@ func (g *Generator) GenerateUnitTests() (string, error) {
 	}
 	buf.WriteString("\t\"testing\"\n")
 	buf.WriteString("\n")
-	buf.WriteString("\t\"github.com/hsdfat8/diam-gw/models_base\"\n")
+	buf.WriteString("\t\"github.com/hsdfat/diam-gw/models_base\"\n")
 	buf.WriteString(")\n\n")
 
 	// Generate test functions for each command
@@ -2600,7 +2600,7 @@ func (g *Generator) GeneratePcapTests() (string, error) {
 	buf.WriteString("\t\"github.com/google/gopacket\"\n")
 	buf.WriteString("\t\"github.com/google/gopacket/layers\"\n")
 	buf.WriteString("\t\"github.com/google/gopacket/pcapgo\"\n")
-	buf.WriteString("\t\"github.com/hsdfat8/diam-gw/models_base\"\n")
+	buf.WriteString("\t\"github.com/hsdfat/diam-gw/models_base\"\n")
 	buf.WriteString(")\n\n")
 
 	// Generate pcap helper functions
@@ -2632,7 +2632,7 @@ func (g *Generator) GenerateBenchmarkTests() (string, error) {
 	}
 	buf.WriteString("\t\"testing\"\n")
 	buf.WriteString("\n")
-	buf.WriteString("\t\"github.com/hsdfat8/diam-gw/models_base\"\n")
+	buf.WriteString("\t\"github.com/hsdfat/diam-gw/models_base\"\n")
 	buf.WriteString(")\n\n")
 
 	// Generate benchmark tests for each command

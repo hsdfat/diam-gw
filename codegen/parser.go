@@ -7,17 +7,17 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/hsdfat8/diam-gw/models_base"
+	"github.com/hsdfat/diam-gw/models_base"
 )
 
 // ProtoParser parses diameter proto files
 type ProtoParser struct {
 	AVPs        map[string]*AVPDefinition
 	Commands    []*CommandDefinition
-	Consts      map[string]uint64         // Protocol-level constants
+	Consts      map[string]uint64          // Protocol-level constants
 	Enums       map[string]*EnumDefinition // Enum definitions
 	Package     string                     // Proto package name (e.g., "diameter.base")
-	GoPackage   string                     // Go package path (e.g., "github.com/hsdfat8/diam-gw/commands/base")
+	GoPackage   string                     // Go package path (e.g., "github.com/hsdfat/diam-gw/commands/base")
 	PackageName string                     // Simple package name extracted from go_package (e.g., "base")
 }
 
@@ -78,7 +78,7 @@ func (p *ProtoParser) ParseFile(filename string) error {
 		}
 
 		if strings.HasPrefix(line, "option go_package") {
-			// Extract go_package: option go_package = "github.com/hsdfat8/diam-gw/commands/base";
+			// Extract go_package: option go_package = "github.com/hsdfat/diam-gw/commands/base";
 			parts := strings.Split(line, "=")
 			if len(parts) >= 2 {
 				goPackage := strings.TrimSpace(parts[1])

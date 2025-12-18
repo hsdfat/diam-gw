@@ -1,9 +1,9 @@
 # Diameter Gateway - Client & Code Generator
 
-[![CI/CD](https://github.com/hsdfat8/diam-gw/actions/workflows/gateway-ci.yml/badge.svg)](https://github.com/hsdfat8/diam-gw/actions/workflows/gateway-ci.yml)
-[![Performance](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/hsdfat8/diam-gw/main/.github/badges/performance.json)](https://github.com/hsdfat8/diam-gw/actions/workflows/gateway-ci.yml)
-[![Grade](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/hsdfat8/diam-gw/main/.github/badges/grade.json)](https://github.com/hsdfat8/diam-gw/actions/workflows/gateway-ci.yml)
-[![Go Report Card](https://goreportcard.com/badge/github.com/hsdfat8/diam-gw)](https://goreportcard.com/report/github.com/hsdfat8/diam-gw)
+[![CI/CD](https://github.com/hsdfat/diam-gw/actions/workflows/gateway-ci.yml/badge.svg)](https://github.com/hsdfat/diam-gw/actions/workflows/gateway-ci.yml)
+[![Performance](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/hsdfat8/diam-gw/main/.github/badges/performance.json)](https://github.com/hsdfat/diam-gw/actions/workflows/gateway-ci.yml)
+[![Grade](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/hsdfat8/diam-gw/main/.github/badges/grade.json)](https://github.com/hsdfat/diam-gw/actions/workflows/gateway-ci.yml)
+[![Go Report Card](https://goreportcard.com/badge/github.com/hsdfat/diam-gw)](https://goreportcard.com/report/github.com/hsdfat/diam-gw)
 
 A comprehensive Diameter protocol implementation in Go with code generation tools, production-ready client with priority-based routing, and DRA simulator for testing.
 
@@ -52,7 +52,7 @@ See **[BENCHMARKING.md](tests/performance/BENCHMARKING.md)** for complete benchm
 ### Using the Client
 
 ```go
-import "github.com/hsdfat8/diam-gw/client"
+import "github.com/hsdfat/diam-gw/client"
 
 // Configure DRA pool with priorities
 config := client.DefaultDRAPoolConfig()
@@ -136,7 +136,7 @@ diam-gw/
 ## Installation
 
 ```bash
-git clone https://github.com/hsdfat8/diam-gw.git
+git clone https://github.com/hsdfat/diam-gw.git
 cd diam-gw
 go mod download
 ```

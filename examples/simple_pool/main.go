@@ -4,8 +4,8 @@ import (
 	"context"
 	"time"
 
-	"github.com/hsdfat8/diam-gw/client"
-	"github.com/hsdfat8/diam-gw/pkg/logger"
+	"github.com/hsdfat/diam-gw/client"
+	"github.com/hsdfat/diam-gw/pkg/logger"
 )
 
 // Simple example demonstrating basic connection pool usage

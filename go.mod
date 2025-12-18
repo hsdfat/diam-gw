@@ -1,4 +1,4 @@
-module github.com/hsdfat8/diam-gw
+module github.com/hsdfat/diam-gw
 
 go 1.23
 

@@ -10,27 +10,27 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/hsdfat8/diam-gw/client"
-	"github.com/hsdfat8/diam-gw/commands/base"
-	"github.com/hsdfat8/diam-gw/models_base"
-	"github.com/hsdfat8/diam-gw/pkg/logger"
+	"github.com/hsdfat/diam-gw/client"
+	"github.com/hsdfat/diam-gw/commands/base"
+	"github.com/hsdfat/diam-gw/models_base"
+	"github.com/hsdfat/diam-gw/pkg/logger"
 )
 
 // Connection represents a single client connection to the server
 type Connection struct {
-	conn           net.Conn
-	config         *ConnectionConfig
-	state          atomic.Int32
-	sendChan       chan []byte
-	receiveChan    chan []byte
-	processChan    chan []byte  // Internal channel for processing
-	closeChan      chan struct{}
-	closeOnce      sync.Once
-	ctx            context.Context
-	cancel         context.CancelFunc
-	wg             sync.WaitGroup
-	lastActivity   time.Time
-	activityMu     sync.RWMutex
+	conn               net.Conn
+	config             *ConnectionConfig
+	state              atomic.Int32
+	sendChan           chan []byte
+	receiveChan        chan []byte
+	processChan        chan []byte // Internal channel for processing
+	closeChan          chan struct{}
+	closeOnce          sync.Once
+	ctx                context.Context
+	cancel             context.CancelFunc
+	wg                 sync.WaitGroup
+	lastActivity       time.Time
+	activityMu         sync.RWMutex
 	stats              ConnectionStats
 	originHost         string
 	originRealm        string
@@ -46,18 +46,18 @@ type Connection struct {
 
 // ConnectionConfig holds configuration for a server connection
 type ConnectionConfig struct {
-	ReadTimeout       time.Duration
-	WriteTimeout      time.Duration
-	WatchdogInterval  time.Duration
-	WatchdogTimeout   time.Duration
-	MaxMessageSize    int
-	SendChannelSize   int
-	RecvChannelSize   int
-	OriginHost        string
-	OriginRealm       string
-	ProductName       string
-	VendorID          uint32
-	HandleWatchdog    bool // If true, handle DWR locally, otherwise forward
+	ReadTimeout      time.Duration
+	WriteTimeout     time.Duration
+	WatchdogInterval time.Duration
+	WatchdogTimeout  time.Duration
+	MaxMessageSize   int
+	SendChannelSize  int
+	RecvChannelSize  int
+	OriginHost       string
+	OriginRealm      string
+	ProductName      string
+	VendorID         uint32
+	HandleWatchdog   bool // If true, handle DWR locally, otherwise forward
 }
 
 // ConnectionStats tracks connection statistics

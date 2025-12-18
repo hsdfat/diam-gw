@@ -7,7 +7,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/hsdfat8/diam-gw/pkg/logger"
+	"github.com/hsdfat/diam-gw/pkg/logger"
 )
 
 // ConnectionPool manages multiple connections to a single DRA

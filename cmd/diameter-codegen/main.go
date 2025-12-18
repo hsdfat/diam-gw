@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/hsdfat8/diam-gw/codegen"
+	"github.com/hsdfat/diam-gw/codegen"
 )
 
 func main() {

@@ -8,15 +8,15 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/hsdfat8/diam-gw/commands/s6a"
-	"github.com/hsdfat8/diam-gw/models_base"
-	"github.com/hsdfat8/diam-gw/pkg/logger"
+	"github.com/hsdfat/diam-gw/commands/s6a"
+	"github.com/hsdfat/diam-gw/models_base"
+	"github.com/hsdfat/diam-gw/pkg/logger"
 )
 
 // LoadGeneratorConfig holds load generator configuration
 type LoadGeneratorConfig struct {
-	Duration     time.Duration
-	RampUpTime   time.Duration
+	Duration      time.Duration
+	RampUpTime    time.Duration
 	S13RatePerSec int
 	S6aRatePerSec int
 	GxRatePerSec  int
@@ -36,17 +36,17 @@ type LoadGenerator struct {
 
 // LoadStats holds load generation statistics
 type LoadStats struct {
-	S13Sent      atomic.Uint64
-	S13Received  atomic.Uint64
-	S6aSent      atomic.Uint64
-	S6aReceived  atomic.Uint64
-	GxSent       atomic.Uint64
-	GxReceived   atomic.Uint64
-	TotalSent    atomic.Uint64
+	S13Sent       atomic.Uint64
+	S13Received   atomic.Uint64
+	S6aSent       atomic.Uint64
+	S6aReceived   atomic.Uint64
+	GxSent        atomic.Uint64
+	GxReceived    atomic.Uint64
+	TotalSent     atomic.Uint64
 	TotalReceived atomic.Uint64
-	Errors       atomic.Uint64
-	StartTime    time.Time
-	EndTime      time.Time
+	Errors        atomic.Uint64
+	StartTime     time.Time
+	EndTime       time.Time
 }
 
 // NewLoadGenerator creates a new load generator

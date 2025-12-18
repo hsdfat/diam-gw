@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"net"
 
-	"github.com/hsdfat8/diam-gw/commands/base"
-	"github.com/hsdfat8/diam-gw/models_base"
+	"github.com/hsdfat/diam-gw/commands/base"
+	"github.com/hsdfat/diam-gw/models_base"
 )
 
 func main() {
@@ -190,7 +190,7 @@ func createACR() *base.AccountingRequest {
 	acr.OriginHost = models_base.DiameterIdentity("client.example.com")
 	acr.OriginRealm = models_base.DiameterIdentity("example.com")
 	acr.DestinationRealm = models_base.DiameterIdentity("server.example.com")
-	acr.AccountingRecordType = models_base.Enumerated(2)  // START_RECORD
+	acr.AccountingRecordType = models_base.Enumerated(2) // START_RECORD
 	acr.AccountingRecordNumber = models_base.Unsigned32(1)
 
 	acr.Header.HopByHopID = 0x00000004

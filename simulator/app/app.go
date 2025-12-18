@@ -11,12 +11,12 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/hsdfat8/diam-gw/client"
-	"github.com/hsdfat8/diam-gw/commands/s13"
-	"github.com/hsdfat8/diam-gw/commands/s6a"
-	"github.com/hsdfat8/diam-gw/models_base"
-	"github.com/hsdfat8/diam-gw/pkg/logger"
-	"github.com/hsdfat8/diam-gw/server"
+	"github.com/hsdfat/diam-gw/client"
+	"github.com/hsdfat/diam-gw/commands/s13"
+	"github.com/hsdfat/diam-gw/commands/s6a"
+	"github.com/hsdfat/diam-gw/models_base"
+	"github.com/hsdfat/diam-gw/pkg/logger"
+	"github.com/hsdfat/diam-gw/server"
 )
 
 func main() {
@@ -66,8 +66,8 @@ func main() {
 		log.Info("Starting server mode on %s", *listenAddr)
 
 		serverConfig := &server.ServerConfig{
-			ListenAddress:   *listenAddr,
-			MaxConnections:  100,
+			ListenAddress:  *listenAddr,
+			MaxConnections: 100,
 			ConnectionConfig: &server.ConnectionConfig{
 				ReadTimeout:      30 * time.Second,
 				WriteTimeout:     10 * time.Second,

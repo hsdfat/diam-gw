@@ -5,7 +5,7 @@ package s13
 import (
 	"testing"
 
-	"github.com/hsdfat8/diam-gw/models_base"
+	"github.com/hsdfat/diam-gw/models_base"
 )
 
 func BenchmarkNewMEIdentityCheckRequest(b *testing.B) {

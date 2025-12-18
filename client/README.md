@@ -53,7 +53,7 @@ package main
 import (
     "context"
     "log"
-    "github.com/hsdfat8/diam-gw/client"
+    "github.com/hsdfat/diam-gw/client"
 )
 
 func main() {

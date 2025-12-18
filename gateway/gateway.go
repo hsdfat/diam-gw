@@ -8,10 +8,10 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/hsdfat8/diam-gw/client"
-	"github.com/hsdfat8/diam-gw/pkg/logger"
-	"github.com/hsdfat8/diam-gw/pkg/metrics"
-	"github.com/hsdfat8/diam-gw/server"
+	"github.com/hsdfat/diam-gw/client"
+	"github.com/hsdfat/diam-gw/pkg/logger"
+	"github.com/hsdfat/diam-gw/pkg/metrics"
+	"github.com/hsdfat/diam-gw/server"
 )
 
 // Gateway handles bidirectional message routing between applications and DRA

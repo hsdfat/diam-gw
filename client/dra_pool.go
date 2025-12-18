@@ -8,7 +8,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/hsdfat8/diam-gw/pkg/logger"
+	"github.com/hsdfat/diam-gw/pkg/logger"
 )
 
 // DRAConfig represents configuration for a single DRA
@@ -35,11 +35,11 @@ type DRAPoolConfig struct {
 	ConnectionsPerDRA int // Number of connections to each DRA
 
 	// Timeouts
-	ConnectTimeout    time.Duration
-	CERTimeout        time.Duration
-	DWRInterval       time.Duration
-	DWRTimeout        time.Duration
-	MaxDWRFailures    int           // Maximum consecutive DWR failures before reconnecting
+	ConnectTimeout      time.Duration
+	CERTimeout          time.Duration
+	DWRInterval         time.Duration
+	DWRTimeout          time.Duration
+	MaxDWRFailures      int // Maximum consecutive DWR failures before reconnecting
 	HealthCheckInterval time.Duration
 
 	// Reconnection strategy
@@ -57,8 +57,8 @@ type DRAPool struct {
 	config *DRAPoolConfig
 
 	// DRA pools organized by priority
-	draPools map[string]*ConnectionPool // key: DRA name
-	draConfigs []*DRAServerConfig       // sorted by priority
+	draPools   map[string]*ConnectionPool // key: DRA name
+	draConfigs []*DRAServerConfig         // sorted by priority
 
 	// Priority groups
 	priorityGroups map[int][]*DRAServerConfig // priority -> DRAs

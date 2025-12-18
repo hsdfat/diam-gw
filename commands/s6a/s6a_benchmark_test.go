@@ -5,7 +5,7 @@ package s6a
 import (
 	"testing"
 
-	"github.com/hsdfat8/diam-gw/models_base"
+	"github.com/hsdfat/diam-gw/models_base"
 )
 
 func BenchmarkNewUpdateLocationRequest(b *testing.B) {

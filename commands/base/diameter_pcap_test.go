@@ -12,7 +12,7 @@ import (
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
 	"github.com/google/gopacket/pcapgo"
-	"github.com/hsdfat8/diam-gw/models_base"
+	"github.com/hsdfat/diam-gw/models_base"
 )
 
 // writeDiameterToPcap writes a Diameter message to a pcap file with proper network layers

@@ -7,7 +7,7 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/hsdfat8/diam-gw/pkg/logger"
+	"github.com/hsdfat/diam-gw/pkg/logger"
 )
 
 // Server represents a Diameter server
