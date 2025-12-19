@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"crypto/tls"
 	"encoding/binary"
 	"fmt"
 	"io"
@@ -470,6 +471,13 @@ func (c *Connection) handleCER(msg []byte, msgInfo *client.MessageInfo) error {
 	cea.ProductName = models_base.UTF8String(c.config.ProductName)
 	cea.VendorId = models_base.Unsigned32(c.config.VendorID)
 
+	// Set Host-IP-Address from connection local address
+	if localAddr := c.conn.LocalAddr(); localAddr != nil {
+		if tcpAddr, ok := localAddr.(*net.TCPAddr); ok {
+			cea.HostIpAddress = []models_base.Address{models_base.Address(tcpAddr.IP)}
+		}
+	}
+
 	ceaBytes, err := cea.Marshal()
 	if err != nil {
 		c.logger.Error("Failed to marshal CEA: %v", err)
@@ -580,4 +588,54 @@ func isClosedError(err error) bool {
 	errStr := err.Error()
 	return errStr == "use of closed network connection" ||
 		errStr == "EOF"
+}
+
+// Conn interface implementation methods
+
+// Write writes data to the connection (implements Conn interface)
+func (c *Connection) Write(b []byte) (int, error) {
+	if err := c.Send(b); err != nil {
+		return 0, err
+	}
+	return len(b), nil
+}
+
+// WriteStream writes data to the connection's stream (implements Conn interface)
+func (c *Connection) WriteStream(b []byte, stream uint) (int, error) {
+	// For diameter, streams are not used, delegate to Write
+	return c.Write(b)
+}
+
+// LocalAddr returns the local network address (implements Conn interface)
+func (c *Connection) LocalAddr() net.Addr {
+	return c.conn.LocalAddr()
+}
+
+// RemoteAddr returns the remote network address (implements Conn interface)
+func (c *Connection) RemoteAddr() net.Addr {
+	return c.conn.RemoteAddr()
+}
+
+// TLS returns the TLS connection state (implements Conn interface)
+func (c *Connection) TLS() *tls.ConnectionState {
+	if tlsConn, ok := c.conn.(*tls.Conn); ok {
+		state := tlsConn.ConnectionState()
+		return &state
+	}
+	return nil
+}
+
+// Context returns the connection's context (implements Conn interface)
+func (c *Connection) Context() context.Context {
+	return c.ctx
+}
+
+// SetContext sets the connection's context (implements Conn interface)
+func (c *Connection) SetContext(ctx context.Context) {
+	c.ctx = ctx
+}
+
+// Connection returns the underlying network connection (implements Conn interface)
+func (c *Connection) Connection() net.Conn {
+	return c.conn
 }

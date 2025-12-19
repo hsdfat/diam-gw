@@ -1,14 +1,127 @@
 package server
 
 import (
+	"bufio"
+	"bytes"
 	"context"
+	"crypto/tls"
+	"encoding/binary"
+	"errors"
 	"fmt"
+	"io"
 	"net"
+	"runtime"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/hsdfat/diam-gw/pkg/logger"
 )
+
+// Conn interface is used by a handler to send diameter messages.
+type Conn interface {
+	Write(b []byte) (int, error)                    // Writes a msg to the connection
+	WriteStream(b []byte, stream uint) (int, error) // Writes a msg to the connection's stream
+	Close() error                                   // Close the connection
+	LocalAddr() net.Addr                            // Returns the local IP
+	RemoteAddr() net.Addr                           // Returns the remote IP
+	TLS() *tls.ConnectionState                      // TLS or nil when not using TLS
+	Context() context.Context                       // Returns the internal context
+	SetContext(ctx context.Context)                 // Stores a new context
+	Connection() net.Conn                           // Returns network connection
+}
+
+// The CloseNotifier interface is implemented by Conns which
+// allow detecting when the underlying connection has gone away.
+//
+// This mechanism can be used to detect if a peer has disconnected.
+type CloseNotifier interface {
+	// CloseNotify returns a channel that is closed
+	// when the client connection has gone away.
+	CloseNotify() <-chan struct{}
+}
+
+// Message represents a Diameter message
+type Message struct {
+	Length uint32
+	Header []byte
+	Body   []byte
+}
+
+// The HandlerFunc type is an adapter to allow the use of
+// ordinary functions as diameter handlers.  If f is a function
+// with the appropriate signature, HandlerFunc(f) is a
+// Handler object that calls f.
+type HandlerFunc func(Conn, *Message)
+
+// ServeDIAM calls f(c, m).
+func (f HandlerFunc) ServeDIAM(c Conn, m *Message) {
+	f(c, m)
+}
+
+// ErrorReporter interface is implemented by Handlers that
+// allow reading errors from the underlying connection, like
+// parsing diameter messages or connection errors.
+type ErrorReporter interface {
+	// Error writes an error to the reporter.
+	Error(err *ErrorReport)
+
+	// ErrorReports returns a channel that receives
+	// errors from the connection.
+	ErrorReports() <-chan *ErrorReport
+}
+
+// ErrorReport is sent out of the server in case it fails to
+// read messages due to a bad dictionary or network errors.
+type ErrorReport struct {
+	Conn    Conn     // Peer that caused the error
+	Message *Message // Message that caused the error
+	Error   error    // Error message
+}
+
+// String returns an error message. It does not render the Message field.
+func (er *ErrorReport) String() string {
+	if er.Conn == nil {
+		return fmt.Sprintf("diameter error: %s", er.Error)
+	}
+	return fmt.Sprintf("diameter error on %s: %s", er.Conn.RemoteAddr(), er.Error)
+}
+
+// Command represents a Diameter command identifier
+type Command struct {
+	Interface int // Application ID (e.g., S13=16777252, S6a=16777251)
+	Code      int // Command Code
+}
+
+// Handler is a function that handles a Diameter message
+// It receives the Message struct (with Header and Body) and the connection interface
+//
+// Example usage:
+//
+//	server := NewServer(config, logger)
+//
+//	// Register handler for Capabilities-Exchange-Request (CER)
+//	server.HandleFunc(Command{Interface: 0, Code: 257}, func(msg *Message, conn Conn) {
+//	    // Access message header and body
+//	    logger.Info("Received CER from %s, length=%d", conn.RemoteAddr(), msg.Length)
+//
+//	    // Process AVPs in message body
+//	    processAVPs(msg.Body)
+//
+//	    // Send Capabilities-Exchange-Answer (CEA)
+//	    response := buildCEA(msg)
+//	    conn.Write(response)
+//	})
+//
+//	// Register handler for Device-Watchdog-Request (DWR)
+//	server.HandleFunc(Command{Interface: 0, Code: 280}, func(msg *Message, conn Conn) {
+//	    logger.Info("Received DWR from %s", conn.RemoteAddr())
+//	    response := buildDWA(msg)
+//	    conn.Write(response)
+//	})
+//
+//	server.Start()
+type Handler func(msg *Message, conn Conn)
 
 // Server represents a Diameter server
 type Server struct {
@@ -22,6 +135,15 @@ type Server struct {
 	stats       ServerStats
 	logger      logger.Logger
 	receiveChan chan *MessageContext
+
+	Network      string              // network of the address - empty string defaults to tcp
+	Addr         string              // address to listen on, ":3868" if empty
+	ReadTimeout  time.Duration       // maximum duration before timing out read of the request
+	WriteTimeout time.Duration       // maximum duration before timing out write of the response
+	TLSConfig    *tls.Config         // optional TLS config, used by ListenAndServeTLS
+	LocalAddr    net.Addr            // optional Local Address to bind dailer's (Dail...) socket to
+	HandlerMux   map[Command]Handler // Map of command to handler functions
+	handlerMu    sync.RWMutex        // Protects HandlerMux
 }
 
 // ServerConfig holds server configuration
@@ -30,6 +152,26 @@ type ServerConfig struct {
 	MaxConnections   int
 	ConnectionConfig *ConnectionConfig
 	RecvChannelSize  int
+}
+
+// InterfaceStats tracks statistics for a specific Diameter interface (Application ID)
+type InterfaceStats struct {
+	MessagesReceived atomic.Uint64
+	MessagesSent     atomic.Uint64
+	BytesReceived    atomic.Uint64
+	BytesSent        atomic.Uint64
+	Errors           atomic.Uint64
+	CommandStats     map[int]*CommandStats // Map of command code to stats
+	CommandStatsMu   sync.RWMutex
+}
+
+// CommandStats tracks statistics for a specific command code
+type CommandStats struct {
+	MessagesReceived atomic.Uint64
+	MessagesSent     atomic.Uint64
+	BytesReceived    atomic.Uint64
+	BytesSent        atomic.Uint64
+	Errors           atomic.Uint64
 }
 
 // ServerStats tracks server statistics
@@ -42,6 +184,42 @@ type ServerStats struct {
 	TotalBytesSent     atomic.Uint64
 	TotalBytesReceived atomic.Uint64
 	Errors             atomic.Uint64
+	InterfaceStats     map[int]*InterfaceStats // Map of application ID to interface stats
+	InterfaceStatsMu   sync.RWMutex
+}
+
+// ServerStatsSnapshot is a snapshot of server statistics for reading
+type ServerStatsSnapshot struct {
+	TotalConnections   uint64
+	ActiveConnections  uint64
+	TotalMessages      uint64
+	MessagesSent       uint64
+	MessagesReceived   uint64
+	TotalBytesSent     uint64
+	TotalBytesReceived uint64
+	Errors             uint64
+	InterfaceStats     map[int]InterfaceStatsSnapshot
+}
+
+// InterfaceStatsSnapshot is a snapshot of interface statistics
+type InterfaceStatsSnapshot struct {
+	ApplicationID    int
+	MessagesReceived uint64
+	MessagesSent     uint64
+	BytesReceived    uint64
+	BytesSent        uint64
+	Errors           uint64
+	CommandStats     map[int]CommandStatsSnapshot
+}
+
+// CommandStatsSnapshot is a snapshot of command statistics
+type CommandStatsSnapshot struct {
+	CommandCode      int
+	MessagesReceived uint64
+	MessagesSent     uint64
+	BytesReceived    uint64
+	BytesSent        uint64
+	Errors           uint64
 }
 
 // MessageContext wraps a message with its connection
@@ -78,10 +256,14 @@ func NewServer(config *ServerConfig, log logger.Logger) *Server {
 		cancel:      cancel,
 		logger:      log,
 		receiveChan: make(chan *MessageContext, config.RecvChannelSize),
+		HandlerMux:  make(map[Command]Handler),
+		stats: ServerStats{
+			InterfaceStats: make(map[int]*InterfaceStats),
+		},
 	}
 }
 
-// Start starts the server
+// Start starts the server with http.Server-style accept loop
 func (s *Server) Start() error {
 	listener, err := net.Listen("tcp", s.config.ListenAddress)
 	if err != nil {
@@ -89,22 +271,74 @@ func (s *Server) Start() error {
 	}
 
 	s.listener = listener
-	s.logger.Info("Server listening on %s", s.config.ListenAddress)
+	s.logger.Infow("Server listening", "address", s.config.ListenAddress)
 
-	s.wg.Add(1)
-	go s.acceptLoop()
+	var tempDelay time.Duration // how long to sleep on accept failure
+	for {
+		rw, e := listener.Accept()
+		if e != nil {
+			select {
+			case <-s.ctx.Done():
+				return nil
+			default:
+			}
 
-	return nil
+			if ne, ok := e.(net.Error); ok && ne.Temporary() {
+				if tempDelay == 0 {
+					tempDelay = 5 * time.Millisecond
+				} else {
+					tempDelay *= 2
+				}
+				if max := 1 * time.Second; tempDelay > max {
+					tempDelay = max
+				}
+				s.logger.Warnw("accept error, retrying", "error", e, "retry_delay", tempDelay)
+				time.Sleep(tempDelay)
+				continue
+			}
+
+			network := "<nil>"
+			address := network
+			addr := listener.Addr()
+			if addr != nil {
+				network = addr.Network()
+				address = addr.String()
+			}
+			s.logger.Errorw("accept error", "error", e, "network", network, "address", address)
+			return e
+		}
+		tempDelay = 0
+
+		// Check max connections
+		if int(s.stats.ActiveConnections.Load()) >= s.config.MaxConnections {
+			s.logger.Warnw("Max connections reached, rejecting", "remote_addr", rw.RemoteAddr().String())
+			rw.Close()
+			s.stats.Errors.Add(1)
+			continue
+		}
+
+		s.logger.Infow("Accepted connection", "remote_addr", rw.RemoteAddr().String())
+		s.stats.TotalConnections.Add(1)
+		s.stats.ActiveConnections.Add(1)
+
+		if c, err := s.newConn(rw); err != nil {
+			s.logger.Errorw("newConn error", "error", err)
+			s.stats.ActiveConnections.Add(^uint64(0)) // Decrement
+			continue
+		} else {
+			go c.serve()
+		}
+	}
 }
 
 // Stop stops the server
 func (s *Server) Stop() error {
-	s.logger.Info("Stopping server...")
+	s.logger.Infow("Stopping server")
 	s.cancel()
 
 	if s.listener != nil {
 		if err := s.listener.Close(); err != nil {
-			s.logger.Error("Failed to close listener: %v", err)
+			s.logger.Errorw("Failed to close listener", "error", err)
 		}
 	}
 
@@ -118,10 +352,11 @@ func (s *Server) Stop() error {
 	s.wg.Wait()
 	close(s.receiveChan)
 
-	s.logger.Info("Server stopped. Stats: total_conn=%d, total_msg=%d, errors=%d",
-		s.stats.TotalConnections.Load(),
-		s.stats.TotalMessages.Load(),
-		s.stats.Errors.Load())
+	stats := s.GetStats()
+	s.logger.Infow("Server stopped",
+		"total_conn", stats.TotalConnections,
+		"total_msg", stats.TotalMessages,
+		"errors", stats.Errors)
 
 	return nil
 }
@@ -151,99 +386,187 @@ func (s *Server) GetAllConnections() []*Connection {
 	return conns
 }
 
-// GetStats returns server statistics
-func (s *Server) GetStats() ServerStats {
-	return s.stats
+// getOrCreateInterfaceStats gets or creates stats for an interface
+func (s *Server) getOrCreateInterfaceStats(appID int) *InterfaceStats {
+	s.stats.InterfaceStatsMu.Lock()
+	defer s.stats.InterfaceStatsMu.Unlock()
+
+	if stats, exists := s.stats.InterfaceStats[appID]; exists {
+		return stats
+	}
+
+	stats := &InterfaceStats{
+		CommandStats: make(map[int]*CommandStats),
+	}
+	s.stats.InterfaceStats[appID] = stats
+	return stats
 }
 
-// acceptLoop accepts incoming connections
-func (s *Server) acceptLoop() {
-	defer s.wg.Done()
-	defer s.logger.Info("Accept loop exited")
+// getOrCreateCommandStats gets or creates stats for a command within an interface
+func (ifStats *InterfaceStats) getOrCreateCommandStats(cmdCode int) *CommandStats {
+	ifStats.CommandStatsMu.Lock()
+	defer ifStats.CommandStatsMu.Unlock()
 
-	for {
-		conn, err := s.listener.Accept()
-		if err != nil {
-			select {
-			case <-s.ctx.Done():
-				return
-			default:
-				s.logger.Error("Failed to accept connection: %v", err)
-				s.stats.Errors.Add(1)
-				continue
-			}
-		}
-
-		// Check max connections
-		if int(s.stats.ActiveConnections.Load()) >= s.config.MaxConnections {
-			s.logger.Warn("Max connections reached, rejecting %s", conn.RemoteAddr().String())
-			conn.Close()
-			s.stats.Errors.Add(1)
-			continue
-		}
-
-		s.logger.Info("Accepted connection from %s", conn.RemoteAddr().String())
-		s.stats.TotalConnections.Add(1)
-		s.stats.ActiveConnections.Add(1)
-
-		// Create and start connection handler
-		srvConn := NewConnection(conn, s.config.ConnectionConfig, s.logger)
-		if err := srvConn.Start(); err != nil {
-			s.logger.Error("Failed to start connection: %v", err)
-			conn.Close()
-			s.stats.Errors.Add(1)
-			s.stats.ActiveConnections.Add(^uint64(0)) // Decrement
-			continue
-		}
-
-		// Store connection
-		addr := conn.RemoteAddr().String()
-		s.connMu.Lock()
-		s.connections[addr] = srvConn
-		s.connMu.Unlock()
-
-		// Start message receiver for this connection
-		s.wg.Add(1)
-		go s.receiveFromConnection(srvConn, addr)
+	if stats, exists := ifStats.CommandStats[cmdCode]; exists {
+		return stats
 	}
+
+	stats := &CommandStats{}
+	ifStats.CommandStats[cmdCode] = stats
+	return stats
 }
 
-// receiveFromConnection receives messages from a connection
-func (s *Server) receiveFromConnection(conn *Connection, addr string) {
-	defer s.wg.Done()
-	defer func() {
-		s.connMu.Lock()
-		delete(s.connections, addr)
-		s.connMu.Unlock()
-		s.stats.ActiveConnections.Add(^uint64(0)) // Decrement
-		s.logger.Info("Connection %s removed from pool", addr)
-	}()
+// GetStats returns a snapshot of server statistics
+func (s *Server) GetStats() ServerStatsSnapshot {
+	s.stats.InterfaceStatsMu.RLock()
+	defer s.stats.InterfaceStatsMu.RUnlock()
 
-	for {
-		select {
-		case <-s.ctx.Done():
-			return
-		case msg, ok := <-conn.Receive():
-			if !ok {
-				return
-			}
+	snapshot := ServerStatsSnapshot{
+		TotalConnections:   s.stats.TotalConnections.Load(),
+		ActiveConnections:  s.stats.ActiveConnections.Load(),
+		TotalMessages:      s.stats.TotalMessages.Load(),
+		MessagesSent:       s.stats.MessagesSent.Load(),
+		MessagesReceived:   s.stats.MessagesReceived.Load(),
+		TotalBytesSent:     s.stats.TotalBytesSent.Load(),
+		TotalBytesReceived: s.stats.TotalBytesReceived.Load(),
+		Errors:             s.stats.Errors.Load(),
+		InterfaceStats:     make(map[int]InterfaceStatsSnapshot),
+	}
 
-			s.stats.TotalMessages.Add(1)
-			s.stats.MessagesReceived.Add(1)
-
-			// Send to main receive channel
-			msgCtx := &MessageContext{
-				Message:    msg,
-				Connection: conn,
-			}
-
-			select {
-			case s.receiveChan <- msgCtx:
-			case <-s.ctx.Done():
-				return
+	// Copy interface stats
+	for appID, ifStats := range s.stats.InterfaceStats {
+		ifStats.CommandStatsMu.RLock()
+		cmdStatsSnapshot := make(map[int]CommandStatsSnapshot)
+		for cmdCode, cmdStats := range ifStats.CommandStats {
+			cmdStatsSnapshot[cmdCode] = CommandStatsSnapshot{
+				CommandCode:      cmdCode,
+				MessagesReceived: cmdStats.MessagesReceived.Load(),
+				MessagesSent:     cmdStats.MessagesSent.Load(),
+				BytesReceived:    cmdStats.BytesReceived.Load(),
+				BytesSent:        cmdStats.BytesSent.Load(),
+				Errors:           cmdStats.Errors.Load(),
 			}
 		}
+		ifStats.CommandStatsMu.RUnlock()
+
+		snapshot.InterfaceStats[appID] = InterfaceStatsSnapshot{
+			ApplicationID:    appID,
+			MessagesReceived: ifStats.MessagesReceived.Load(),
+			MessagesSent:     ifStats.MessagesSent.Load(),
+			BytesReceived:    ifStats.BytesReceived.Load(),
+			BytesSent:        ifStats.BytesSent.Load(),
+			Errors:           ifStats.Errors.Load(),
+			CommandStats:     cmdStatsSnapshot,
+		}
 	}
+
+	return snapshot
+}
+
+// GetInterfaceStats returns stats for a specific interface (Application ID)
+func (s *Server) GetInterfaceStats(appID int) (InterfaceStatsSnapshot, bool) {
+	s.stats.InterfaceStatsMu.RLock()
+	defer s.stats.InterfaceStatsMu.RUnlock()
+
+	ifStats, exists := s.stats.InterfaceStats[appID]
+	if !exists {
+		return InterfaceStatsSnapshot{}, false
+	}
+
+	ifStats.CommandStatsMu.RLock()
+	cmdStatsSnapshot := make(map[int]CommandStatsSnapshot)
+	for cmdCode, cmdStats := range ifStats.CommandStats {
+		cmdStatsSnapshot[cmdCode] = CommandStatsSnapshot{
+			CommandCode:      cmdCode,
+			MessagesReceived: cmdStats.MessagesReceived.Load(),
+			MessagesSent:     cmdStats.MessagesSent.Load(),
+			BytesReceived:    cmdStats.BytesReceived.Load(),
+			BytesSent:        cmdStats.BytesSent.Load(),
+			Errors:           cmdStats.Errors.Load(),
+		}
+	}
+	ifStats.CommandStatsMu.RUnlock()
+
+	return InterfaceStatsSnapshot{
+		ApplicationID:    appID,
+		MessagesReceived: ifStats.MessagesReceived.Load(),
+		MessagesSent:     ifStats.MessagesSent.Load(),
+		BytesReceived:    ifStats.BytesReceived.Load(),
+		BytesSent:        ifStats.BytesSent.Load(),
+		Errors:           ifStats.Errors.Load(),
+		CommandStats:     cmdStatsSnapshot,
+	}, true
+}
+
+// GetCommandStats returns stats for a specific command within an interface
+func (s *Server) GetCommandStats(appID int, cmdCode int) (CommandStatsSnapshot, bool) {
+	s.stats.InterfaceStatsMu.RLock()
+	ifStats, exists := s.stats.InterfaceStats[appID]
+	s.stats.InterfaceStatsMu.RUnlock()
+
+	if !exists {
+		return CommandStatsSnapshot{}, false
+	}
+
+	ifStats.CommandStatsMu.RLock()
+	defer ifStats.CommandStatsMu.RUnlock()
+
+	cmdStats, exists := ifStats.CommandStats[cmdCode]
+	if !exists {
+		return CommandStatsSnapshot{}, false
+	}
+
+	return CommandStatsSnapshot{
+		CommandCode:      cmdCode,
+		MessagesReceived: cmdStats.MessagesReceived.Load(),
+		MessagesSent:     cmdStats.MessagesSent.Load(),
+		BytesReceived:    cmdStats.BytesReceived.Load(),
+		BytesSent:        cmdStats.BytesSent.Load(),
+		Errors:           cmdStats.Errors.Load(),
+	}, true
+}
+
+// GetListener returns the server listener (for testing)
+func (s *Server) GetListener() net.Listener {
+	return s.listener
+}
+
+// HandleFunc registers a handler function for a specific command
+func (s *Server) HandleFunc(cmd Command, handler Handler) {
+	s.handlerMu.Lock()
+	defer s.handlerMu.Unlock()
+	s.HandlerMux[cmd] = handler
+	s.logger.Infow("Registered handler for command", "interface", cmd.Interface, "code", cmd.Code)
+}
+
+// getHandler retrieves a handler for a given command
+func (s *Server) getHandler(cmd Command) (Handler, bool) {
+	s.handlerMu.RLock()
+	defer s.handlerMu.RUnlock()
+	handler, exists := s.HandlerMux[cmd]
+	return handler, exists
+}
+
+// parseCommand extracts the command information from a message header
+func parseCommand(header []byte) (Command, error) {
+	if len(header) < 20 {
+		return Command{}, errors.New("invalid header length")
+	}
+
+	// Diameter header format:
+	// 0-3: Version(1) + Length(3)
+	// 4-7: Command Flags(1) + Command Code(3)
+	// 8-11: Application ID (4 bytes)
+	// 12-15: Hop-by-Hop ID
+	// 16-19: End-to-End ID
+
+	commandCode := int(binary.BigEndian.Uint32([]byte{0, header[5], header[6], header[7]}))
+	applicationID := int(binary.BigEndian.Uint32(header[8:12]))
+
+	return Command{
+		Interface: applicationID,
+		Code:      commandCode,
+	}, nil
 }
 
 // Broadcast sends a message to all connections
@@ -254,7 +577,7 @@ func (s *Server) Broadcast(msg []byte) error {
 	var lastErr error
 	for addr, conn := range s.connections {
 		if err := conn.Send(msg); err != nil {
-			s.logger.Error("Failed to send to %s: %v", addr, err)
+			s.logger.Errorw("Failed to send message", "address", addr, "error", err)
 			lastErr = err
 			s.stats.Errors.Add(1)
 		} else {
@@ -263,4 +586,383 @@ func (s *Server) Broadcast(msg []byte) error {
 	}
 
 	return lastErr
+}
+
+// Buffer pool for message reading
+var readerBufferPool sync.Pool
+
+const (
+	maxMessageLength = 1 << 12 // 4096 bytes
+)
+
+func newReaderBuffer() *bytes.Buffer {
+	if v := readerBufferPool.Get(); v != nil {
+		return v.(*bytes.Buffer)
+	}
+	return bytes.NewBuffer(make([]byte, maxMessageLength))
+}
+
+func putReaderBuffer(b *bytes.Buffer) {
+	if cap(b.Bytes()) == maxMessageLength {
+		b.Reset()
+		readerBufferPool.Put(b)
+	}
+}
+
+func readerBufferSlice(buf *bytes.Buffer, l int) []byte {
+	b := buf.Bytes()
+	if l <= maxMessageLength && cap(b) >= maxMessageLength {
+		return b[:l]
+	}
+	return make([]byte, l)
+}
+
+// ReadMessage reads a binary stream from the reader and parses it into a Message
+func ReadMessage(reader io.Reader) (*Message, error) {
+	buf := newReaderBuffer()
+	defer putReaderBuffer(buf)
+	m := &Message{}
+	err := m.readHeader(reader, buf)
+	if err != nil {
+		return nil, err
+	}
+	if err = m.readBody(reader, buf); err != nil {
+		return m, err
+	}
+	return m, nil
+}
+
+// readHeader reads the message header
+func (m *Message) readHeader(r io.Reader, buf *bytes.Buffer) error {
+	b := buf.Bytes()[:20]
+
+	_, err := io.ReadFull(r, b)
+	if err != nil {
+		return err
+	}
+
+	m.Length = uint32(b[1])<<16 | uint32(b[2])<<8 | uint32(b[3])
+	if m.Length < 20 {
+		return errors.New("invalid header: message length less than 20 bytes")
+	}
+
+	m.Header = make([]byte, 20)
+	copy(m.Header, b)
+
+	return nil
+}
+
+// readBody reads the message body
+func (m *Message) readBody(r io.Reader, buf *bytes.Buffer) error {
+	if m.Length <= 20 {
+		m.Body = []byte{}
+		return nil
+	}
+
+	bodyLen := int(m.Length - 20)
+	b := readerBufferSlice(buf, bodyLen)
+
+	n, err := io.ReadFull(r, b)
+	if err != nil {
+		return fmt.Errorf("readBody error: %v, %d bytes read", err, n)
+	}
+
+	m.Body = make([]byte, bodyLen)
+	copy(m.Body, b)
+
+	return nil
+}
+
+// liveSwitchReader is a switchReader that's safe for concurrent reads and switches
+type liveSwitchReader struct {
+	sync.Mutex
+	r         io.Reader
+	pr        *io.PipeReader
+	pipeCopyF func()
+}
+
+func (sr *liveSwitchReader) Read(p []byte) (n int, err error) {
+	sr.Lock()
+	// Check if closeNotifier was created prior to this Read call & start it
+	if sr.pr != nil && sr.pipeCopyF != nil {
+		go sr.pipeCopyF()
+		sr.r = sr.pr
+		sr.pr = nil
+		sr.pipeCopyF = nil
+	}
+	r := sr.r
+	sr.Unlock()
+	return r.Read(p)
+}
+
+// conn represents the server side of a diameter connection
+type conn struct {
+	server   *Server
+	rwc      net.Conn
+	sr       liveSwitchReader
+	buf      *bufio.ReadWriter
+	tlsState *tls.ConnectionState
+	writer   *response
+
+	mu           sync.Mutex
+	closeNotifyc chan struct{}
+	clientGone   bool
+	ctx          context.Context
+}
+
+func (c *conn) closeNotify() <-chan struct{} {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.closeNotifyc == nil {
+		c.closeNotifyc = make(chan struct{})
+
+		pr, pw := io.Pipe()
+		c.sr.Lock()
+		readSource := c.sr.r
+		c.sr.pr = pr
+		c.sr.pipeCopyF = func() {
+			_, err := io.Copy(pw, readSource)
+			if err == nil {
+				err = io.EOF
+			}
+			pw.CloseWithError(err)
+			c.notifyClientGone()
+		}
+		c.sr.Unlock()
+	}
+	return c.closeNotifyc
+}
+
+func (c *conn) notifyClientGone() {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.closeNotifyc != nil && !c.clientGone {
+		close(c.closeNotifyc)
+		c.clientGone = true
+	}
+}
+
+// newConn creates a new connection from rwc
+func (srv *Server) newConn(rwc net.Conn) (*conn, error) {
+	c := &conn{
+		server: srv,
+		rwc:    rwc,
+		sr:     liveSwitchReader{r: rwc},
+		ctx:    context.Background(),
+	}
+	c.buf = bufio.NewReadWriter(bufio.NewReader(&c.sr), bufio.NewWriter(rwc))
+	c.writer = &response{conn: c}
+	return c, nil
+}
+
+// readMessage reads the next message from connection
+func (c *conn) readMessage() (*Message, error) {
+	if c.server.ReadTimeout > 0 {
+		c.rwc.SetReadDeadline(time.Now().Add(c.server.ReadTimeout))
+	}
+
+	buf := newReaderBuffer()
+	defer putReaderBuffer(buf)
+	m := &Message{}
+	err := m.readHeader(c.buf.Reader, buf)
+	if err != nil {
+		return nil, err
+	}
+	if err = m.readBody(c.buf.Reader, buf); err != nil {
+		return m, err
+	}
+	return m, nil
+}
+
+// serve handles a connection
+func (c *conn) serve() {
+	defer func() {
+		if err := recover(); err != nil {
+			buf := make([]byte, 4096)
+			buf = buf[:runtime.Stack(buf, false)]
+			c.server.logger.Errorw("panic serving connection",
+				"remote_addr", c.rwc.RemoteAddr().String(),
+				"error", err,
+				"stack", string(buf))
+			c.server.stats.Errors.Add(1)
+		}
+		c.rwc.Close()
+		// Decrement active connections when connection closes
+		c.server.stats.ActiveConnections.Add(^uint64(0)) // Decrement
+	}()
+
+	if tlsConn, ok := c.rwc.(*tls.Conn); ok {
+		if err := tlsConn.Handshake(); err != nil {
+			c.server.logger.Errorw("TLS handshake failed", "error", err)
+			return
+		}
+		c.tlsState = &tls.ConnectionState{}
+		*c.tlsState = tlsConn.ConnectionState()
+	}
+
+	for {
+		m, err := c.readMessage()
+		if err != nil {
+			c.rwc.Close()
+			if err != io.EOF && err != io.ErrUnexpectedEOF {
+				c.server.logger.Errorw("Failed to read message", "error", err)
+				c.server.stats.Errors.Add(1)
+			}
+			c.server.logger.Errorw("connection closed", "err", err, "remote", c.rwc.RemoteAddr().String())
+			break
+		}
+
+		// Update stats for received message
+		c.server.stats.TotalMessages.Add(1)
+		c.server.stats.MessagesReceived.Add(1)
+		c.server.stats.TotalBytesReceived.Add(uint64(m.Length))
+
+		// Parse command from message header
+		cmd, err := parseCommand(m.Header)
+		if err != nil {
+			c.server.logger.Errorw("Failed to parse command", "error", err)
+			c.server.stats.Errors.Add(1)
+			continue
+		}
+
+		// Update interface and command stats for received message
+		ifStats := c.server.getOrCreateInterfaceStats(cmd.Interface)
+		ifStats.MessagesReceived.Add(1)
+		ifStats.BytesReceived.Add(uint64(m.Length))
+		cmdStats := ifStats.getOrCreateCommandStats(cmd.Code)
+		cmdStats.MessagesReceived.Add(1)
+		cmdStats.BytesReceived.Add(uint64(m.Length))
+
+		// Get handler for this command
+		handler, exists := c.server.getHandler(cmd)
+		if !exists {
+			c.server.logger.Warnw("No handler registered for command",
+				"interface", cmd.Interface,
+				"code", cmd.Code)
+			continue
+		}
+
+		// Call handler in a goroutine with Message struct and connection interface
+		// For base protocol messages (CER, DWR, DPR), we need to ensure response is sent
+		// before continuing to read next message
+		if cmd.Interface == 0 && (cmd.Code == 257 || cmd.Code == 280 || cmd.Code == 282) {
+			// Base protocol messages - call handler synchronously to ensure response is sent
+			go handler(m, c.writer)
+		} else {
+			// Application messages - call handler in goroutine
+			go func(msg *Message, conn Conn) {
+				defer func() {
+					if r := recover(); r != nil {
+						buf := make([]byte, 4096)
+						buf = buf[:runtime.Stack(buf, false)]
+						c.server.logger.Errorw("panic in handler",
+							"error", r,
+							"stack", string(buf))
+					}
+				}()
+				go handler(msg, conn)
+			}(m, c.writer)
+		}
+	}
+}
+
+// response represents the server side of a diameter response
+type response struct {
+	mu   sync.Mutex
+	conn *conn
+	xmu  sync.Mutex
+	ctx  context.Context
+}
+
+// Write writes the message to the connection
+func (w *response) Write(b []byte) (int, error) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	if w.conn.server.WriteTimeout > 0 {
+		w.conn.rwc.SetWriteDeadline(time.Now().Add(w.conn.server.WriteTimeout))
+	}
+	// Use bufio.Writer but ensure proper flushing
+	n, err := w.conn.buf.Writer.Write(b)
+	if err != nil {
+		w.conn.server.logger.Errorw("Failed to write message", "error", err)
+		w.conn.server.stats.Errors.Add(1)
+		return 0, err
+	}
+	// Force flush to ensure data is sent
+	if err = w.conn.buf.Writer.Flush(); err != nil {
+		w.conn.server.logger.Errorw("Failed to flush message", "error", err)
+		w.conn.server.stats.Errors.Add(1)
+		return 0, err
+	}
+	// Update stats for sent message
+	w.conn.server.stats.MessagesSent.Add(1)
+	w.conn.server.stats.TotalBytesSent.Add(uint64(n))
+
+	// Update interface and command stats for sent message
+	// Parse command from response message header (first 20 bytes)
+	if len(b) >= 20 {
+		cmd, err := parseCommand(b[:20])
+		if err == nil {
+			ifStats := w.conn.server.getOrCreateInterfaceStats(cmd.Interface)
+			ifStats.MessagesSent.Add(1)
+			ifStats.BytesSent.Add(uint64(n))
+			cmdStats := ifStats.getOrCreateCommandStats(cmd.Code)
+			cmdStats.MessagesSent.Add(1)
+			cmdStats.BytesSent.Add(uint64(n))
+		}
+	}
+
+	return n, nil
+}
+
+// WriteStream implements the Conn interface
+func (w *response) WriteStream(b []byte, stream uint) (int, error) {
+	return w.Write(b)
+}
+
+// Close closes the connection
+func (w *response) Close() error {
+	return w.conn.rwc.Close()
+}
+
+// LocalAddr returns the local address of the connection
+func (w *response) LocalAddr() net.Addr {
+	return w.conn.rwc.LocalAddr()
+}
+
+// RemoteAddr returns the peer address of the connection
+func (w *response) RemoteAddr() net.Addr {
+	return w.conn.rwc.RemoteAddr()
+}
+
+// TLS returns the TLS connection state, or nil
+func (w *response) TLS() *tls.ConnectionState {
+	return w.conn.tlsState
+}
+
+// CloseNotify implements the CloseNotifier interface
+func (w *response) CloseNotify() <-chan struct{} {
+	return w.conn.closeNotify()
+}
+
+// Context returns the internal context or a new context.Background
+func (w *response) Context() context.Context {
+	w.xmu.Lock()
+	defer w.xmu.Unlock()
+	if w.ctx == nil {
+		w.ctx = context.Background()
+	}
+	return w.ctx
+}
+
+// SetContext replaces the internal context with the given one
+func (w *response) SetContext(ctx context.Context) {
+	w.xmu.Lock()
+	w.ctx = ctx
+	w.xmu.Unlock()
+}
+
+// Connection returns the underlying network connection
+func (w *response) Connection() net.Conn {
+	return w.conn.rwc
 }
