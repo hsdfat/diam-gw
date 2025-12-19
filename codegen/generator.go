@@ -1862,13 +1862,30 @@ func (g *Generator) generateCommandValidationTest(buf *bytes.Buffer, cmd *Comman
 	buf.WriteString("}\n\n")
 }
 
-// generateMessageCreationHelper generates a helper function to create a test message with all fields
-func (g *Generator) generateMessageCreationHelper(buf *bytes.Buffer, cmd *CommandDefinition) {
+// generateCommandPcapTest generates PCAP file tests for both request and answer
+func (g *Generator) generateCommandPcapTest(buf *bytes.Buffer, cmd *CommandDefinition) {
 	structName := toCamelCase(strings.ReplaceAll(cmd.Name, "-", "_"))
-	helperName := fmt.Sprintf("create%sForTest", structName)
+	testFuncName := fmt.Sprintf("Test%s_PCAP", structName)
+	pcapFileName := fmt.Sprintf("test_%s.pcap", strings.ToLower(strings.ReplaceAll(cmd.Abbreviation, "-", "_")))
 
-	buf.WriteString(fmt.Sprintf("// %s creates a %s message with ALL fields populated for testing\n", helperName, structName))
-	buf.WriteString(fmt.Sprintf("func %s() *%s {\n", helperName, structName))
+	isRequest := cmd.Request
+	msgType := "Request"
+	if !isRequest {
+		msgType = "Answer"
+	}
+
+	buf.WriteString(fmt.Sprintf("// %s tests PCAP file generation for %s message\n", testFuncName, msgType))
+	buf.WriteString(fmt.Sprintf("func %s(t *testing.T) {\n", testFuncName))
+	buf.WriteString("\t// Create testdata directory\n")
+	buf.WriteString("\tif err := os.MkdirAll(\"testdata\", 0755); err != nil {\n")
+	buf.WriteString("\t\tt.Fatalf(\"Failed to create testdata directory: %v\", err)\n")
+	buf.WriteString("\t}\n\n")
+
+	buf.WriteString("\t// Create pcap file path\n")
+	buf.WriteString(fmt.Sprintf("\tpcapFile := filepath.Join(\"testdata\", \"%s\")\n", pcapFileName))
+	buf.WriteString("\t// PCAP files are kept for Wireshark analysis\n\n")
+
+	buf.WriteString(fmt.Sprintf("\t// Create %s message with ALL fields populated\n", msgType))
 	buf.WriteString(fmt.Sprintf("\tmsg := New%s()\n\n", structName))
 
 	// Set ALL fields (required and optional) for complete PCAP examples
@@ -1889,38 +1906,7 @@ func (g *Generator) generateMessageCreationHelper(buf *bytes.Buffer, cmd *Comman
 		}
 	}
 
-	buf.WriteString("\n\treturn msg\n")
-	buf.WriteString("}\n\n")
-}
-
-// generateCommandPcapTest generates PCAP file tests for both request and answer
-func (g *Generator) generateCommandPcapTest(buf *bytes.Buffer, cmd *CommandDefinition) {
-	structName := toCamelCase(strings.ReplaceAll(cmd.Name, "-", "_"))
-	testFuncName := fmt.Sprintf("Test%s_PCAP", structName)
-	pcapFileName := fmt.Sprintf("test_%s.pcap", strings.ToLower(strings.ReplaceAll(cmd.Abbreviation, "-", "_")))
-	helperName := fmt.Sprintf("create%sForTest", structName)
-
-	isRequest := cmd.Request
-	msgType := "Request"
-	if !isRequest {
-		msgType = "Answer"
-	}
-
-	buf.WriteString(fmt.Sprintf("// %s tests PCAP file generation for %s message\n", testFuncName, msgType))
-	buf.WriteString(fmt.Sprintf("func %s(t *testing.T) {\n", testFuncName))
-	buf.WriteString("\t// Create testdata directory\n")
-	buf.WriteString("\tif err := os.MkdirAll(\"testdata\", 0755); err != nil {\n")
-	buf.WriteString("\t\tt.Fatalf(\"Failed to create testdata directory: %v\", err)\n")
-	buf.WriteString("\t}\n\n")
-
-	buf.WriteString("\t// Create pcap file path\n")
-	buf.WriteString(fmt.Sprintf("\tpcapFile := filepath.Join(\"testdata\", \"%s\")\n", pcapFileName))
-	buf.WriteString("\t// PCAP files are kept for Wireshark analysis\n\n")
-
-	buf.WriteString(fmt.Sprintf("\t// Create %s message with ALL fields populated\n", msgType))
-	buf.WriteString(fmt.Sprintf("\tmsg := %s()\n\n", helperName))
-
-	buf.WriteString("\t// Set header identifiers\n")
+	buf.WriteString("\n\t// Set header identifiers\n")
 	buf.WriteString("\tmsg.Header.HopByHopID = 0x12345678\n")
 	buf.WriteString("\tmsg.Header.EndToEndID = 0x87654321\n\n")
 
@@ -1958,9 +1944,6 @@ func (g *Generator) generateCommandPcapTest(buf *bytes.Buffer, cmd *CommandDefin
 func (g *Generator) generateCommandPairPcapTest(buf *bytes.Buffer, requestCmd, answerCmd *CommandDefinition) {
 	requestStructName := toCamelCase(strings.ReplaceAll(requestCmd.Name, "-", "_"))
 	answerStructName := toCamelCase(strings.ReplaceAll(answerCmd.Name, "-", "_"))
-	requestHelperName := fmt.Sprintf("create%sForTest", requestStructName)
-	answerHelperName := fmt.Sprintf("create%sForTest", answerStructName)
-
 	// Generate a clean test name based on command abbreviation
 	baseName := strings.TrimSuffix(requestCmd.Abbreviation, "R")
 	if baseName == requestCmd.Abbreviation {
@@ -1980,15 +1963,35 @@ func (g *Generator) generateCommandPairPcapTest(buf *bytes.Buffer, requestCmd, a
 	buf.WriteString(fmt.Sprintf("\tpcapFile := filepath.Join(\"testdata\", \"%s\")\n", pcapFileName))
 	buf.WriteString("\t// PCAP files are kept for Wireshark analysis\n\n")
 
-	buf.WriteString("\t// Create Request message with ALL fields populated (using helper function)\n")
-	buf.WriteString(fmt.Sprintf("\trequest := %s()\n", requestHelperName))
+	buf.WriteString("\t// Create Request message\n")
+	buf.WriteString(fmt.Sprintf("\trequest := New%s()\n", requestStructName))
+
+	// Set required fields for request
+	cmdName := requestCmd.Name
+	for _, field := range requestCmd.Fields {
+		if field.Required {
+			g.generateTestFieldAssignmentWithVar(buf, field, &cmdName, "request", "\t")
+		}
+	}
+
+	buf.WriteString("\n\t// Set header identifiers for request\n")
 	buf.WriteString("\trequest.Header.HopByHopID = 0x12345678\n")
 	buf.WriteString("\trequest.Header.EndToEndID = 0x87654321\n\n")
 
-	buf.WriteString("\t// Create Answer message with ALL fields populated (using helper function)\n")
-	buf.WriteString(fmt.Sprintf("\tanswer := %s()\n", answerHelperName))
-	buf.WriteString("\tanswer.Header.HopByHopID = 0x12345678 // Must match request\n")
-	buf.WriteString("\tanswer.Header.EndToEndID = 0x87654321 // Must match request\n\n")
+	buf.WriteString("\t// Create Answer message\n")
+	buf.WriteString(fmt.Sprintf("\tanswer := New%s()\n", answerStructName))
+
+	// Set required fields for answer
+	cmdName = answerCmd.Name
+	for _, field := range answerCmd.Fields {
+		if field.Required {
+			g.generateTestFieldAssignmentWithVar(buf, field, &cmdName, "answer", "\t")
+		}
+	}
+
+	buf.WriteString("\n\t// Set header identifiers for answer (must match request)\n")
+	buf.WriteString("\tanswer.Header.HopByHopID = 0x12345678\n")
+	buf.WriteString("\tanswer.Header.EndToEndID = 0x87654321\n\n")
 
 	buf.WriteString("\t// Marshal request\n")
 	buf.WriteString("\trequestData, err := request.Marshal()\n")
@@ -2348,11 +2351,6 @@ func (g *Generator) GeneratePcapTests() (string, error) {
 
 	// Generate pcap helper functions
 	g.generatePcapHelpers(&buf)
-
-	// Generate message creation helper functions for each command
-	for _, cmd := range g.Parser.Commands {
-		g.generateMessageCreationHelper(&buf, cmd)
-	}
 
 	// Generate PCAP test functions for each command
 	for _, cmd := range g.Parser.Commands {

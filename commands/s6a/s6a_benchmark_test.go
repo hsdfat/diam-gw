@@ -25,6 +25,9 @@ func BenchmarkUpdateLocationRequest_Marshal(b *testing.B) {
 	msg.OriginRealm = models_base.DiameterIdentity("client.example.com")
 	msg.DestinationRealm = models_base.DiameterIdentity("server.example.com")
 	msg.UserName = models_base.UTF8String("test")
+	msg.RatType = models_base.Enumerated(1)
+	msg.UlrFlags = models_base.Unsigned32(1)
+	msg.VisitedPlmnId = models_base.OctetString([]byte{0x00, 0xF1, 0x10})
 
 	b.ResetTimer()
 	b.ReportAllocs()
@@ -46,6 +49,9 @@ func BenchmarkUpdateLocationRequest_Unmarshal(b *testing.B) {
 	msg.OriginRealm = models_base.DiameterIdentity("client.example.com")
 	msg.DestinationRealm = models_base.DiameterIdentity("server.example.com")
 	msg.UserName = models_base.UTF8String("test")
+	msg.RatType = models_base.Enumerated(1)
+	msg.UlrFlags = models_base.Unsigned32(1)
+	msg.VisitedPlmnId = models_base.OctetString([]byte{0x00, 0xF1, 0x10})
 
 	data, err := msg.Marshal()
 	if err != nil {
@@ -73,6 +79,9 @@ func BenchmarkUpdateLocationRequest_Roundtrip(b *testing.B) {
 	msg.OriginRealm = models_base.DiameterIdentity("client.example.com")
 	msg.DestinationRealm = models_base.DiameterIdentity("server.example.com")
 	msg.UserName = models_base.UTF8String("test")
+	msg.RatType = models_base.Enumerated(1)
+	msg.UlrFlags = models_base.Unsigned32(1)
+	msg.VisitedPlmnId = models_base.OctetString([]byte{0x00, 0xF1, 0x10})
 
 	b.ResetTimer()
 	b.ReportAllocs()
@@ -157,6 +166,1134 @@ func BenchmarkUpdateLocationAnswer_Roundtrip(b *testing.B) {
 			b.Fatal(err)
 		}
 		result := &UpdateLocationAnswer{}
+		err = result.Unmarshal(data)
+		if err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
+func BenchmarkNewAuthenticationInformationRequest(b *testing.B) {
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		_ = NewAuthenticationInformationRequest()
+	}
+}
+
+func BenchmarkAuthenticationInformationRequest_Marshal(b *testing.B) {
+	msg := NewAuthenticationInformationRequest()
+
+	// Set required fields
+	msg.SessionId = models_base.UTF8String("client.example.com;1234567890;1")
+	msg.AuthSessionState = models_base.Enumerated(1)
+	msg.OriginHost = models_base.DiameterIdentity("client.example.com")
+	msg.OriginRealm = models_base.DiameterIdentity("client.example.com")
+	msg.DestinationRealm = models_base.DiameterIdentity("server.example.com")
+	msg.UserName = models_base.UTF8String("test")
+	msg.VisitedPlmnId = models_base.OctetString([]byte{0x00, 0xF1, 0x10})
+
+	b.ResetTimer()
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		_, err := msg.Marshal()
+		if err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
+func BenchmarkAuthenticationInformationRequest_Unmarshal(b *testing.B) {
+	msg := NewAuthenticationInformationRequest()
+
+	// Set required fields
+	msg.SessionId = models_base.UTF8String("client.example.com;1234567890;1")
+	msg.AuthSessionState = models_base.Enumerated(1)
+	msg.OriginHost = models_base.DiameterIdentity("client.example.com")
+	msg.OriginRealm = models_base.DiameterIdentity("client.example.com")
+	msg.DestinationRealm = models_base.DiameterIdentity("server.example.com")
+	msg.UserName = models_base.UTF8String("test")
+	msg.VisitedPlmnId = models_base.OctetString([]byte{0x00, 0xF1, 0x10})
+
+	data, err := msg.Marshal()
+	if err != nil {
+		b.Fatal(err)
+	}
+
+	b.ResetTimer()
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		result := &AuthenticationInformationRequest{}
+		err := result.Unmarshal(data)
+		if err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
+func BenchmarkAuthenticationInformationRequest_Roundtrip(b *testing.B) {
+	msg := NewAuthenticationInformationRequest()
+
+	// Set required fields
+	msg.SessionId = models_base.UTF8String("client.example.com;1234567890;1")
+	msg.AuthSessionState = models_base.Enumerated(1)
+	msg.OriginHost = models_base.DiameterIdentity("client.example.com")
+	msg.OriginRealm = models_base.DiameterIdentity("client.example.com")
+	msg.DestinationRealm = models_base.DiameterIdentity("server.example.com")
+	msg.UserName = models_base.UTF8String("test")
+	msg.VisitedPlmnId = models_base.OctetString([]byte{0x00, 0xF1, 0x10})
+
+	b.ResetTimer()
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		data, err := msg.Marshal()
+		if err != nil {
+			b.Fatal(err)
+		}
+		result := &AuthenticationInformationRequest{}
+		err = result.Unmarshal(data)
+		if err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
+func BenchmarkNewAuthenticationInformationAnswer(b *testing.B) {
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		_ = NewAuthenticationInformationAnswer()
+	}
+}
+
+func BenchmarkAuthenticationInformationAnswer_Marshal(b *testing.B) {
+	msg := NewAuthenticationInformationAnswer()
+
+	// Set required fields
+	msg.SessionId = models_base.UTF8String("client.example.com;1234567890;1")
+	msg.AuthSessionState = models_base.Enumerated(1)
+	msg.OriginHost = models_base.DiameterIdentity("server.example.com")
+	msg.OriginRealm = models_base.DiameterIdentity("server.example.com")
+
+	b.ResetTimer()
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		_, err := msg.Marshal()
+		if err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
+func BenchmarkAuthenticationInformationAnswer_Unmarshal(b *testing.B) {
+	msg := NewAuthenticationInformationAnswer()
+
+	// Set required fields
+	msg.SessionId = models_base.UTF8String("client.example.com;1234567890;1")
+	msg.AuthSessionState = models_base.Enumerated(1)
+	msg.OriginHost = models_base.DiameterIdentity("server.example.com")
+	msg.OriginRealm = models_base.DiameterIdentity("server.example.com")
+
+	data, err := msg.Marshal()
+	if err != nil {
+		b.Fatal(err)
+	}
+
+	b.ResetTimer()
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		result := &AuthenticationInformationAnswer{}
+		err := result.Unmarshal(data)
+		if err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
+func BenchmarkAuthenticationInformationAnswer_Roundtrip(b *testing.B) {
+	msg := NewAuthenticationInformationAnswer()
+
+	// Set required fields
+	msg.SessionId = models_base.UTF8String("client.example.com;1234567890;1")
+	msg.AuthSessionState = models_base.Enumerated(1)
+	msg.OriginHost = models_base.DiameterIdentity("server.example.com")
+	msg.OriginRealm = models_base.DiameterIdentity("server.example.com")
+
+	b.ResetTimer()
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		data, err := msg.Marshal()
+		if err != nil {
+			b.Fatal(err)
+		}
+		result := &AuthenticationInformationAnswer{}
+		err = result.Unmarshal(data)
+		if err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
+func BenchmarkNewCancelLocationRequest(b *testing.B) {
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		_ = NewCancelLocationRequest()
+	}
+}
+
+func BenchmarkCancelLocationRequest_Marshal(b *testing.B) {
+	msg := NewCancelLocationRequest()
+
+	// Set required fields
+	msg.SessionId = models_base.UTF8String("client.example.com;1234567890;1")
+	msg.AuthSessionState = models_base.Enumerated(1)
+	msg.OriginHost = models_base.DiameterIdentity("client.example.com")
+	msg.OriginRealm = models_base.DiameterIdentity("client.example.com")
+	msg.DestinationHost = models_base.DiameterIdentity("server.example.com")
+	msg.DestinationRealm = models_base.DiameterIdentity("server.example.com")
+	msg.UserName = models_base.UTF8String("test")
+	msg.CancellationType = models_base.Enumerated(1)
+
+	b.ResetTimer()
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		_, err := msg.Marshal()
+		if err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
+func BenchmarkCancelLocationRequest_Unmarshal(b *testing.B) {
+	msg := NewCancelLocationRequest()
+
+	// Set required fields
+	msg.SessionId = models_base.UTF8String("client.example.com;1234567890;1")
+	msg.AuthSessionState = models_base.Enumerated(1)
+	msg.OriginHost = models_base.DiameterIdentity("client.example.com")
+	msg.OriginRealm = models_base.DiameterIdentity("client.example.com")
+	msg.DestinationHost = models_base.DiameterIdentity("server.example.com")
+	msg.DestinationRealm = models_base.DiameterIdentity("server.example.com")
+	msg.UserName = models_base.UTF8String("test")
+	msg.CancellationType = models_base.Enumerated(1)
+
+	data, err := msg.Marshal()
+	if err != nil {
+		b.Fatal(err)
+	}
+
+	b.ResetTimer()
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		result := &CancelLocationRequest{}
+		err := result.Unmarshal(data)
+		if err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
+func BenchmarkCancelLocationRequest_Roundtrip(b *testing.B) {
+	msg := NewCancelLocationRequest()
+
+	// Set required fields
+	msg.SessionId = models_base.UTF8String("client.example.com;1234567890;1")
+	msg.AuthSessionState = models_base.Enumerated(1)
+	msg.OriginHost = models_base.DiameterIdentity("client.example.com")
+	msg.OriginRealm = models_base.DiameterIdentity("client.example.com")
+	msg.DestinationHost = models_base.DiameterIdentity("server.example.com")
+	msg.DestinationRealm = models_base.DiameterIdentity("server.example.com")
+	msg.UserName = models_base.UTF8String("test")
+	msg.CancellationType = models_base.Enumerated(1)
+
+	b.ResetTimer()
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		data, err := msg.Marshal()
+		if err != nil {
+			b.Fatal(err)
+		}
+		result := &CancelLocationRequest{}
+		err = result.Unmarshal(data)
+		if err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
+func BenchmarkNewCancelLocationAnswer(b *testing.B) {
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		_ = NewCancelLocationAnswer()
+	}
+}
+
+func BenchmarkCancelLocationAnswer_Marshal(b *testing.B) {
+	msg := NewCancelLocationAnswer()
+
+	// Set required fields
+	msg.SessionId = models_base.UTF8String("client.example.com;1234567890;1")
+	msg.AuthSessionState = models_base.Enumerated(1)
+	msg.OriginHost = models_base.DiameterIdentity("server.example.com")
+	msg.OriginRealm = models_base.DiameterIdentity("server.example.com")
+
+	b.ResetTimer()
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		_, err := msg.Marshal()
+		if err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
+func BenchmarkCancelLocationAnswer_Unmarshal(b *testing.B) {
+	msg := NewCancelLocationAnswer()
+
+	// Set required fields
+	msg.SessionId = models_base.UTF8String("client.example.com;1234567890;1")
+	msg.AuthSessionState = models_base.Enumerated(1)
+	msg.OriginHost = models_base.DiameterIdentity("server.example.com")
+	msg.OriginRealm = models_base.DiameterIdentity("server.example.com")
+
+	data, err := msg.Marshal()
+	if err != nil {
+		b.Fatal(err)
+	}
+
+	b.ResetTimer()
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		result := &CancelLocationAnswer{}
+		err := result.Unmarshal(data)
+		if err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
+func BenchmarkCancelLocationAnswer_Roundtrip(b *testing.B) {
+	msg := NewCancelLocationAnswer()
+
+	// Set required fields
+	msg.SessionId = models_base.UTF8String("client.example.com;1234567890;1")
+	msg.AuthSessionState = models_base.Enumerated(1)
+	msg.OriginHost = models_base.DiameterIdentity("server.example.com")
+	msg.OriginRealm = models_base.DiameterIdentity("server.example.com")
+
+	b.ResetTimer()
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		data, err := msg.Marshal()
+		if err != nil {
+			b.Fatal(err)
+		}
+		result := &CancelLocationAnswer{}
+		err = result.Unmarshal(data)
+		if err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
+func BenchmarkNewInsertSubscriberDataRequest(b *testing.B) {
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		_ = NewInsertSubscriberDataRequest()
+	}
+}
+
+func BenchmarkInsertSubscriberDataRequest_Marshal(b *testing.B) {
+	msg := NewInsertSubscriberDataRequest()
+
+	// Set required fields
+	msg.SessionId = models_base.UTF8String("client.example.com;1234567890;1")
+	msg.AuthSessionState = models_base.Enumerated(1)
+	msg.OriginHost = models_base.DiameterIdentity("client.example.com")
+	msg.OriginRealm = models_base.DiameterIdentity("client.example.com")
+	msg.DestinationHost = models_base.DiameterIdentity("server.example.com")
+	msg.DestinationRealm = models_base.DiameterIdentity("server.example.com")
+	msg.UserName = models_base.UTF8String("test")
+	msg.SubscriptionData = &SubscriptionData{
+		SubscriberStatus: ptrEnumerated(1),
+		Msisdn:           ptrOctetString([]byte{0x01, 0x02, 0x03}),
+		AMsisdn:          ptrOctetString([]byte{0x01, 0x02, 0x03}),
+		// ... and 42 more fields
+	}
+
+	b.ResetTimer()
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		_, err := msg.Marshal()
+		if err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
+func BenchmarkInsertSubscriberDataRequest_Unmarshal(b *testing.B) {
+	msg := NewInsertSubscriberDataRequest()
+
+	// Set required fields
+	msg.SessionId = models_base.UTF8String("client.example.com;1234567890;1")
+	msg.AuthSessionState = models_base.Enumerated(1)
+	msg.OriginHost = models_base.DiameterIdentity("client.example.com")
+	msg.OriginRealm = models_base.DiameterIdentity("client.example.com")
+	msg.DestinationHost = models_base.DiameterIdentity("server.example.com")
+	msg.DestinationRealm = models_base.DiameterIdentity("server.example.com")
+	msg.UserName = models_base.UTF8String("test")
+	msg.SubscriptionData = &SubscriptionData{
+		SubscriberStatus: ptrEnumerated(1),
+		Msisdn:           ptrOctetString([]byte{0x01, 0x02, 0x03}),
+		AMsisdn:          ptrOctetString([]byte{0x01, 0x02, 0x03}),
+		// ... and 42 more fields
+	}
+
+	data, err := msg.Marshal()
+	if err != nil {
+		b.Fatal(err)
+	}
+
+	b.ResetTimer()
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		result := &InsertSubscriberDataRequest{}
+		err := result.Unmarshal(data)
+		if err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
+func BenchmarkInsertSubscriberDataRequest_Roundtrip(b *testing.B) {
+	msg := NewInsertSubscriberDataRequest()
+
+	// Set required fields
+	msg.SessionId = models_base.UTF8String("client.example.com;1234567890;1")
+	msg.AuthSessionState = models_base.Enumerated(1)
+	msg.OriginHost = models_base.DiameterIdentity("client.example.com")
+	msg.OriginRealm = models_base.DiameterIdentity("client.example.com")
+	msg.DestinationHost = models_base.DiameterIdentity("server.example.com")
+	msg.DestinationRealm = models_base.DiameterIdentity("server.example.com")
+	msg.UserName = models_base.UTF8String("test")
+	msg.SubscriptionData = &SubscriptionData{
+		SubscriberStatus: ptrEnumerated(1),
+		Msisdn:           ptrOctetString([]byte{0x01, 0x02, 0x03}),
+		AMsisdn:          ptrOctetString([]byte{0x01, 0x02, 0x03}),
+		// ... and 42 more fields
+	}
+
+	b.ResetTimer()
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		data, err := msg.Marshal()
+		if err != nil {
+			b.Fatal(err)
+		}
+		result := &InsertSubscriberDataRequest{}
+		err = result.Unmarshal(data)
+		if err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
+func BenchmarkNewInsertSubscriberDataAnswer(b *testing.B) {
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		_ = NewInsertSubscriberDataAnswer()
+	}
+}
+
+func BenchmarkInsertSubscriberDataAnswer_Marshal(b *testing.B) {
+	msg := NewInsertSubscriberDataAnswer()
+
+	// Set required fields
+	msg.SessionId = models_base.UTF8String("client.example.com;1234567890;1")
+	msg.AuthSessionState = models_base.Enumerated(1)
+	msg.OriginHost = models_base.DiameterIdentity("server.example.com")
+	msg.OriginRealm = models_base.DiameterIdentity("server.example.com")
+
+	b.ResetTimer()
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		_, err := msg.Marshal()
+		if err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
+func BenchmarkInsertSubscriberDataAnswer_Unmarshal(b *testing.B) {
+	msg := NewInsertSubscriberDataAnswer()
+
+	// Set required fields
+	msg.SessionId = models_base.UTF8String("client.example.com;1234567890;1")
+	msg.AuthSessionState = models_base.Enumerated(1)
+	msg.OriginHost = models_base.DiameterIdentity("server.example.com")
+	msg.OriginRealm = models_base.DiameterIdentity("server.example.com")
+
+	data, err := msg.Marshal()
+	if err != nil {
+		b.Fatal(err)
+	}
+
+	b.ResetTimer()
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		result := &InsertSubscriberDataAnswer{}
+		err := result.Unmarshal(data)
+		if err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
+func BenchmarkInsertSubscriberDataAnswer_Roundtrip(b *testing.B) {
+	msg := NewInsertSubscriberDataAnswer()
+
+	// Set required fields
+	msg.SessionId = models_base.UTF8String("client.example.com;1234567890;1")
+	msg.AuthSessionState = models_base.Enumerated(1)
+	msg.OriginHost = models_base.DiameterIdentity("server.example.com")
+	msg.OriginRealm = models_base.DiameterIdentity("server.example.com")
+
+	b.ResetTimer()
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		data, err := msg.Marshal()
+		if err != nil {
+			b.Fatal(err)
+		}
+		result := &InsertSubscriberDataAnswer{}
+		err = result.Unmarshal(data)
+		if err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
+func BenchmarkNewDeleteSubscriberDataRequest(b *testing.B) {
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		_ = NewDeleteSubscriberDataRequest()
+	}
+}
+
+func BenchmarkDeleteSubscriberDataRequest_Marshal(b *testing.B) {
+	msg := NewDeleteSubscriberDataRequest()
+
+	// Set required fields
+	msg.SessionId = models_base.UTF8String("client.example.com;1234567890;1")
+	msg.AuthSessionState = models_base.Enumerated(1)
+	msg.OriginHost = models_base.DiameterIdentity("client.example.com")
+	msg.OriginRealm = models_base.DiameterIdentity("client.example.com")
+	msg.DestinationHost = models_base.DiameterIdentity("server.example.com")
+	msg.DestinationRealm = models_base.DiameterIdentity("server.example.com")
+	msg.UserName = models_base.UTF8String("test")
+	msg.DsrFlags = models_base.Unsigned32(1)
+
+	b.ResetTimer()
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		_, err := msg.Marshal()
+		if err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
+func BenchmarkDeleteSubscriberDataRequest_Unmarshal(b *testing.B) {
+	msg := NewDeleteSubscriberDataRequest()
+
+	// Set required fields
+	msg.SessionId = models_base.UTF8String("client.example.com;1234567890;1")
+	msg.AuthSessionState = models_base.Enumerated(1)
+	msg.OriginHost = models_base.DiameterIdentity("client.example.com")
+	msg.OriginRealm = models_base.DiameterIdentity("client.example.com")
+	msg.DestinationHost = models_base.DiameterIdentity("server.example.com")
+	msg.DestinationRealm = models_base.DiameterIdentity("server.example.com")
+	msg.UserName = models_base.UTF8String("test")
+	msg.DsrFlags = models_base.Unsigned32(1)
+
+	data, err := msg.Marshal()
+	if err != nil {
+		b.Fatal(err)
+	}
+
+	b.ResetTimer()
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		result := &DeleteSubscriberDataRequest{}
+		err := result.Unmarshal(data)
+		if err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
+func BenchmarkDeleteSubscriberDataRequest_Roundtrip(b *testing.B) {
+	msg := NewDeleteSubscriberDataRequest()
+
+	// Set required fields
+	msg.SessionId = models_base.UTF8String("client.example.com;1234567890;1")
+	msg.AuthSessionState = models_base.Enumerated(1)
+	msg.OriginHost = models_base.DiameterIdentity("client.example.com")
+	msg.OriginRealm = models_base.DiameterIdentity("client.example.com")
+	msg.DestinationHost = models_base.DiameterIdentity("server.example.com")
+	msg.DestinationRealm = models_base.DiameterIdentity("server.example.com")
+	msg.UserName = models_base.UTF8String("test")
+	msg.DsrFlags = models_base.Unsigned32(1)
+
+	b.ResetTimer()
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		data, err := msg.Marshal()
+		if err != nil {
+			b.Fatal(err)
+		}
+		result := &DeleteSubscriberDataRequest{}
+		err = result.Unmarshal(data)
+		if err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
+func BenchmarkNewDeleteSubscriberDataAnswer(b *testing.B) {
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		_ = NewDeleteSubscriberDataAnswer()
+	}
+}
+
+func BenchmarkDeleteSubscriberDataAnswer_Marshal(b *testing.B) {
+	msg := NewDeleteSubscriberDataAnswer()
+
+	// Set required fields
+	msg.SessionId = models_base.UTF8String("client.example.com;1234567890;1")
+	msg.AuthSessionState = models_base.Enumerated(1)
+	msg.OriginHost = models_base.DiameterIdentity("server.example.com")
+	msg.OriginRealm = models_base.DiameterIdentity("server.example.com")
+
+	b.ResetTimer()
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		_, err := msg.Marshal()
+		if err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
+func BenchmarkDeleteSubscriberDataAnswer_Unmarshal(b *testing.B) {
+	msg := NewDeleteSubscriberDataAnswer()
+
+	// Set required fields
+	msg.SessionId = models_base.UTF8String("client.example.com;1234567890;1")
+	msg.AuthSessionState = models_base.Enumerated(1)
+	msg.OriginHost = models_base.DiameterIdentity("server.example.com")
+	msg.OriginRealm = models_base.DiameterIdentity("server.example.com")
+
+	data, err := msg.Marshal()
+	if err != nil {
+		b.Fatal(err)
+	}
+
+	b.ResetTimer()
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		result := &DeleteSubscriberDataAnswer{}
+		err := result.Unmarshal(data)
+		if err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
+func BenchmarkDeleteSubscriberDataAnswer_Roundtrip(b *testing.B) {
+	msg := NewDeleteSubscriberDataAnswer()
+
+	// Set required fields
+	msg.SessionId = models_base.UTF8String("client.example.com;1234567890;1")
+	msg.AuthSessionState = models_base.Enumerated(1)
+	msg.OriginHost = models_base.DiameterIdentity("server.example.com")
+	msg.OriginRealm = models_base.DiameterIdentity("server.example.com")
+
+	b.ResetTimer()
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		data, err := msg.Marshal()
+		if err != nil {
+			b.Fatal(err)
+		}
+		result := &DeleteSubscriberDataAnswer{}
+		err = result.Unmarshal(data)
+		if err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
+func BenchmarkNewPurgeUERequest(b *testing.B) {
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		_ = NewPurgeUERequest()
+	}
+}
+
+func BenchmarkPurgeUERequest_Marshal(b *testing.B) {
+	msg := NewPurgeUERequest()
+
+	// Set required fields
+	msg.SessionId = models_base.UTF8String("client.example.com;1234567890;1")
+	msg.AuthSessionState = models_base.Enumerated(1)
+	msg.OriginHost = models_base.DiameterIdentity("client.example.com")
+	msg.OriginRealm = models_base.DiameterIdentity("client.example.com")
+	msg.DestinationRealm = models_base.DiameterIdentity("server.example.com")
+	msg.UserName = models_base.UTF8String("test")
+
+	b.ResetTimer()
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		_, err := msg.Marshal()
+		if err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
+func BenchmarkPurgeUERequest_Unmarshal(b *testing.B) {
+	msg := NewPurgeUERequest()
+
+	// Set required fields
+	msg.SessionId = models_base.UTF8String("client.example.com;1234567890;1")
+	msg.AuthSessionState = models_base.Enumerated(1)
+	msg.OriginHost = models_base.DiameterIdentity("client.example.com")
+	msg.OriginRealm = models_base.DiameterIdentity("client.example.com")
+	msg.DestinationRealm = models_base.DiameterIdentity("server.example.com")
+	msg.UserName = models_base.UTF8String("test")
+
+	data, err := msg.Marshal()
+	if err != nil {
+		b.Fatal(err)
+	}
+
+	b.ResetTimer()
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		result := &PurgeUERequest{}
+		err := result.Unmarshal(data)
+		if err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
+func BenchmarkPurgeUERequest_Roundtrip(b *testing.B) {
+	msg := NewPurgeUERequest()
+
+	// Set required fields
+	msg.SessionId = models_base.UTF8String("client.example.com;1234567890;1")
+	msg.AuthSessionState = models_base.Enumerated(1)
+	msg.OriginHost = models_base.DiameterIdentity("client.example.com")
+	msg.OriginRealm = models_base.DiameterIdentity("client.example.com")
+	msg.DestinationRealm = models_base.DiameterIdentity("server.example.com")
+	msg.UserName = models_base.UTF8String("test")
+
+	b.ResetTimer()
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		data, err := msg.Marshal()
+		if err != nil {
+			b.Fatal(err)
+		}
+		result := &PurgeUERequest{}
+		err = result.Unmarshal(data)
+		if err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
+func BenchmarkNewPurgeUEAnswer(b *testing.B) {
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		_ = NewPurgeUEAnswer()
+	}
+}
+
+func BenchmarkPurgeUEAnswer_Marshal(b *testing.B) {
+	msg := NewPurgeUEAnswer()
+
+	// Set required fields
+	msg.SessionId = models_base.UTF8String("client.example.com;1234567890;1")
+	msg.AuthSessionState = models_base.Enumerated(1)
+	msg.OriginHost = models_base.DiameterIdentity("server.example.com")
+	msg.OriginRealm = models_base.DiameterIdentity("server.example.com")
+
+	b.ResetTimer()
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		_, err := msg.Marshal()
+		if err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
+func BenchmarkPurgeUEAnswer_Unmarshal(b *testing.B) {
+	msg := NewPurgeUEAnswer()
+
+	// Set required fields
+	msg.SessionId = models_base.UTF8String("client.example.com;1234567890;1")
+	msg.AuthSessionState = models_base.Enumerated(1)
+	msg.OriginHost = models_base.DiameterIdentity("server.example.com")
+	msg.OriginRealm = models_base.DiameterIdentity("server.example.com")
+
+	data, err := msg.Marshal()
+	if err != nil {
+		b.Fatal(err)
+	}
+
+	b.ResetTimer()
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		result := &PurgeUEAnswer{}
+		err := result.Unmarshal(data)
+		if err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
+func BenchmarkPurgeUEAnswer_Roundtrip(b *testing.B) {
+	msg := NewPurgeUEAnswer()
+
+	// Set required fields
+	msg.SessionId = models_base.UTF8String("client.example.com;1234567890;1")
+	msg.AuthSessionState = models_base.Enumerated(1)
+	msg.OriginHost = models_base.DiameterIdentity("server.example.com")
+	msg.OriginRealm = models_base.DiameterIdentity("server.example.com")
+
+	b.ResetTimer()
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		data, err := msg.Marshal()
+		if err != nil {
+			b.Fatal(err)
+		}
+		result := &PurgeUEAnswer{}
+		err = result.Unmarshal(data)
+		if err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
+func BenchmarkNewResetRequest(b *testing.B) {
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		_ = NewResetRequest()
+	}
+}
+
+func BenchmarkResetRequest_Marshal(b *testing.B) {
+	msg := NewResetRequest()
+
+	// Set required fields
+	msg.SessionId = models_base.UTF8String("client.example.com;1234567890;1")
+	msg.AuthSessionState = models_base.Enumerated(1)
+	msg.OriginHost = models_base.DiameterIdentity("client.example.com")
+	msg.OriginRealm = models_base.DiameterIdentity("client.example.com")
+	msg.DestinationHost = models_base.DiameterIdentity("server.example.com")
+	msg.DestinationRealm = models_base.DiameterIdentity("server.example.com")
+
+	b.ResetTimer()
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		_, err := msg.Marshal()
+		if err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
+func BenchmarkResetRequest_Unmarshal(b *testing.B) {
+	msg := NewResetRequest()
+
+	// Set required fields
+	msg.SessionId = models_base.UTF8String("client.example.com;1234567890;1")
+	msg.AuthSessionState = models_base.Enumerated(1)
+	msg.OriginHost = models_base.DiameterIdentity("client.example.com")
+	msg.OriginRealm = models_base.DiameterIdentity("client.example.com")
+	msg.DestinationHost = models_base.DiameterIdentity("server.example.com")
+	msg.DestinationRealm = models_base.DiameterIdentity("server.example.com")
+
+	data, err := msg.Marshal()
+	if err != nil {
+		b.Fatal(err)
+	}
+
+	b.ResetTimer()
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		result := &ResetRequest{}
+		err := result.Unmarshal(data)
+		if err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
+func BenchmarkResetRequest_Roundtrip(b *testing.B) {
+	msg := NewResetRequest()
+
+	// Set required fields
+	msg.SessionId = models_base.UTF8String("client.example.com;1234567890;1")
+	msg.AuthSessionState = models_base.Enumerated(1)
+	msg.OriginHost = models_base.DiameterIdentity("client.example.com")
+	msg.OriginRealm = models_base.DiameterIdentity("client.example.com")
+	msg.DestinationHost = models_base.DiameterIdentity("server.example.com")
+	msg.DestinationRealm = models_base.DiameterIdentity("server.example.com")
+
+	b.ResetTimer()
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		data, err := msg.Marshal()
+		if err != nil {
+			b.Fatal(err)
+		}
+		result := &ResetRequest{}
+		err = result.Unmarshal(data)
+		if err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
+func BenchmarkNewResetAnswer(b *testing.B) {
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		_ = NewResetAnswer()
+	}
+}
+
+func BenchmarkResetAnswer_Marshal(b *testing.B) {
+	msg := NewResetAnswer()
+
+	// Set required fields
+	msg.SessionId = models_base.UTF8String("client.example.com;1234567890;1")
+	msg.AuthSessionState = models_base.Enumerated(1)
+	msg.OriginHost = models_base.DiameterIdentity("server.example.com")
+	msg.OriginRealm = models_base.DiameterIdentity("server.example.com")
+
+	b.ResetTimer()
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		_, err := msg.Marshal()
+		if err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
+func BenchmarkResetAnswer_Unmarshal(b *testing.B) {
+	msg := NewResetAnswer()
+
+	// Set required fields
+	msg.SessionId = models_base.UTF8String("client.example.com;1234567890;1")
+	msg.AuthSessionState = models_base.Enumerated(1)
+	msg.OriginHost = models_base.DiameterIdentity("server.example.com")
+	msg.OriginRealm = models_base.DiameterIdentity("server.example.com")
+
+	data, err := msg.Marshal()
+	if err != nil {
+		b.Fatal(err)
+	}
+
+	b.ResetTimer()
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		result := &ResetAnswer{}
+		err := result.Unmarshal(data)
+		if err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
+func BenchmarkResetAnswer_Roundtrip(b *testing.B) {
+	msg := NewResetAnswer()
+
+	// Set required fields
+	msg.SessionId = models_base.UTF8String("client.example.com;1234567890;1")
+	msg.AuthSessionState = models_base.Enumerated(1)
+	msg.OriginHost = models_base.DiameterIdentity("server.example.com")
+	msg.OriginRealm = models_base.DiameterIdentity("server.example.com")
+
+	b.ResetTimer()
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		data, err := msg.Marshal()
+		if err != nil {
+			b.Fatal(err)
+		}
+		result := &ResetAnswer{}
+		err = result.Unmarshal(data)
+		if err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
+func BenchmarkNewNotifyRequest(b *testing.B) {
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		_ = NewNotifyRequest()
+	}
+}
+
+func BenchmarkNotifyRequest_Marshal(b *testing.B) {
+	msg := NewNotifyRequest()
+
+	// Set required fields
+	msg.SessionId = models_base.UTF8String("client.example.com;1234567890;1")
+	msg.AuthSessionState = models_base.Enumerated(1)
+	msg.OriginHost = models_base.DiameterIdentity("client.example.com")
+	msg.OriginRealm = models_base.DiameterIdentity("client.example.com")
+	msg.DestinationRealm = models_base.DiameterIdentity("server.example.com")
+	msg.UserName = models_base.UTF8String("test")
+
+	b.ResetTimer()
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		_, err := msg.Marshal()
+		if err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
+func BenchmarkNotifyRequest_Unmarshal(b *testing.B) {
+	msg := NewNotifyRequest()
+
+	// Set required fields
+	msg.SessionId = models_base.UTF8String("client.example.com;1234567890;1")
+	msg.AuthSessionState = models_base.Enumerated(1)
+	msg.OriginHost = models_base.DiameterIdentity("client.example.com")
+	msg.OriginRealm = models_base.DiameterIdentity("client.example.com")
+	msg.DestinationRealm = models_base.DiameterIdentity("server.example.com")
+	msg.UserName = models_base.UTF8String("test")
+
+	data, err := msg.Marshal()
+	if err != nil {
+		b.Fatal(err)
+	}
+
+	b.ResetTimer()
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		result := &NotifyRequest{}
+		err := result.Unmarshal(data)
+		if err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
+func BenchmarkNotifyRequest_Roundtrip(b *testing.B) {
+	msg := NewNotifyRequest()
+
+	// Set required fields
+	msg.SessionId = models_base.UTF8String("client.example.com;1234567890;1")
+	msg.AuthSessionState = models_base.Enumerated(1)
+	msg.OriginHost = models_base.DiameterIdentity("client.example.com")
+	msg.OriginRealm = models_base.DiameterIdentity("client.example.com")
+	msg.DestinationRealm = models_base.DiameterIdentity("server.example.com")
+	msg.UserName = models_base.UTF8String("test")
+
+	b.ResetTimer()
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		data, err := msg.Marshal()
+		if err != nil {
+			b.Fatal(err)
+		}
+		result := &NotifyRequest{}
+		err = result.Unmarshal(data)
+		if err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
+func BenchmarkNewNotifyAnswer(b *testing.B) {
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		_ = NewNotifyAnswer()
+	}
+}
+
+func BenchmarkNotifyAnswer_Marshal(b *testing.B) {
+	msg := NewNotifyAnswer()
+
+	// Set required fields
+	msg.SessionId = models_base.UTF8String("client.example.com;1234567890;1")
+	msg.AuthSessionState = models_base.Enumerated(1)
+	msg.OriginHost = models_base.DiameterIdentity("server.example.com")
+	msg.OriginRealm = models_base.DiameterIdentity("server.example.com")
+
+	b.ResetTimer()
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		_, err := msg.Marshal()
+		if err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
+func BenchmarkNotifyAnswer_Unmarshal(b *testing.B) {
+	msg := NewNotifyAnswer()
+
+	// Set required fields
+	msg.SessionId = models_base.UTF8String("client.example.com;1234567890;1")
+	msg.AuthSessionState = models_base.Enumerated(1)
+	msg.OriginHost = models_base.DiameterIdentity("server.example.com")
+	msg.OriginRealm = models_base.DiameterIdentity("server.example.com")
+
+	data, err := msg.Marshal()
+	if err != nil {
+		b.Fatal(err)
+	}
+
+	b.ResetTimer()
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		result := &NotifyAnswer{}
+		err := result.Unmarshal(data)
+		if err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
+func BenchmarkNotifyAnswer_Roundtrip(b *testing.B) {
+	msg := NewNotifyAnswer()
+
+	// Set required fields
+	msg.SessionId = models_base.UTF8String("client.example.com;1234567890;1")
+	msg.AuthSessionState = models_base.Enumerated(1)
+	msg.OriginHost = models_base.DiameterIdentity("server.example.com")
+	msg.OriginRealm = models_base.DiameterIdentity("server.example.com")
+
+	b.ResetTimer()
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		data, err := msg.Marshal()
+		if err != nil {
+			b.Fatal(err)
+		}
+		result := &NotifyAnswer{}
 		err = result.Unmarshal(data)
 		if err != nil {
 			b.Fatal(err)
