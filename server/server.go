@@ -1,12 +1,8 @@
 package server
 
 import (
-	"bufio"
-	"bytes"
 	"context"
 	"crypto/tls"
-	"encoding/binary"
-	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -15,38 +11,23 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/hsdfat/diam-gw/pkg/connection"
 	"github.com/hsdfat/diam-gw/pkg/logger"
 )
 
 // Conn interface is used by a handler to send diameter messages.
-type Conn interface {
-	Write(b []byte) (int, error)                    // Writes a msg to the connection
-	WriteStream(b []byte, stream uint) (int, error) // Writes a msg to the connection's stream
-	Close() error                                   // Close the connection
-	LocalAddr() net.Addr                            // Returns the local IP
-	RemoteAddr() net.Addr                           // Returns the remote IP
-	TLS() *tls.ConnectionState                      // TLS or nil when not using TLS
-	Context() context.Context                       // Returns the internal context
-	SetContext(ctx context.Context)                 // Stores a new context
-	Connection() net.Conn                           // Returns network connection
-}
+// This is an alias to the shared connection.Conn interface.
+type Conn = connection.Conn
 
 // The CloseNotifier interface is implemented by Conns which
 // allow detecting when the underlying connection has gone away.
 //
 // This mechanism can be used to detect if a peer has disconnected.
-type CloseNotifier interface {
-	// CloseNotify returns a channel that is closed
-	// when the client connection has gone away.
-	CloseNotify() <-chan struct{}
-}
+type CloseNotifier = connection.CloseNotifier
 
-// Message represents a Diameter message
-type Message struct {
-	Length uint32
-	Header []byte
-	Body   []byte
-}
+// Message represents a Diameter message.
+// This is an alias to the shared connection.Message type.
+type Message = connection.Message
 
 // The HandlerFunc type is an adapter to allow the use of
 // ordinary functions as diameter handlers.  If f is a function
@@ -87,11 +68,9 @@ func (er *ErrorReport) String() string {
 	return fmt.Sprintf("diameter error on %s: %s", er.Conn.RemoteAddr(), er.Error)
 }
 
-// Command represents a Diameter command identifier
-type Command struct {
-	Interface int // Application ID (e.g., S13=16777252, S6a=16777251)
-	Code      int // Command Code
-}
+// Command represents a Diameter command identifier.
+// This is an alias to the shared connection.Command type.
+type Command = connection.Command
 
 // Handler is a function that handles a Diameter message
 // It receives the Message struct (with Header and Body) and the connection interface
@@ -547,26 +526,10 @@ func (s *Server) getHandler(cmd Command) (Handler, bool) {
 	return handler, exists
 }
 
-// parseCommand extracts the command information from a message header
+// parseCommand extracts the command information from a message header.
+// This is a wrapper around the shared connection.ParseCommand function.
 func parseCommand(header []byte) (Command, error) {
-	if len(header) < 20 {
-		return Command{}, errors.New("invalid header length")
-	}
-
-	// Diameter header format:
-	// 0-3: Version(1) + Length(3)
-	// 4-7: Command Flags(1) + Command Code(3)
-	// 8-11: Application ID (4 bytes)
-	// 12-15: Hop-by-Hop ID
-	// 16-19: End-to-End ID
-
-	commandCode := int(binary.BigEndian.Uint32([]byte{0, header[5], header[6], header[7]}))
-	applicationID := int(binary.BigEndian.Uint32(header[8:12]))
-
-	return Command{
-		Interface: applicationID,
-		Code:      commandCode,
-	}, nil
+	return connection.ParseCommand(header)
 }
 
 // Broadcast sends a message to all connections
@@ -588,169 +551,34 @@ func (s *Server) Broadcast(msg []byte) error {
 	return lastErr
 }
 
-// Buffer pool for message reading
-var readerBufferPool sync.Pool
-
-const (
-	maxMessageLength = 1 << 12 // 4096 bytes
-)
-
-func newReaderBuffer() *bytes.Buffer {
-	if v := readerBufferPool.Get(); v != nil {
-		return v.(*bytes.Buffer)
-	}
-	return bytes.NewBuffer(make([]byte, maxMessageLength))
-}
-
-func putReaderBuffer(b *bytes.Buffer) {
-	if cap(b.Bytes()) == maxMessageLength {
-		b.Reset()
-		readerBufferPool.Put(b)
-	}
-}
-
-func readerBufferSlice(buf *bytes.Buffer, l int) []byte {
-	b := buf.Bytes()
-	if l <= maxMessageLength && cap(b) >= maxMessageLength {
-		return b[:l]
-	}
-	return make([]byte, l)
-}
-
-// ReadMessage reads a binary stream from the reader and parses it into a Message
+// ReadMessage reads a binary stream from the reader and parses it into a Message.
+// This is a wrapper around the shared connection.ReadMessage function.
 func ReadMessage(reader io.Reader) (*Message, error) {
-	buf := newReaderBuffer()
-	defer putReaderBuffer(buf)
-	m := &Message{}
-	err := m.readHeader(reader, buf)
-	if err != nil {
-		return nil, err
-	}
-	if err = m.readBody(reader, buf); err != nil {
-		return m, err
-	}
-	return m, nil
-}
-
-// readHeader reads the message header
-func (m *Message) readHeader(r io.Reader, buf *bytes.Buffer) error {
-	b := buf.Bytes()[:20]
-
-	_, err := io.ReadFull(r, b)
-	if err != nil {
-		return err
-	}
-
-	m.Length = uint32(b[1])<<16 | uint32(b[2])<<8 | uint32(b[3])
-	if m.Length < 20 {
-		return errors.New("invalid header: message length less than 20 bytes")
-	}
-
-	m.Header = make([]byte, 20)
-	copy(m.Header, b)
-
-	return nil
-}
-
-// readBody reads the message body
-func (m *Message) readBody(r io.Reader, buf *bytes.Buffer) error {
-	if m.Length <= 20 {
-		m.Body = []byte{}
-		return nil
-	}
-
-	bodyLen := int(m.Length - 20)
-	b := readerBufferSlice(buf, bodyLen)
-
-	n, err := io.ReadFull(r, b)
-	if err != nil {
-		return fmt.Errorf("readBody error: %v, %d bytes read", err, n)
-	}
-
-	m.Body = make([]byte, bodyLen)
-	copy(m.Body, b)
-
-	return nil
-}
-
-// liveSwitchReader is a switchReader that's safe for concurrent reads and switches
-type liveSwitchReader struct {
-	sync.Mutex
-	r         io.Reader
-	pr        *io.PipeReader
-	pipeCopyF func()
-}
-
-func (sr *liveSwitchReader) Read(p []byte) (n int, err error) {
-	sr.Lock()
-	// Check if closeNotifier was created prior to this Read call & start it
-	if sr.pr != nil && sr.pipeCopyF != nil {
-		go sr.pipeCopyF()
-		sr.r = sr.pr
-		sr.pr = nil
-		sr.pipeCopyF = nil
-	}
-	r := sr.r
-	sr.Unlock()
-	return r.Read(p)
+	return connection.ReadMessage(reader)
 }
 
 // conn represents the server side of a diameter connection
 type conn struct {
 	server   *Server
 	rwc      net.Conn
-	sr       liveSwitchReader
-	buf      *bufio.ReadWriter
-	tlsState *tls.ConnectionState
+	connImpl connection.Conn // Use shared connection implementation
 	writer   *response
-
-	mu           sync.Mutex
-	closeNotifyc chan struct{}
-	clientGone   bool
-	ctx          context.Context
-}
-
-func (c *conn) closeNotify() <-chan struct{} {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	if c.closeNotifyc == nil {
-		c.closeNotifyc = make(chan struct{})
-
-		pr, pw := io.Pipe()
-		c.sr.Lock()
-		readSource := c.sr.r
-		c.sr.pr = pr
-		c.sr.pipeCopyF = func() {
-			_, err := io.Copy(pw, readSource)
-			if err == nil {
-				err = io.EOF
-			}
-			pw.CloseWithError(err)
-			c.notifyClientGone()
-		}
-		c.sr.Unlock()
-	}
-	return c.closeNotifyc
-}
-
-func (c *conn) notifyClientGone() {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	if c.closeNotifyc != nil && !c.clientGone {
-		close(c.closeNotifyc)
-		c.clientGone = true
-	}
 }
 
 // newConn creates a new connection from rwc
 func (srv *Server) newConn(rwc net.Conn) (*conn, error) {
-	c := &conn{
-		server: srv,
-		rwc:    rwc,
-		sr:     liveSwitchReader{r: rwc},
-		ctx:    context.Background(),
+	config := &connection.ConnectionConfig{
+		ReadTimeout:  srv.ReadTimeout,
+		WriteTimeout: srv.WriteTimeout,
 	}
-	c.buf = bufio.NewReadWriter(bufio.NewReader(&c.sr), bufio.NewWriter(rwc))
+
+	connImpl := connection.NewConn(rwc, config)
+
+	c := &conn{
+		server:   srv,
+		rwc:      rwc,
+		connImpl: connImpl,
+	}
 	c.writer = &response{conn: c}
 	return c, nil
 }
@@ -761,17 +589,7 @@ func (c *conn) readMessage() (*Message, error) {
 		c.rwc.SetReadDeadline(time.Now().Add(c.server.ReadTimeout))
 	}
 
-	buf := newReaderBuffer()
-	defer putReaderBuffer(buf)
-	m := &Message{}
-	err := m.readHeader(c.buf.Reader, buf)
-	if err != nil {
-		return nil, err
-	}
-	if err = m.readBody(c.buf.Reader, buf); err != nil {
-		return m, err
-	}
-	return m, nil
+	return connection.ReadMessage(c.rwc)
 }
 
 // serve handles a connection
@@ -796,8 +614,6 @@ func (c *conn) serve() {
 			c.server.logger.Errorw("TLS handshake failed", "error", err)
 			return
 		}
-		c.tlsState = &tls.ConnectionState{}
-		*c.tlsState = tlsConn.ConnectionState()
 	}
 
 	for {
@@ -867,33 +683,25 @@ func (c *conn) serve() {
 }
 
 // response represents the server side of a diameter response
+// It wraps the shared connection implementation and adds server-specific statistics tracking
 type response struct {
 	mu   sync.Mutex
 	conn *conn
-	xmu  sync.Mutex
-	ctx  context.Context
 }
 
 // Write writes the message to the connection
 func (w *response) Write(b []byte) (int, error) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
-	if w.conn.server.WriteTimeout > 0 {
-		w.conn.rwc.SetWriteDeadline(time.Now().Add(w.conn.server.WriteTimeout))
-	}
-	// Use bufio.Writer but ensure proper flushing
-	n, err := w.conn.buf.Writer.Write(b)
+
+	// Use the shared connection implementation for writing
+	n, err := w.conn.connImpl.Write(b)
 	if err != nil {
 		w.conn.server.logger.Errorw("Failed to write message", "error", err)
 		w.conn.server.stats.Errors.Add(1)
 		return 0, err
 	}
-	// Force flush to ensure data is sent
-	if err = w.conn.buf.Writer.Flush(); err != nil {
-		w.conn.server.logger.Errorw("Failed to flush message", "error", err)
-		w.conn.server.stats.Errors.Add(1)
-		return 0, err
-	}
+
 	// Update stats for sent message
 	w.conn.server.stats.MessagesSent.Add(1)
 	w.conn.server.stats.TotalBytesSent.Add(uint64(n))
@@ -922,47 +730,45 @@ func (w *response) WriteStream(b []byte, stream uint) (int, error) {
 
 // Close closes the connection
 func (w *response) Close() error {
-	return w.conn.rwc.Close()
+	return w.conn.connImpl.Close()
 }
 
 // LocalAddr returns the local address of the connection
 func (w *response) LocalAddr() net.Addr {
-	return w.conn.rwc.LocalAddr()
+	return w.conn.connImpl.LocalAddr()
 }
 
 // RemoteAddr returns the peer address of the connection
 func (w *response) RemoteAddr() net.Addr {
-	return w.conn.rwc.RemoteAddr()
+	return w.conn.connImpl.RemoteAddr()
 }
 
 // TLS returns the TLS connection state, or nil
 func (w *response) TLS() *tls.ConnectionState {
-	return w.conn.tlsState
+	return w.conn.connImpl.TLS()
 }
 
 // CloseNotify implements the CloseNotifier interface
 func (w *response) CloseNotify() <-chan struct{} {
-	return w.conn.closeNotify()
+	if cn, ok := w.conn.connImpl.(CloseNotifier); ok {
+		return cn.CloseNotify()
+	}
+	// Return a channel that never closes if CloseNotify is not supported
+	ch := make(chan struct{})
+	return ch
 }
 
 // Context returns the internal context or a new context.Background
 func (w *response) Context() context.Context {
-	w.xmu.Lock()
-	defer w.xmu.Unlock()
-	if w.ctx == nil {
-		w.ctx = context.Background()
-	}
-	return w.ctx
+	return w.conn.connImpl.Context()
 }
 
 // SetContext replaces the internal context with the given one
 func (w *response) SetContext(ctx context.Context) {
-	w.xmu.Lock()
-	w.ctx = ctx
-	w.xmu.Unlock()
+	w.conn.connImpl.SetContext(ctx)
 }
 
 // Connection returns the underlying network connection
 func (w *response) Connection() net.Conn {
-	return w.conn.rwc
+	return w.conn.connImpl.Connection()
 }
