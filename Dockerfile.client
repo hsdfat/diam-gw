@@ -1,0 +1,18 @@
+# Dockerfile for Multi-DRA Test Client
+FROM golang:1.25-alpine AS builder
+
+# Set working directory
+WORKDIR /app
+
+# Copy go mod files
+COPY go.mod go.sum ./
+RUN go mod download
+
+# Copy source code
+COPY . .
+
+# Build multi-DRA test client (container version)
+RUN CGO_ENABLED=0 GOOS=linux go build -o multi-dra-test examples/multi_dra_test_container/*.go
+
+# Run client
+ENTRYPOINT ["/app/multi-dra-test"]

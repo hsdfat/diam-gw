@@ -1,0 +1,186 @@
+version: '3.8'
+
+services:
+  # DRA Simulator - Load Generator for performance testing
+  dra-perf:
+    image: diam-gw-dra:latest
+    build:
+      context: ../..
+      dockerfile: Dockerfile.dra
+    container_name: dra-perf
+    hostname: dra-perf
+    command: [
+      "--port", "3869",
+      "--origin-host", "dra-perf.example.com",
+      "--origin-realm", "example.com"
+    ]
+    environment:
+      # Performance test configuration - set by test script
+      - TEST_DURATION=${DURATION:-60}
+      - RAMP_UP_TIME=${RAMP_UP:-10}
+      - S13_RATE=${S13_RATE:-400}
+      - S6A_RATE=${S6A_RATE:-400}
+      - GX_RATE=${GX_RATE:-200}
+    ports:
+      - "3869:3869"
+    networks:
+      - diameter-perf
+    healthcheck:
+      test: ["CMD", "nc", "-z", "localhost", "3869"]
+      interval: 2s
+      timeout: 1s
+      retries: 10
+
+  # Gateway - Performance Testing Configuration (Bidirectional Mode)
+  gateway-perf:
+    image: diam-gw-gateway:latest
+    build:
+      context: ../..
+      dockerfile: Dockerfile.gateway
+    container_name: gateway-perf
+    hostname: gateway-perf
+    command: [
+      "--app-addrs", "app-s13-1:4868,app-s13-2:4869,app-s13-3:4870,app-s13-4:4871,app-s6a-1:4872,app-s6a-2:4873,app-s6a-3:4874,app-s6a-4:4875",
+      "--app-priorities", "1,1,1,1,1,1,1,1",
+      "--app-conns", "2",
+      "--dra-addrs", "dra-perf:3869",
+      "--dra-priorities", "1",
+      "--dra-conns", "4",
+      "--origin-host", "gateway-perf.example.com",
+      "--origin-realm", "example.com",
+      "--log-level", "info"
+    ]
+    depends_on:
+      dra-perf:
+        condition: service_healthy
+    networks:
+      - diameter-perf
+
+  # S13 Applications - Pool of 4 apps (Server Mode - Bidirectional)
+  app-s13-1:
+    image: diam-gw-app:latest
+    build:
+      context: ../..
+      dockerfile: Dockerfile.app
+    container_name: app-s13-1
+    hostname: app-s13-1
+    environment:
+      - APP_LISTEN=0.0.0.0:4868
+      - APP_ORIGIN_HOST=app-s13-1.example.com
+      - APP_ORIGIN_REALM=example.com
+      - APP_INTERFACES=S13
+      - APP_LOG_LEVEL=error
+    ports:
+      - "4868:4868"
+    networks:
+      - diameter-perf
+
+  app-s13-2:
+    image: diam-gw-app:latest
+    container_name: app-s13-2
+    hostname: app-s13-2
+    environment:
+      - APP_LISTEN=0.0.0.0:4869
+      - APP_ORIGIN_HOST=app-s13-2.example.com
+      - APP_ORIGIN_REALM=example.com
+      - APP_INTERFACES=S13
+      - APP_LOG_LEVEL=error
+    ports:
+      - "4869:4869"
+    networks:
+      - diameter-perf
+
+  app-s13-3:
+    image: diam-gw-app:latest
+    container_name: app-s13-3
+    hostname: app-s13-3
+    environment:
+      - APP_LISTEN=0.0.0.0:4870
+      - APP_ORIGIN_HOST=app-s13-3.example.com
+      - APP_ORIGIN_REALM=example.com
+      - APP_INTERFACES=S13
+      - APP_LOG_LEVEL=error
+    ports:
+      - "4870:4870"
+    networks:
+      - diameter-perf
+
+  app-s13-4:
+    image: diam-gw-app:latest
+    container_name: app-s13-4
+    hostname: app-s13-4
+    environment:
+      - APP_LISTEN=0.0.0.0:4871
+      - APP_ORIGIN_HOST=app-s13-4.example.com
+      - APP_ORIGIN_REALM=example.com
+      - APP_INTERFACES=S13
+      - APP_LOG_LEVEL=error
+    ports:
+      - "4871:4871"
+    networks:
+      - diameter-perf
+
+  # S6a Applications - Pool of 4 apps (Server Mode - Bidirectional)
+  app-s6a-1:
+    image: diam-gw-app:latest
+    container_name: app-s6a-1
+    hostname: app-s6a-1
+    environment:
+      - APP_LISTEN=0.0.0.0:4872
+      - APP_ORIGIN_HOST=app-s6a-1.example.com
+      - APP_ORIGIN_REALM=example.com
+      - APP_INTERFACES=S6a
+      - APP_LOG_LEVEL=error
+    ports:
+      - "4872:4872"
+    networks:
+      - diameter-perf
+
+  app-s6a-2:
+    image: diam-gw-app:latest
+    container_name: app-s6a-2
+    hostname: app-s6a-2
+    environment:
+      - APP_LISTEN=0.0.0.0:4873
+      - APP_ORIGIN_HOST=app-s6a-2.example.com
+      - APP_ORIGIN_REALM=example.com
+      - APP_INTERFACES=S6a
+      - APP_LOG_LEVEL=error
+    ports:
+      - "4873:4873"
+    networks:
+      - diameter-perf
+
+  app-s6a-3:
+    image: diam-gw-app:latest
+    container_name: app-s6a-3
+    hostname: app-s6a-3
+    environment:
+      - APP_LISTEN=0.0.0.0:4874
+      - APP_ORIGIN_HOST=app-s6a-3.example.com
+      - APP_ORIGIN_REALM=example.com
+      - APP_INTERFACES=S6a
+      - APP_LOG_LEVEL=error
+    ports:
+      - "4874:4874"
+    networks:
+      - diameter-perf
+
+  app-s6a-4:
+    image: diam-gw-app:latest
+    container_name: app-s6a-4
+    hostname: app-s6a-4
+    environment:
+      - APP_LISTEN=0.0.0.0:4875
+      - APP_ORIGIN_HOST=app-s6a-4.example.com
+      - APP_ORIGIN_REALM=example.com
+      - APP_INTERFACES=S6a
+      - APP_LOG_LEVEL=error
+    ports:
+      - "4875:4875"
+    networks:
+      - diameter-perf
+
+networks:
+  diameter-perf:
+    driver: bridge

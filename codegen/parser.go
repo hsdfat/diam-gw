@@ -7,16 +7,30 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/hsdfat8/diam-gw/models_base"
+	"github.com/hsdfat/diam-gw/models_base"
 )
 
 // ProtoParser parses diameter proto files
 type ProtoParser struct {
 	AVPs        map[string]*AVPDefinition
 	Commands    []*CommandDefinition
-	Package     string // Proto package name (e.g., "diameter.base")
-	GoPackage   string // Go package path (e.g., "github.com/hsdfat8/diam-gw/commands/base")
-	PackageName string // Simple package name extracted from go_package (e.g., "base")
+	Consts      map[string]uint64          // Protocol-level constants
+	Enums       map[string]*EnumDefinition // Enum definitions
+	Package     string                     // Proto package name (e.g., "diameter.base")
+	GoPackage   string                     // Go package path (e.g., "github.com/hsdfat/diam-gw/commands/base")
+	PackageName string                     // Simple package name extracted from go_package (e.g., "base")
+}
+
+// EnumDefinition represents an enum type definition
+type EnumDefinition struct {
+	Name   string
+	Values map[string]uint32 // Value name -> Value
+}
+
+// EnumValue represents a single enum value
+type EnumValue struct {
+	Name  string
+	Value uint32
 }
 
 // NewProtoParser creates a new parser
@@ -24,6 +38,8 @@ func NewProtoParser() *ProtoParser {
 	return &ProtoParser{
 		AVPs:     make(map[string]*AVPDefinition),
 		Commands: make([]*CommandDefinition, 0),
+		Consts:   make(map[string]uint64),
+		Enums:    make(map[string]*EnumDefinition),
 	}
 }
 
@@ -62,7 +78,7 @@ func (p *ProtoParser) ParseFile(filename string) error {
 		}
 
 		if strings.HasPrefix(line, "option go_package") {
-			// Extract go_package: option go_package = "github.com/hsdfat8/diam-gw/commands/base";
+			// Extract go_package: option go_package = "github.com/hsdfat/diam-gw/commands/base";
 			parts := strings.Split(line, "=")
 			if len(parts) >= 2 {
 				goPackage := strings.TrimSpace(parts[1])
@@ -78,12 +94,23 @@ func (p *ProtoParser) ParseFile(filename string) error {
 			continue
 		}
 
-		// Detect start of AVP or command block
+		// Parse const declarations: const S6A_APPLICATION_ID = 16777251;
+		if strings.HasPrefix(line, "const ") {
+			if err := p.parseConst(line); err != nil {
+				return err
+			}
+			continue
+		}
+
+		// Detect start of AVP, command, or enum block
 		if strings.HasPrefix(line, "avp ") {
 			currentBlock = "avp"
 			blockLines = []string{line}
 		} else if strings.HasPrefix(line, "command ") {
 			currentBlock = "command"
+			blockLines = []string{line}
+		} else if strings.HasPrefix(line, "enum ") {
+			currentBlock = "enum"
 			blockLines = []string{line}
 		} else if currentBlock != "" {
 			blockLines = append(blockLines, line)
@@ -96,6 +123,10 @@ func (p *ProtoParser) ParseFile(filename string) error {
 					}
 				} else if currentBlock == "command" {
 					if err := p.parseCommandBlock(blockLines); err != nil {
+						return err
+					}
+				} else if currentBlock == "enum" {
+					if err := p.parseEnumBlock(blockLines); err != nil {
 						return err
 					}
 				}
@@ -500,6 +531,92 @@ func generateAbbreviation(name string) string {
 		}
 	}
 	return abbr
+}
+
+// parseConst parses a const declaration
+func (p *ProtoParser) parseConst(line string) error {
+	// Example: const S6A_APPLICATION_ID = 16777251;
+	line = strings.TrimPrefix(line, "const ")
+
+	// Remove inline comments first
+	if idx := strings.Index(line, "//"); idx >= 0 {
+		line = strings.TrimSpace(line[:idx])
+	}
+
+	line = strings.TrimSuffix(line, ";")
+
+	parts := strings.SplitN(line, "=", 2)
+	if len(parts) != 2 {
+		return fmt.Errorf("invalid const declaration: %s", line)
+	}
+
+	name := strings.TrimSpace(parts[0])
+	valueStr := strings.TrimSpace(parts[1])
+
+	value, err := strconv.ParseUint(valueStr, 10, 64)
+	if err != nil {
+		return fmt.Errorf("invalid const value for %s: %v", name, err)
+	}
+
+	p.Consts[name] = value
+	return nil
+}
+
+// parseEnumBlock parses an enum definition block
+func (p *ProtoParser) parseEnumBlock(lines []string) error {
+	if len(lines) == 0 {
+		return fmt.Errorf("empty enum block")
+	}
+
+	// Parse enum name from first line: "enum CancellationType {"
+	firstLine := strings.TrimSpace(lines[0])
+	parts := strings.Fields(firstLine)
+	if len(parts) < 2 {
+		return fmt.Errorf("invalid enum declaration: %s", firstLine)
+	}
+
+	name := strings.TrimSuffix(parts[1], "{")
+	name = strings.TrimSpace(name)
+
+	enum := &EnumDefinition{
+		Name:   name,
+		Values: make(map[string]uint32),
+	}
+
+	// Parse enum values
+	for i := 1; i < len(lines)-1; i++ {
+		line := strings.TrimSpace(lines[i])
+		if line == "" || strings.HasPrefix(line, "//") {
+			continue
+		}
+
+		// Remove inline comments first
+		if idx := strings.Index(line, "//"); idx >= 0 {
+			line = strings.TrimSpace(line[:idx])
+		}
+
+		// Remove trailing semicolon
+		line = strings.TrimSuffix(line, ";")
+
+		// Parse enum value: "MME_UPDATE_PROCEDURE = 0"
+		parts := strings.SplitN(line, "=", 2)
+		if len(parts) != 2 {
+			continue
+		}
+
+		valueName := strings.TrimSpace(parts[0])
+		valueStr := strings.TrimSpace(parts[1])
+
+		value, err := strconv.ParseUint(valueStr, 10, 32)
+		if err != nil {
+			return fmt.Errorf("invalid enum value for %s.%s: %v", name, valueName, err)
+		}
+
+		enum.Values[valueName] = uint32(value)
+	}
+
+	p.Enums[name] = enum
+	return nil
 }
 
 // toCamelCase converts snake_case to CamelCase

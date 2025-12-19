@@ -1,0 +1,205 @@
+version: '3.8'
+
+# Docker Compose configuration for testing DWR failure threshold
+# This setup allows testing different DWR configurations and failure scenarios
+
+services:
+  # Priority 1 DRAs (Primary) - Configured with custom DWR settings
+  dra-1:
+    build:
+      context: ../..
+      dockerfile: Dockerfile.dra
+    container_name: dra-1
+    hostname: dra-1.example.com
+    networks:
+      diameter_net:
+        ipv4_address: 172.20.0.11
+    ports:
+      - "3868:3868"
+    command:
+      - "-host"
+      - "0.0.0.0"
+      - "-port"
+      - "3868"
+      - "-origin-host"
+      - "dra-1.example.com"
+      - "-origin-realm"
+      - "example.com"
+      - "-product-name"
+      - "DRA-1/1.0"
+      - "-metrics-interval"
+      - "10s"
+      - "-verbose"
+    healthcheck:
+      test: ["CMD", "nc", "-zv", "localhost", "3868"]
+      interval: 5s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+    restart: unless-stopped
+    labels:
+      diameter.priority: "1"
+      diameter.role: "primary"
+      test.scenario: "dwr-failure-threshold"
+
+  dra-2:
+    build:
+      context: ../..
+      dockerfile: Dockerfile.dra
+    container_name: dra-2
+    hostname: dra-2.example.com
+    networks:
+      diameter_net:
+        ipv4_address: 172.20.0.12
+    ports:
+      - "3869:3868"
+    command:
+      - "-host"
+      - "0.0.0.0"
+      - "-port"
+      - "3868"
+      - "-origin-host"
+      - "dra-2.example.com"
+      - "-origin-realm"
+      - "example.com"
+      - "-product-name"
+      - "DRA-2/1.0"
+      - "-metrics-interval"
+      - "10s"
+      - "-verbose"
+    healthcheck:
+      test: ["CMD", "nc", "-zv", "localhost", "3868"]
+      interval: 5s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+    restart: unless-stopped
+    labels:
+      diameter.priority: "1"
+      diameter.role: "primary"
+      test.scenario: "dwr-failure-threshold"
+
+  # Priority 2 DRAs (Backup)
+  dra-3:
+    build:
+      context: ../..
+      dockerfile: Dockerfile.dra
+    container_name: dra-3
+    hostname: dra-3.example.com
+    networks:
+      diameter_net:
+        ipv4_address: 172.20.0.13
+    ports:
+      - "3870:3868"
+    command:
+      - "-host"
+      - "0.0.0.0"
+      - "-port"
+      - "3868"
+      - "-origin-host"
+      - "dra-3.example.com"
+      - "-origin-realm"
+      - "example.com"
+      - "-product-name"
+      - "DRA-3/1.0"
+      - "-metrics-interval"
+      - "10s"
+      - "-verbose"
+    healthcheck:
+      test: ["CMD", "nc", "-zv", "localhost", "3868"]
+      interval: 5s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+    restart: unless-stopped
+    labels:
+      diameter.priority: "2"
+      diameter.role: "backup"
+      test.scenario: "dwr-failure-threshold"
+
+  dra-4:
+    build:
+      context: ../..
+      dockerfile: Dockerfile.dra
+    container_name: dra-4
+    hostname: dra-4.example.com
+    networks:
+      diameter_net:
+        ipv4_address: 172.20.0.14
+    ports:
+      - "3871:3868"
+    command:
+      - "-host"
+      - "0.0.0.0"
+      - "-port"
+      - "3868"
+      - "-origin-host"
+      - "dra-4.example.com"
+      - "-origin-realm"
+      - "example.com"
+      - "-product-name"
+      - "DRA-4/1.0"
+      - "-metrics-interval"
+      - "10s"
+      - "-verbose"
+    healthcheck:
+      test: ["CMD", "nc", "-zv", "localhost", "3868"]
+      interval: 5s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+    restart: unless-stopped
+    labels:
+      diameter.priority: "2"
+      diameter.role: "backup"
+      test.scenario: "dwr-failure-threshold"
+
+  # Test Client - Configured with DWR failure threshold settings
+  client-dwr-test:
+    build:
+      context: ../..
+      dockerfile: Dockerfile.client
+    container_name: diameter-client-dwr-test
+    hostname: client.example.com
+    networks:
+      diameter_net:
+        ipv4_address: 172.20.0.20
+    depends_on:
+      dra-1:
+        condition: service_healthy
+      dra-2:
+        condition: service_healthy
+      dra-3:
+        condition: service_healthy
+      dra-4:
+        condition: service_healthy
+    environment:
+      # DRA Connection Settings
+      - DRA1_HOST=172.20.0.11
+      - DRA1_PORT=3868
+      - DRA2_HOST=172.20.0.12
+      - DRA2_PORT=3868
+      - DRA3_HOST=172.20.0.13
+      - DRA3_PORT=3868
+      - DRA4_HOST=172.20.0.14
+      - DRA4_PORT=3868
+
+      # DWR Configuration (can be overridden)
+      - DWR_INTERVAL=${DWR_INTERVAL:-10s}
+      - DWR_TIMEOUT=${DWR_TIMEOUT:-5s}
+      - MAX_DWR_FAILURES=${MAX_DWR_FAILURES:-3}
+
+      # Test Mode
+      - TEST_MODE=${TEST_MODE:-normal}
+      - TEST_DURATION=${TEST_DURATION:-120s}
+    restart: "no"
+    labels:
+      diameter.role: "client"
+      test.scenario: "dwr-failure-threshold"
+
+networks:
+  diameter_net:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/24

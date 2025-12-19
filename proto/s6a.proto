@@ -6,7 +6,7 @@ syntax = "diameter1";
 
 package diameter.s6a;
 
-option go_package = "github.com/hsdfat8/diam-gw/commands/s6a";
+option go_package = "github.com/hsdfat/diam-gw/commands/s6a";
 
 // ================================================================================
 //                         APPLICATION IDENTIFIER
@@ -102,10 +102,271 @@ enum SMSRegisterRequest {
 }
 
 // ================================================================================
+//                         BASE PROTOCOL AVP DEFINITIONS
+// ================================================================================
+// These AVPs are defined in RFC 6733 (Diameter Base Protocol)
+// They do NOT have a Vendor-ID (vendor_id is absent or 0)
+
+// User-Name (AVP Code 1)
+// Contains the user identifier (IMSI in S6a context)
+// RFC 6733 - No Vendor-ID
+avp User-Name {
+  code = 1;
+  type = UTF8String;
+  must = true;
+  may_encrypt = true;
+  description = "User identifier (IMSI when used in S6a context)";
+}
+
+// Session-Id (AVP Code 263)
+// Identifies the Diameter session
+// RFC 6733 - No Vendor-ID
+avp Session-Id {
+  code = 263;
+  type = UTF8String;
+  must = true;
+  may_encrypt = false;
+  description = "Uniquely identifies a Diameter session";
+}
+
+// Auth-Session-State (AVP Code 277)
+// Specifies whether session state is maintained
+// RFC 6733 - No Vendor-ID
+avp Auth-Session-State {
+  code = 277;
+  type = Enumerated;
+  must = true;
+  may_encrypt = false;
+  description = "Indicates whether state is maintained for a session";
+  // Values:
+  //   0 = STATE_MAINTAINED
+  //   1 = NO_STATE_MAINTAINED (required for S6a)
+}
+
+// Origin-Host (AVP Code 264)
+// Identity of the Diameter node that originated the message
+// RFC 6733 - No Vendor-ID
+avp Origin-Host {
+  code = 264;
+  type = DiameterIdentity;
+  must = true;
+  may_encrypt = false;
+  description = "Identity of the node that originated the Diameter message";
+}
+
+// Origin-Realm (AVP Code 296)
+// Realm of the node that originated the message
+// RFC 6733 - No Vendor-ID
+avp Origin-Realm {
+  code = 296;
+  type = DiameterIdentity;
+  must = true;
+  may_encrypt = false;
+  description = "Realm of the node that originated the Diameter message";
+}
+
+// Destination-Host (AVP Code 293)
+// Identity of the Diameter node that should receive the message
+// RFC 6733 - No Vendor-ID
+avp Destination-Host {
+  code = 293;
+  type = DiameterIdentity;
+  must = true;
+  may_encrypt = false;
+  description = "Identity of the destination Diameter node";
+}
+
+// Destination-Realm (AVP Code 283)
+// Realm of the destination node
+// RFC 6733 - No Vendor-ID
+avp Destination-Realm {
+  code = 283;
+  type = DiameterIdentity;
+  must = true;
+  may_encrypt = false;
+  description = "Realm of the destination Diameter node";
+}
+
+// Result-Code (AVP Code 268)
+// Indicates whether a request was successfully completed
+// RFC 6733 - No Vendor-ID
+avp Result-Code {
+  code = 268;
+  type = Unsigned32;
+  must = true;
+  may_encrypt = false;
+  description = "Result of the Diameter request";
+  // Common values:
+  //   2001 = DIAMETER_SUCCESS
+  //   3xxx = Protocol Errors
+  //   5xxx = Permanent Failures
+}
+
+// Experimental-Result (AVP Code 297)
+// Used for vendor-specific result codes
+// RFC 6733 - No Vendor-ID
+avp Experimental-Result {
+  code = 297;
+  type = Grouped;
+  must = true;
+  may_encrypt = false;
+  description = "Contains vendor-specific result information";
+
+  grouped {
+    required Vendor-Id vendor_id = 1;                           // Code 266
+    required Experimental-Result-Code experimental_result_code = 2; // Code 298
+  }
+}
+
+// Vendor-Id (AVP Code 266)
+// Vendor identifier (10415 for 3GPP)
+// RFC 6733 - No Vendor-ID
+avp Vendor-Id {
+  code = 266;
+  type = Unsigned32;
+  must = true;
+  may_encrypt = false;
+  description = "Vendor identifier (10415 for 3GPP)";
+}
+
+// Experimental-Result-Code (AVP Code 298)
+// Vendor-specific result code value
+// RFC 6733 - No Vendor-ID
+avp Experimental-Result-Code {
+  code = 298;
+  type = Unsigned32;
+  must = true;
+  may_encrypt = false;
+  description = "Vendor-specific result code";
+}
+
+// Vendor-Specific-Application-Id (AVP Code 260)
+// Used to advertise vendor-specific Diameter applications
+// RFC 6733 - No Vendor-ID
+avp Vendor-Specific-Application-Id {
+  code = 260;
+  type = Grouped;
+  must = true;
+  may_encrypt = false;
+  description = "Contains vendor-specific application identifier";
+
+  grouped {
+    optional Vendor-Id vendor_id = 1;
+    optional Auth-Application-Id auth_application_id = 2;
+    optional Acct-Application-Id acct_application_id = 3;
+  }
+}
+
+// Auth-Application-Id (AVP Code 258)
+// Authentication and authorization application identifier
+// RFC 6733 - No Vendor-ID
+avp Auth-Application-Id {
+  code = 258;
+  type = Unsigned32;
+  must = true;
+  may_encrypt = false;
+  description = "Authentication application identifier";
+}
+
+// Acct-Application-Id (AVP Code 259)
+// Accounting application identifier
+// RFC 6733 - No Vendor-ID
+avp Acct-Application-Id {
+  code = 259;
+  type = Unsigned32;
+  must = true;
+  may_encrypt = false;
+  description = "Accounting application identifier";
+}
+
+// Failed-AVP (AVP Code 279)
+// Contains AVPs that caused a request to fail
+// RFC 6733 - No Vendor-ID
+avp Failed-AVP {
+  code = 279;
+  type = Grouped;
+  must = true;
+  may_encrypt = false;
+  description = "Contains AVPs that could not be processed successfully";
+
+  grouped {
+    repeated optional AVP avp = 1;  // Any AVP that failed
+  }
+}
+
+// Proxy-Info (AVP Code 284)
+// Contains state information from a proxy
+// RFC 6733 - No Vendor-ID
+avp Proxy-Info {
+  code = 284;
+  type = Grouped;
+  must = true;
+  may_encrypt = false;
+  description = "Contains proxy state information";
+
+  grouped {
+    required Proxy-Host proxy_host = 1;    // Code 280
+    optional Proxy-State proxy_state = 2;  // Code 33
+  }
+}
+
+// Proxy-Host (AVP Code 280)
+// Identity of the proxy that added the Proxy-Info AVP
+// RFC 6733 - No Vendor-ID
+avp Proxy-Host {
+  code = 280;
+  type = DiameterIdentity;
+  must = true;
+  may_encrypt = false;
+  description = "Identity of the proxy server";
+}
+
+// Proxy-State (AVP Code 33)
+// State information from a proxy
+// RFC 6733 - No Vendor-ID
+avp Proxy-State {
+  code = 33;
+  type = OctetString;
+  must = true;
+  may_encrypt = false;
+  description = "State information added by a proxy";
+}
+
+// Route-Record (AVP Code 282)
+// Identity of a node that processed the message
+// RFC 6733 - No Vendor-ID
+avp Route-Record {
+  code = 282;
+  type = DiameterIdentity;
+  must = true;
+  may_encrypt = false;
+  description = "Identity of a Diameter node in the path";
+}
+
+// DRMP (AVP Code 301)
+// Diameter Routing Message Priority
+// RFC 7944 - No Vendor-ID
+avp DRMP {
+  code = 301;
+  type = Enumerated;
+  must = false;
+  may_encrypt = false;
+  description = "Diameter Routing Message Priority";
+  // Values:
+  //   0 = PRIORITY_0 (lowest)
+  //   ...
+  //   15 = PRIORITY_15 (highest)
+}
+
+// ================================================================================
 //                         S6a SPECIFIC AVP DEFINITIONS
 // ================================================================================
+// All S6a-specific AVPs have Vendor-ID = 10415 (3GPP)
+// Flag notation: M (Mandatory), V (Vendor-specific)
+// All S6a AVPs use M,V flags as per Table 7.3.1/1 in TS 29.272
 
 // Subscription-Data (AVP Code 1400) - Grouped
+// Flags: M, V
 avp Subscription-Data {
   code = 1400;
   vendor_id = 10415;
@@ -164,6 +425,7 @@ avp Subscription-Data {
 }
 
 // Terminal-Information (AVP Code 1401) - Grouped
+// Flags: M, V
 avp Terminal-Information {
   code = 1401;
   vendor_id = 10415;
@@ -1474,5 +1736,119 @@ command Notify-Answer {
 //   +-- PDN-GW-Allocation-Type (1438)
 //   +-- AMBR (1435)
 //   +-- ...more optional AVPs
+//
+// ================================================================================
+//                         AVP VENDOR-ID SUMMARY
+// ================================================================================
+//
+// S6a-SPECIFIC AVPs (Vendor-ID = 10415 / 3GPP):
+// -----------------------------------------------
+//   Subscription-Data                    (1400) - Grouped      - M,V flags
+//   Terminal-Information                 (1401) - Grouped      - M,V flags
+//   IMEI                                 (1402) - UTF8String   - M,V flags
+//   Software-Version                     (1403) - UTF8String   - M,V flags
+//   ULR-Flags                            (1405) - Unsigned32   - M,V flags
+//   ULA-Flags                            (1406) - Unsigned32   - M,V flags
+//   Visited-PLMN-Id                      (1407) - OctetString  - M,V flags
+//   Requested-EUTRAN-Authentication-Info (1408) - Grouped      - M,V flags
+//   Requested-UTRAN-GERAN-Auth-Info      (1409) - Grouped      - M,V flags
+//   Number-Of-Requested-Vectors          (1410) - Unsigned32   - M,V flags
+//   Re-Synchronization-Info              (1411) - OctetString  - M,V flags
+//   Immediate-Response-Preferred         (1412) - Unsigned32   - M,V flags
+//   Authentication-Info                  (1413) - Grouped      - M,V flags
+//   E-UTRAN-Vector                       (1414) - Grouped      - M,V flags
+//   UTRAN-Vector                         (1415) - Grouped      - M,V flags
+//   GERAN-Vector                         (1416) - Grouped      - M,V flags
+//   Network-Access-Mode                  (1417) - Enumerated   - M,V flags
+//   HPLMN-ODB                            (1418) - Unsigned32   - M,V flags
+//   Item-Number                          (1419) - Unsigned32   - M,V flags
+//   Cancellation-Type                    (1420) - Enumerated   - M,V flags
+//   DSR-Flags                            (1421) - Unsigned32   - M,V flags
+//   DSA-Flags                            (1422) - Unsigned32   - M,V flags
+//   Context-Identifier                   (1423) - Unsigned32   - M,V flags
+//   Subscriber-Status                    (1424) - Enumerated   - M,V flags
+//   Operator-Determined-Barring          (1425) - Unsigned32   - M,V flags
+//   Access-Restriction-Data              (1426) - Unsigned32   - M,V flags
+//   APN-OI-Replacement                   (1427) - UTF8String   - M,V flags
+//   All-APN-Configurations-Inc-Indicator (1428) - Enumerated   - M,V flags
+//   APN-Configuration-Profile            (1429) - Grouped      - M,V flags
+//   APN-Configuration                    (1430) - Grouped      - M,V flags
+//   EPS-Subscribed-QoS-Profile           (1431) - Grouped      - M,V flags
+//   VPLMN-Dynamic-Address-Allowed        (1432) - Enumerated   - M,V flags
+//   STN-SR                               (1433) - OctetString  - M,V flags
+//   Alert-Reason                         (1434) - Enumerated   - M,V flags
+//   AMBR                                 (1435) - Grouped      - M,V flags
+//   CSG-Subscription-Data                (1436) - Grouped      - M,V flags
+//   CSG-Id                               (1437) - Unsigned32   - M,V flags
+//   PDN-GW-Allocation-Type               (1438) - Enumerated   - M,V flags
+//   Expiration-Date                      (1439) - Time         - M,V flags
+//   RAT-Frequency-Selection-Priority-ID  (1440) - Unsigned32   - M,V flags
+//   IDA-Flags                            (1441) - Unsigned32   - M,V flags
+//   PUA-Flags                            (1442) - Unsigned32   - M,V flags
+//   NOR-Flags                            (1443) - Unsigned32   - M,V flags
+//   User-Id                              (1444) - UTF8String   - M,V flags
+//   Equipment-Status                     (1445) - Enumerated   - M,V flags
+//   Regional-Subscription-Zone-Code      (1446) - OctetString  - M,V flags
+//   RAND                                 (1447) - OctetString  - M,V flags
+//   XRES                                 (1448) - OctetString  - M,V flags
+//   AUTN                                 (1449) - OctetString  - M,V flags
+//   KASME                                (1450) - OctetString  - M,V flags
+//   Confidentiality-Key                  (1451) - OctetString  - M,V flags
+//   Integrity-Key                        (1452) - OctetString  - M,V flags
+//   Kc                                   (1453) - OctetString  - M,V flags
+//   SRES                                 (1454) - OctetString  - M,V flags
+//   PDN-Type                             (1456) - Enumerated   - M,V flags
+//   Roaming-Restricted-Due-To-Unsup-Feat (1457) - Enumerated   - M,V flags
+//   3GPP2-MEID                           (1471) - OctetString  - M,V flags
+//   SGSN-Number                          (1489) - OctetString  - M,V flags
+//   IDR-Flags                            (1490) - Unsigned32   - M,V flags
+//   UE-SRVCC-Capability                  (1615) - Enumerated   - M,V flags
+//   Error-Diagnostic                     (1614) - Enumerated   - M,V flags (optional)
+//   PUR-Flags                            (1635) - Unsigned32   - M,V flags
+//   CLR-Flags                            (1638) - Unsigned32   - M,V flags
+//   A-MSISDN                             (1643) - OctetString  - M,V flags
+//   SMS-Register-Request                 (1648) - Enumerated   - M,V flags
+//   AIR-Flags                            (1679) - Unsigned32   - M,V flags
+//   MSISDN                               (701)  - OctetString  - M,V flags
+//   RAT-Type                             (1032) - Enumerated   - M,V flags
+//   ... and many more S6a-specific AVPs
+//
+// BASE PROTOCOL AVPs (No Vendor-ID / RFC 6733):
+// -----------------------------------------------
+//   User-Name                 (1)     - UTF8String
+//   Proxy-State               (33)    - OctetString
+//   Auth-Application-Id       (258)   - Unsigned32
+//   Acct-Application-Id       (259)   - Unsigned32
+//   Vendor-Specific-App-Id    (260)   - Grouped
+//   Session-Id                (263)   - UTF8String
+//   Origin-Host               (264)   - DiameterIdentity
+//   Vendor-Id                 (266)   - Unsigned32
+//   Result-Code               (268)   - Unsigned32
+//   Auth-Session-State        (277)   - Enumerated
+//   Failed-AVP                (279)   - Grouped
+//   Proxy-Host                (280)   - DiameterIdentity
+//   Route-Record              (282)   - DiameterIdentity
+//   Destination-Realm         (283)   - DiameterIdentity
+//   Proxy-Info                (284)   - Grouped
+//   Destination-Host          (293)   - DiameterIdentity
+//   Origin-Realm              (296)   - DiameterIdentity
+//   Experimental-Result       (297)   - Grouped
+//   Experimental-Result-Code  (298)   - Unsigned32
+//   DRMP                      (301)   - Enumerated (RFC 7944)
+//
+// OTHER PROTOCOL AVPs (RFC 5778):
+// -----------------------------------------------
+//   Service-Selection         (493)   - UTF8String (No Vendor-ID)
+//
+// ================================================================================
+//                         RELATED SPECIFICATIONS
+// ================================================================================
+//
+// - 3GPP TS 29.272: S6a/S6d and S13/S13' interface specification
+// - 3GPP TS 23.003: Numbering, addressing and identification
+// - 3GPP TS 23.401: GPRS enhancements for E-UTRAN access
+// - 3GPP TS 33.210: Network Domain Security (NDS)
+// - RFC 6733: Diameter Base Protocol
+// - RFC 5778: Diameter Mobile IPv6 (defines Service-Selection)
 //
 // ================================================================================

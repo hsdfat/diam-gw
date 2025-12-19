@@ -7,7 +7,7 @@ import (
 	"net"
 	"testing"
 
-	"github.com/hsdfat8/diam-gw/models_base"
+	"github.com/hsdfat/diam-gw/models_base"
 )
 
 // TestCapabilitiesExchangeRequest_Creation tests basic creation and initialization

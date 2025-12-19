@@ -1,0 +1,136 @@
+version: '3.8'
+
+services:
+  # DRA Simulator - sends test traffic
+  dra:
+    image: diam-gw-dra:latest
+    build:
+      context: ../..
+      dockerfile: Dockerfile.dra
+    container_name: dra
+    hostname: dra
+    command: [
+      "--port", "3869",
+      "--origin-host", "dra.example.com",
+      "--origin-realm", "example.com",
+      "--send-micr",
+      "--micr-delay", "15s"
+    ]
+    ports:
+      - "3869:3869"
+    networks:
+      - diameter
+    healthcheck:
+      test: ["CMD", "nc", "-z", "localhost", "3869"]
+      interval: 2s
+      timeout: 1s
+      retries: 10
+
+  # Gateway - routes between DRA and applications
+  gateway:
+    image: diam-gw-gateway:latest
+    build:
+      context: ../..
+      dockerfile: Dockerfile.gateway
+    container_name: gateway
+    hostname: gateway
+    command: [
+      "--app-listen", "0.0.0.0:3868",
+      "--dra-addrs", "dra:3869",
+      "--dra-priorities", "1",
+      "--dra-conns", "2",
+      "--origin-host", "gateway.example.com",
+      "--origin-realm", "example.com",
+      "--log-level", "debug"
+    ]
+    depends_on:
+      dra:
+        condition: service_healthy
+    ports:
+      - "3868:3868"
+    networks:
+      - diameter
+    healthcheck:
+      test: ["CMD", "nc", "-z", "localhost", "3868"]
+      interval: 2s
+      timeout: 1s
+      retries: 10
+
+  # App1: S13 only (Equipment Check)
+  app1-s13:
+    image: diam-gw-app:latest
+    build:
+      context: ../..
+      dockerfile: Dockerfile.app
+    container_name: app1-s13
+    hostname: app1
+    environment:
+      - APP_GATEWAY=gateway:3868
+      - APP_CONNECTIONS=2
+      - APP_ORIGIN_HOST=app1.example.com
+      - APP_ORIGIN_REALM=example.com
+      - APP_INTERFACES=S13
+      - APP_LOG_LEVEL=info
+    depends_on:
+      gateway:
+        condition: service_healthy
+    networks:
+      - diameter
+
+  # App2: S6a only (Authentication/Subscription)
+  app2-s6a:
+    image: diam-gw-app:latest
+    container_name: app2-s6a
+    hostname: app2
+    environment:
+      - APP_GATEWAY=gateway:3868
+      - APP_CONNECTIONS=2
+      - APP_ORIGIN_HOST=app2.example.com
+      - APP_ORIGIN_REALM=example.com
+      - APP_INTERFACES=S6a
+      - APP_LOG_LEVEL=info
+    depends_on:
+      gateway:
+        condition: service_healthy
+    networks:
+      - diameter
+
+  # App3: S13 + S6a (Multi-interface)
+  app3-multi:
+    image: diam-gw-app:latest
+    container_name: app3-multi
+    hostname: app3
+    environment:
+      - APP_GATEWAY=gateway:3868
+      - APP_CONNECTIONS=3
+      - APP_ORIGIN_HOST=app3.example.com
+      - APP_ORIGIN_REALM=example.com
+      - APP_INTERFACES=S13,S6a
+      - APP_LOG_LEVEL=info
+    depends_on:
+      gateway:
+        condition: service_healthy
+    networks:
+      - diameter
+
+  # App4: Gx only (Policy Control)
+  app4-gx:
+    image: diam-gw-app:latest
+    container_name: app4-gx
+    hostname: app4
+    environment:
+      - APP_GATEWAY=gateway:3868
+      - APP_CONNECTIONS=2
+      - APP_ORIGIN_HOST=app4.example.com
+      - APP_ORIGIN_REALM=example.com
+      - APP_INTERFACES=Gx
+      - APP_LOG_LEVEL=info
+    depends_on:
+      gateway:
+        condition: service_healthy
+    networks:
+      - diameter
+
+networks:
+  diameter:
+    driver: bridge

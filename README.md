@@ -1,84 +1,243 @@
-# Diameter Gateway - Code Generator
+# Diameter Gateway - Client & Code Generator
 
-A Protocol Buffers-like code generator for Diameter protocol commands and AVPs in Go.
+[![CI/CD](https://github.com/hsdfat/diam-gw/actions/workflows/gateway-ci.yml/badge.svg)](https://github.com/hsdfat/diam-gw/actions/workflows/gateway-ci.yml)
+[![Performance](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/hsdfat8/diam-gw/main/.github/badges/performance.json)](https://github.com/hsdfat/diam-gw/actions/workflows/gateway-ci.yml)
+[![Grade](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/hsdfat8/diam-gw/main/.github/badges/grade.json)](https://github.com/hsdfat/diam-gw/actions/workflows/gateway-ci.yml)
+[![Go Report Card](https://goreportcard.com/badge/github.com/hsdfat/diam-gw)](https://goreportcard.com/report/github.com/hsdfat/diam-gw)
+
+A comprehensive Diameter protocol implementation in Go with code generation tools, production-ready client with priority-based routing, and DRA simulator for testing.
 
 ## Overview
 
-This project provides a code generation system for Diameter base protocol commands, similar to how Protocol Buffers generates code from `.proto` files. It allows you to define Diameter commands and AVPs in a declarative format and automatically generates Go structs with Marshal/Unmarshal methods.
+This project provides:
+- **Code Generator**: Proto-like syntax for Diameter commands and AVPs
+- **Client Library**: Production-ready client with multi-DRA support, priority-based routing, and automatic failover
+- **DRA Simulator**: Full-featured Diameter Routing Agent for testing
+- **Type-Safe**: Generated Go structs with Marshal/Unmarshal methods
+- **Complete Protocol**: Base protocol (CER/CEA, DWR/DWA, DPR/DPA, etc.) and S13 interface
+
+## Quick Start
+
+### Testing & Performance
+
+The gateway includes comprehensive testing and performance benchmarking:
+
+```bash
+# Multi-application interface test
+cd tests/multi-app
+./test-multi-app-podman.sh
+
+# Single performance test (1000 req/s baseline)
+cd tests/performance
+./test-performance-podman.sh --duration 60 --rate 1000
+
+# Find maximum throughput (quick ~5 min)
+./quick-benchmark.sh
+
+# Detailed maximum throughput benchmark (~15-30 min)
+./benchmark-max-throughput.sh
+
+# Profile at specific rate to find bottlenecks
+./profile-gateway.sh --rate 5000 --duration 60
+```
+
+**Performance Testing:**
+- ✅ **Real Load Generation**: S13 (MICR) and S6a (AIR) actual Diameter requests
+- ✅ **Accurate Metrics**: Application messages only (excludes protocol overhead)
+- ✅ **Automated CI/CD**: Performance regression testing on every commit
+- ✅ **Grade System**: A (≥95%), B (80-95%), C (<80%), F (errors)
+
+See **[BENCHMARKING.md](tests/performance/BENCHMARKING.md)** for complete benchmarking guide.
+
+### Using the Client
+
+```go
+import "github.com/hsdfat/diam-gw/client"
+
+// Configure DRA pool with priorities
+config := client.DefaultDRAPoolConfig()
+config.DRAs = []*client.DRAServerConfig{
+    {Name: "DRA-1", Host: "10.0.0.1", Port: 3868, Priority: 1},
+    {Name: "DRA-2", Host: "10.0.0.2", Port: 3868, Priority: 1},
+    {Name: "DRA-3", Host: "10.0.0.3", Port: 3868, Priority: 2},
+}
+
+// Create and start pool
+pool, _ := client.NewDRAPool(ctx, config)
+pool.Start()
+
+// Send message (automatically routes to active priority)
+pool.Send(messageData)
+```
 
 ## Features
 
-- **Proto-like syntax** for defining Diameter commands and AVPs
-- **Automatic code generation** with Marshal/Unmarshal methods
-- **Type-safe** Go structs for all Diameter commands
-- **Complete base protocol support** (CER/CEA, DWR/DWA, DPR/DPA, RAR/RAA, STR/STA, ASR/ASA, ACR/ACA)
-- **Built-in length calculation** and padding
-- **Round-trip serialization** guaranteed
+### Client Library
+
+- **Priority-Based Routing**: Multi-tier priority system with automatic failover/fail-back
+- **Connection Pooling**: Multiple connections per DRA
+- **Health Monitoring**: Automatic health checks via DWR/DWA
+- **Load Balancing**: Round-robin within same priority level
+- **Automatic Reconnection**: Handles connection failures gracefully
+- **Thread-Safe**: Concurrent message sending
+
+### DRA Simulator
+
+- **Full Protocol Support**: CER/CEA, DWR/DWA, DPR/DPA, S13 commands
+- **Concurrent Connections**: Handles multiple clients
+- **Health Checks**: Automatic DWR/DWA keepalives
+- **Statistics**: Real-time metrics and logging
+- **Configurable**: Command-line flags for all parameters
+
+### Code Generator
+
+- **Proto-Like Syntax**: Familiar .proto format for Diameter definitions
+- **Auto-Generate**: Creates Go structs with full serialization
+- **Type-Safe**: Compile-time checking for Diameter messages
+- **Round-Trip**: Marshal/Unmarshal with length calculation
+- **Extensible**: Support for custom AVPs and commands
 
 ## Project Structure
 
 ```
 diam-gw/
-├── proto/                      # Protocol definition files
-│   └── diameter.proto         # Base protocol definitions
-├── codegen/                   # Code generator package
-│   ├── avp.go                # AVP structures
-│   ├── command.go            # Command structures
-│   ├── parser.go             # Proto file parser
-│   └── generator.go          # Code generator
-├── cmd/
-│   └── diameter-codegen/     # Code generator CLI
-│       └── main.go
-├── commands/                  # Generated command code
-│   └── base/
-│       ├── diameter.pb.go    # Generated from proto
-│       └── diameter_test.go  # Tests for generated code
-└── models_base/               # Base data types
-    ├── datatype.go
-    ├── unsigned32.go
-    ├── utf8string.go
-    └── ...
+├── client/                    # Client library
+│   ├── dra_pool.go           # Priority-based DRA pool
+│   ├── connection_pool.go    # Connection pooling per DRA
+│   └── connection.go         # Single connection management
+├── simulator/dra/            # DRA simulator
+│   ├── dra.go               # Main DRA implementation
+│   ├── load_generator.go    # Performance test load generator
+│   ├── session.go           # Session management
+│   └── router.go            # Message routing
+├── codegen/                  # Code generator
+│   ├── parser.go            # Proto file parser
+│   └── generator.go         # Code generator
+├── commands/                 # Generated commands
+│   ├── base/                # Base protocol (CER, DWR, etc.)
+│   └── s13/                 # S13 interface (MEICR, MEICA)
+├── models_base/             # Diameter data types
+├── examples/                # Example applications
+│   ├── multi_dra_test/      # Host-based multi-DRA test
+│   └── multi_dra_test_container/ # Container multi-DRA test
+├── tests/                   # Test suites
+│   ├── multi-app/           # Multi-application interface tests
+│   ├── performance/         # Performance tests
+│   ├── dwr-failover/        # DWR failure threshold testing
+│   ├── integration/         # Integration tests
+│   └── verification/        # Setup verification scripts
+├── tools/                   # Development tools
+│   └── run-4-dras.sh        # Host-based DRA management
+├── docker-compose.yml       # Container orchestration
+├── test-integration.sh      # Wrapper for integration tests
+└── test-dwr.sh             # Wrapper for DWR tests
 ```
 
-## Getting Started
+## Installation
 
-### 1. Define Your Protocol
+```bash
+git clone https://github.com/hsdfat/diam-gw.git
+cd diam-gw
+go mod download
+```
 
-Create a `.proto` file with Diameter AVP and command definitions:
+## Usage
 
+### Testing with Multiple DRAs
+
+See **[TESTING.md](TESTING.md)** for:
+- Containerized setup with Docker/Podman
+- Host-based setup
+- Test scenarios (normal, failover, fail-back)
+- Monitoring and troubleshooting
+- Performance tuning
+
+### Client Library Examples
+
+**Basic connection:**
+```go
+// Single DRA
+conn, _ := client.NewConnection(ctx, &client.ConnectionConfig{
+    Host:        "10.0.0.1",
+    Port:        3868,
+    OriginHost:  "client.example.com",
+    OriginRealm: "example.com",
+})
+conn.Start()
+conn.Send(messageData)
+```
+
+**Multi-DRA with priority:**
+```go
+// Multiple DRAs with failover
+pool, _ := client.NewDRAPool(ctx, &client.DRAPoolConfig{
+    OriginHost:  "client.example.com",
+    OriginRealm: "example.com",
+    DRAs: []*client.DRAServerConfig{
+        {Name: "Primary-1", Host: "10.0.0.1", Port: 3868, Priority: 1},
+        {Name: "Primary-2", Host: "10.0.0.2", Port: 3868, Priority: 1},
+        {Name: "Backup-1", Host: "10.0.0.3", Port: 3868, Priority: 2},
+    },
+    HealthCheckInterval: 5 * time.Second,
+    ConnectionsPerDRA:   2,
+})
+pool.Start()
+
+// Send automatically routes to active priority with load balancing
+pool.Send(messageData)
+
+// Get statistics
+stats := pool.GetStats()
+fmt.Printf("Active Priority: %d, Messages Sent: %d\n",
+    stats.CurrentPriority, stats.TotalMessagesSent)
+```
+
+### DRA Simulator
+
+**Start simulator:**
+```bash
+# Build
+go build -o bin/dra-simulator simulator/dra/*.go
+
+# Run
+./bin/dra-simulator \
+  -host 0.0.0.0 \
+  -port 3868 \
+  -origin-host dra.example.com \
+  -origin-realm example.com \
+  -verbose
+```
+
+**Docker:**
+```bash
+docker build -f Dockerfile.dra -t dra-simulator .
+docker run -p 3868:3868 dra-simulator
+```
+
+### Code Generator
+
+**Define protocol:**
 ```proto
 syntax = "diameter1";
-
 package diameter.base;
 
-option go_package = "github.com/hsdfat8/diam-gw/commands/base";
-
-// Define AVPs
 avp Origin-Host {
   code = 264;
   type = DiameterIdentity;
   must = true;
-  may_encrypt = false;
 }
 
-// Define Commands
 command Capabilities-Exchange-Request {
   code = 257;
   application_id = 0;
   request = true;
-  proxiable = false;
 
   fixed required Origin-Host origin_host = 1;
   fixed required Origin-Realm origin_realm = 2;
-  repeated required Host-IP-Address host_ip_address = 3;
-  // ... more fields
 }
 ```
 
-### 2. Generate Code
-
-Run the code generator:
-
+**Generate code:**
 ```bash
 go run cmd/diameter-codegen/main.go \
   -proto proto/diameter.proto \
@@ -86,248 +245,133 @@ go run cmd/diameter-codegen/main.go \
   -package base
 ```
 
-### 3. Use Generated Code
-
+**Use generated code:**
 ```go
-package main
+cer := base.NewCapabilitiesExchangeRequest()
+cer.OriginHost = models_base.DiameterIdentity("client.example.com")
+cer.OriginRealm = models_base.DiameterIdentity("example.com")
 
-import (
-    "net"
-    "github.com/hsdfat8/diam-gw/commands/base"
-    "github.com/hsdfat8/diam-gw/models_base"
-)
-
-func main() {
-    // Create a Capabilities-Exchange-Request
-    cer := base.NewCapabilitiesExchangeRequest()
-
-    // Set required fields
-    cer.OriginHost = models_base.DiameterIdentity("client.example.com")
-    cer.OriginRealm = models_base.DiameterIdentity("example.com")
-    cer.HostIpAddress = []models_base.Address{
-        models_base.Address(net.ParseIP("127.0.0.1")),
-    }
-    cer.VendorId = models_base.Unsigned32(10415) // 3GPP
-    cer.ProductName = models_base.UTF8String("MyApp")
-
-    // Set optional fields
-    cer.AuthApplicationId = []models_base.Unsigned32{
-        models_base.Unsigned32(16777238), // Gx
-    }
-
-    // Set identifiers
-    cer.Header.HopByHopID = 1
-    cer.Header.EndToEndID = 1
-
-    // Marshal to bytes
-    data, err := cer.Marshal()
-    if err != nil {
-        panic(err)
-    }
-
-    // Unmarshal from bytes
-    cer2 := &base.CapabilitiesExchangeRequest{}
-    if err := cer2.Unmarshal(data); err != nil {
-        panic(err)
-    }
-
-    // Get message length
-    length := cer.Len()
-
-    // Get string representation
-    str := cer.String()
-}
+data, _ := cer.Marshal()
+// Send data over network
 ```
 
-## Proto File Syntax
+## Testing Architecture
 
-### AVP Definition
+```
+Client
+  ├─ DRA-1 (Priority 1) ⭐ Primary
+  ├─ DRA-2 (Priority 1) ⭐ Primary
+  ├─ DRA-3 (Priority 2) Standby
+  └─ DRA-4 (Priority 2) Standby
 
-```proto
-avp AVP-Name {
-  code = <uint32>;              // AVP code
-  type = <TypeName>;            // Data type
-  must = <bool>;                // M-bit (mandatory)
-  may_encrypt = <bool>;         // P-bit (protected)
-  vendor_id = <uint32>;         // Optional vendor ID
-}
+• All 4 connections maintained (CER/CEA, DWR/DWA)
+• Messages sent only to active priority
+• Automatic failover: All Priority 1 down → Priority 2
+• Automatic fail-back: Any Priority 1 up → Priority 1
 ```
 
-**Supported Types:**
-- `Unsigned32`, `Unsigned64`
-- `Integer32`, `Integer64`
-- `Float32`, `Float64`
-- `OctetString`
-- `UTF8String`
-- `DiameterIdentity`
-- `DiameterURI`
-- `Enumerated`
-- `Address`
-- `Time`
-- `IPFilterRule`
-- `QoSFilterRule`
-- `Grouped`
-
-### Command Definition
-
-```proto
-command Command-Name {
-  code = <uint32>;              // Command code
-  application_id = <uint32>;    // Application ID
-  request = <bool>;             // Request or Answer
-  proxiable = <bool>;           // P-bit in command flags
-
-  // Field definitions
-  fixed required AVP-Name field_name = 1;
-  repeated optional AVP-Name field_name = 2;
-  optional AVP-Name field_name = 3;
-}
-```
-
-**Field Modifiers:**
-- `fixed` - Fixed position in ABNF
-- `repeated` - Can appear multiple times (generates slice)
-- `required` - Must be present (generates non-pointer)
-- `optional` - May be absent (generates pointer)
-
-## Base Protocol Commands
-
-The following Diameter base protocol commands are included:
-
-| Command | Code | Abbreviation | Description |
-|---------|------|--------------|-------------|
-| Capabilities-Exchange-Request | 257 | CER | Peer connection establishment |
-| Capabilities-Exchange-Answer | 257 | CEA | CER response |
-| Device-Watchdog-Request | 280 | DWR | Keepalive mechanism |
-| Device-Watchdog-Answer | 280 | DWA | DWR response |
-| Disconnect-Peer-Request | 282 | DPR | Graceful disconnect |
-| Disconnect-Peer-Answer | 282 | DPA | DPR response |
-| Re-Auth-Request | 258 | RAR | Server-initiated re-auth |
-| Re-Auth-Answer | 258 | RAA | RAR response |
-| Session-Termination-Request | 275 | STR | Client session termination |
-| Session-Termination-Answer | 275 | STA | STR response |
-| Abort-Session-Request | 274 | ASR | Server session abort |
-| Abort-Session-Answer | 274 | ASA | ASR response |
-| Accounting-Request | 271 | ACR | Accounting record |
-| Accounting-Answer | 271 | ACA | ACR response |
-
-## Generated Code Features
-
-Each generated command struct includes:
-
-- **Constructor**: `New<CommandName>()` - Creates new message with default header
-- **Marshal()**: `([]byte, error)` - Serializes to Diameter wire format
-- **Unmarshal()**: `([]byte) error` - Deserializes from bytes
-- **Len()**: `int` - Returns total message length
-- **String()**: `string` - Human-readable representation
-
-### Example Generated Struct
-
-```go
-type CapabilitiesExchangeRequest struct {
-    Header DiameterHeader
-
-    OriginHost                  models_base.DiameterIdentity // Required
-    OriginRealm                 models_base.DiameterIdentity // Required
-    HostIpAddress               []models_base.Address        // Required
-    VendorId                    models_base.Unsigned32       // Required
-    ProductName                 models_base.UTF8String       // Required
-    OriginStateId               *models_base.Unsigned32      // Optional
-    SupportedVendorId           []models_base.Unsigned32     // Optional
-    AuthApplicationId           []models_base.Unsigned32     // Optional
-    // ... more fields
-}
-```
-
-## Diameter Header Structure
-
-The generated code includes proper Diameter header handling:
-
-```go
-type DiameterHeader struct {
-    Version       uint8        // Must be 1
-    Length        uint32       // Total message length (3 bytes)
-    Flags         CommandFlags // Command flags
-    CommandCode   uint32       // Command code (3 bytes)
-    ApplicationID uint32       // Application ID (4 bytes)
-    HopByHopID    uint32       // Request/answer matching
-    EndToEndID    uint32       // Duplicate detection
-}
-
-type CommandFlags struct {
-    Request       bool // R-bit
-    Proxiable     bool // P-bit
-    Error         bool // E-bit
-    Retransmitted bool // T-bit
-}
-```
-
-## Testing
-
-Run tests for generated code:
+## Building
 
 ```bash
-cd commands/base
-go test -v
+# Build all
+make build
+
+# Build DRA simulator
+make build-dra
+
+# Build examples
+make build-examples
+
+# Run tests
+make test
 ```
 
-All generated code includes comprehensive tests for:
-- Marshal/Unmarshal round-trip
-- Field value preservation
-- Header flag handling
-- Message length calculation
-- String representation
+## CI/CD Pipeline
 
-## Advanced Usage
+The project includes comprehensive GitHub Actions workflows for automated testing and performance monitoring:
 
-### Creating Custom Applications
+### Automated Testing
+- **Build & Unit Tests**: Go tests with race detection and coverage reporting
+- **Multi-App Test**: Interface-based routing validation with 4 applications
+- **Performance Test**: Throughput and latency testing with 12 applications
+- **Automatic Reports**: Performance metrics posted to PRs
 
-You can extend the base protocol by creating your own `.proto` files:
+### Performance Monitoring
+- Real-time performance badges showing throughput and grade
+- Configurable test parameters (duration, rate)
+- Automated performance regression detection
+- Historical performance tracking
 
-```proto
-syntax = "diameter1";
+See **[.github/CICD.md](.github/CICD.md)** for complete CI/CD documentation.
 
-package diameter.gx;
-
-option go_package = "github.com/hsdfat8/diam-gw/commands/gx";
-
-// Define application-specific AVPs
-avp Rating-Group {
-  code = 432;
-  type = Unsigned32;
-  must = true;
-  may_encrypt = false;
-}
-
-// Define application-specific commands
-command Credit-Control-Request {
-  code = 272;
-  application_id = 16777238; // Gx
-  request = true;
-  proxiable = true;
-
-  // Include base AVPs and application AVPs
-  fixed required Session-Id session_id = 1;
-  fixed required Origin-Host origin_host = 2;
-  // ... more fields
-}
+### Manual Workflow Triggers
+```bash
+# Run performance test with custom parameters
+gh workflow run gateway-ci.yml \
+  -f performance_duration=120 \
+  -f performance_rate=2000
 ```
 
-### Extending Data Types
+## Documentation
 
-The code generator uses the `models_base` package for AVP data types. You can add custom types by:
+### Testing & Performance
+- **[TESTING.md](TESTING.md)** - Complete testing guide (multi-app, performance, DWR, integration)
+- **[BENCHMARKING.md](tests/performance/BENCHMARKING.md)** - Comprehensive benchmarking guide
+- **[MAXIMUM_THROUGHPUT_TESTING.md](MAXIMUM_THROUGHPUT_TESTING.md)** - Quick reference for finding max capacity
+- **[PERFORMANCE_TEST_FIXES.md](PERFORMANCE_TEST_FIXES.md)** - Recent performance improvements
+- **[tests/README.md](tests/README.md)** - Test suite overview
 
-1. Implementing the `models_base.Type` interface
-2. Adding the type to `models_base.Available` map
-3. Using it in your proto definitions
+### CI/CD
+- **[.github/CICD.md](.github/CICD.md)** - CI/CD pipeline documentation
+- Automated performance testing on every commit
+- Real-time performance badges and grade tracking
+- Performance regression detection
+- Historical performance data tracking
+
+### Components
+- **[client/README.md](client/README.md)** - Client library documentation
+- **[simulator/dra/README.md](simulator/dra/README.md)** - DRA simulator documentation
+- **[examples/README.md](examples/README.md)** - Example applications
+- **[tools/README.md](tools/README.md)** - Development tools
+
+## Supported Protocols
+
+### Diameter Base (RFC 6733)
+- CER/CEA - Capabilities Exchange
+- DWR/DWA - Device Watchdog
+- DPR/DPA - Disconnect Peer
+- RAR/RAA - Re-Auth
+- STR/STA - Session Termination
+- ASR/ASA - Abort Session
+- ACR/ACA - Accounting
+
+### 3GPP S13 Interface
+- ME-Identity-Check-Request/Answer (MEICR/MEICA)
+
+## Requirements
+
+- Go 1.21 or later
+- For containers: Podman or Docker
+- For testing: netcat
 
 ## References
 
-- **RFC 3588**: Diameter Base Protocol (obsoleted by RFC 6733)
-- **RFC 6733**: Diameter Base Protocol
-- [diameter_base_commands.txt](diameter_base_commands.txt) - Detailed command descriptions
+- RFC 6733: Diameter Base Protocol
+- 3GPP TS 29.272: S13 Interface
+- [diameter_base_commands.txt](diameter_base_commands.txt) - Command descriptions
 - [rfc3588_diameter_summary.txt](rfc3588_diameter_summary.txt) - Protocol summary
 
 ## License
 
-This project is part of the Diameter Gateway implementation.
+Part of the Diameter Gateway implementation.
+
+---
+
+**Quick Links:**
+- [Testing Guide](TESTING.md) - Multi-app, integration, DWR tests
+- [Benchmarking Guide](tests/performance/BENCHMARKING.md) - Find maximum throughput
+- [Performance Fixes](PERFORMANCE_TEST_FIXES.md) - Recent improvements & load generator
+- [Client Library](client/) - Production-ready Diameter client
+- [DRA Simulator](simulator/dra/) - Full-featured testing DRA
+- [Examples](examples/) - Sample applications
+- [CI/CD Pipeline](.github/CICD.md) - Automated testing & deployment

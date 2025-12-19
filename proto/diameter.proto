@@ -6,7 +6,7 @@ syntax = "diameter1";
 
 package diameter.base;
 
-option go_package = "github.com/hsdfat8/diam-gw/commands/base";
+option go_package = "github.com/hsdfat/diam-gw/commands/base";
 
 // ================================================================================
 //                              DATA TYPES

@@ -1,0 +1,183 @@
+version: '3.8'
+
+services:
+  # Priority 1 DRAs (Primary)
+  dra-1:
+    build:
+      context: .
+      dockerfile: Dockerfile.dra
+    container_name: dra-1
+    hostname: dra-1.example.com
+    networks:
+      diameter_net:
+        ipv4_address: 172.20.0.11
+    ports:
+      - "3868:3868"
+    command:
+      - "-host"
+      - "0.0.0.0"
+      - "-port"
+      - "3868"
+      - "-origin-host"
+      - "dra-1.example.com"
+      - "-origin-realm"
+      - "example.com"
+      - "-product-name"
+      - "DRA-1/1.0"
+      - "-metrics-interval"
+      - "15s"
+      - "-verbose"
+    healthcheck:
+      test: ["CMD", "nc", "-zv", "localhost", "3868"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+    restart: unless-stopped
+    labels:
+      diameter.priority: "1"
+      diameter.role: "primary"
+
+  dra-2:
+    build:
+      context: .
+      dockerfile: Dockerfile.dra
+    container_name: dra-2
+    hostname: dra-2.example.com
+    networks:
+      diameter_net:
+        ipv4_address: 172.20.0.12
+    ports:
+      - "3869:3868"
+    command:
+      - "-host"
+      - "0.0.0.0"
+      - "-port"
+      - "3868"
+      - "-origin-host"
+      - "dra-2.example.com"
+      - "-origin-realm"
+      - "example.com"
+      - "-product-name"
+      - "DRA-2/1.0"
+      - "-metrics-interval"
+      - "15s"
+      - "-verbose"
+    healthcheck:
+      test: ["CMD", "nc", "-zv", "localhost", "3868"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+    restart: unless-stopped
+    labels:
+      diameter.priority: "1"
+      diameter.role: "primary"
+
+  # Priority 2 DRAs (Backup)
+  dra-3:
+    build:
+      context: .
+      dockerfile: Dockerfile.dra
+    container_name: dra-3
+    hostname: dra-3.example.com
+    networks:
+      diameter_net:
+        ipv4_address: 172.20.0.13
+    ports:
+      - "3870:3868"
+    command:
+      - "-host"
+      - "0.0.0.0"
+      - "-port"
+      - "3868"
+      - "-origin-host"
+      - "dra-3.example.com"
+      - "-origin-realm"
+      - "example.com"
+      - "-product-name"
+      - "DRA-3/1.0"
+      - "-metrics-interval"
+      - "15s"
+      - "-verbose"
+    healthcheck:
+      test: ["CMD", "nc", "-zv", "localhost", "3868"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+    restart: unless-stopped
+    labels:
+      diameter.priority: "2"
+      diameter.role: "backup"
+
+  dra-4:
+    build:
+      context: .
+      dockerfile: Dockerfile.dra
+    container_name: dra-4
+    hostname: dra-4.example.com
+    networks:
+      diameter_net:
+        ipv4_address: 172.20.0.14
+    ports:
+      - "3871:3868"
+    command:
+      - "-host"
+      - "0.0.0.0"
+      - "-port"
+      - "3868"
+      - "-origin-host"
+      - "dra-4.example.com"
+      - "-origin-realm"
+      - "example.com"
+      - "-product-name"
+      - "DRA-4/1.0"
+      - "-metrics-interval"
+      - "15s"
+      - "-verbose"
+    healthcheck:
+      test: ["CMD", "nc", "-zv", "localhost", "3868"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+    restart: unless-stopped
+    labels:
+      diameter.priority: "2"
+      diameter.role: "backup"
+
+  # Multi-DRA Test Client
+  client:
+    build:
+      context: .
+      dockerfile: Dockerfile.client
+    container_name: diameter-client
+    hostname: client.example.com
+    networks:
+      diameter_net:
+        ipv4_address: 172.20.0.20
+    depends_on:
+      - dra-1
+      - dra-2
+      - dra-3
+      - dra-4
+    environment:
+      - DRA1_HOST=172.20.0.11
+      - DRA1_PORT=3868
+      - DRA2_HOST=172.20.0.12
+      - DRA2_PORT=3868
+      - DRA3_HOST=172.20.0.13
+      - DRA3_PORT=3868
+      - DRA4_HOST=172.20.0.14
+      - DRA4_PORT=3868
+    restart: "no"
+    labels:
+      diameter.role: "client"
+
+networks:
+  diameter_net:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/24

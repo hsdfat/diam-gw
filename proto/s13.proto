@@ -6,7 +6,7 @@ syntax = "diameter1";
 
 package diameter.s13;
 
-option go_package = "github.com/hsdfat8/diam-gw/commands/s13";
+option go_package = "github.com/hsdfat/diam-gw/commands/s13";
 
 // ================================================================================
 //                         APPLICATION IDENTIFIER
@@ -47,11 +47,272 @@ const DIAMETER_ERROR_USER_UNKNOWN = 5001;
 const DIAMETER_ERROR_EQUIPMENT_UNKNOWN = 5422;
 
 // ================================================================================
+//                         BASE PROTOCOL AVP DEFINITIONS
+// ================================================================================
+// These AVPs are defined in RFC 6733 (Diameter Base Protocol)
+// They do NOT have a Vendor-ID (vendor_id is absent or 0)
+
+// User-Name (AVP Code 1)
+// Contains the user identifier (IMSI in S13 context)
+// RFC 6733 - No Vendor-ID
+avp User-Name {
+  code = 1;
+  type = UTF8String;
+  must = true;
+  may_encrypt = true;
+  description = "User identifier (IMSI when used in S13 context)";
+}
+
+// Session-Id (AVP Code 263)
+// Identifies the Diameter session
+// RFC 6733 - No Vendor-ID
+avp Session-Id {
+  code = 263;
+  type = UTF8String;
+  must = true;
+  may_encrypt = false;
+  description = "Uniquely identifies a Diameter session";
+}
+
+// Auth-Session-State (AVP Code 277)
+// Specifies whether session state is maintained
+// RFC 6733 - No Vendor-ID
+avp Auth-Session-State {
+  code = 277;
+  type = Enumerated;
+  must = true;
+  may_encrypt = false;
+  description = "Indicates whether state is maintained for a session";
+  // Values:
+  //   0 = STATE_MAINTAINED
+  //   1 = NO_STATE_MAINTAINED (required for S13)
+}
+
+// Origin-Host (AVP Code 264)
+// Identity of the Diameter node that originated the message
+// RFC 6733 - No Vendor-ID
+avp Origin-Host {
+  code = 264;
+  type = DiameterIdentity;
+  must = true;
+  may_encrypt = false;
+  description = "Identity of the node that originated the Diameter message";
+}
+
+// Origin-Realm (AVP Code 296)
+// Realm of the node that originated the message
+// RFC 6733 - No Vendor-ID
+avp Origin-Realm {
+  code = 296;
+  type = DiameterIdentity;
+  must = true;
+  may_encrypt = false;
+  description = "Realm of the node that originated the Diameter message";
+}
+
+// Destination-Host (AVP Code 293)
+// Identity of the Diameter node that should receive the message
+// RFC 6733 - No Vendor-ID
+avp Destination-Host {
+  code = 293;
+  type = DiameterIdentity;
+  must = true;
+  may_encrypt = false;
+  description = "Identity of the destination Diameter node";
+}
+
+// Destination-Realm (AVP Code 283)
+// Realm of the destination node
+// RFC 6733 - No Vendor-ID
+avp Destination-Realm {
+  code = 283;
+  type = DiameterIdentity;
+  must = true;
+  may_encrypt = false;
+  description = "Realm of the destination Diameter node";
+}
+
+// Result-Code (AVP Code 268)
+// Indicates whether a request was successfully completed
+// RFC 6733 - No Vendor-ID
+avp Result-Code {
+  code = 268;
+  type = Unsigned32;
+  must = true;
+  may_encrypt = false;
+  description = "Result of the Diameter request";
+  // Common values:
+  //   2001 = DIAMETER_SUCCESS
+  //   3xxx = Protocol Errors
+  //   5xxx = Permanent Failures
+}
+
+// Experimental-Result (AVP Code 297)
+// Used for vendor-specific result codes
+// RFC 6733 - No Vendor-ID
+avp Experimental-Result {
+  code = 297;
+  type = Grouped;
+  must = true;
+  may_encrypt = false;
+  description = "Contains vendor-specific result information";
+
+  grouped {
+    required Vendor-Id vendor_id = 1;
+    required Experimental-Result-Code experimental_result_code = 2;
+  }
+}
+
+// Vendor-Id (AVP Code 266)
+// Vendor identifier (10415 for 3GPP)
+// RFC 6733 - No Vendor-ID
+avp Vendor-Id {
+  code = 266;
+  type = Unsigned32;
+  must = true;
+  may_encrypt = false;
+  description = "Vendor identifier (10415 for 3GPP)";
+}
+
+// Experimental-Result-Code (AVP Code 298)
+// Vendor-specific result code value
+// RFC 6733 - No Vendor-ID
+avp Experimental-Result-Code {
+  code = 298;
+  type = Unsigned32;
+  must = true;
+  may_encrypt = false;
+  description = "Vendor-specific result code";
+}
+
+// Vendor-Specific-Application-Id (AVP Code 260)
+// Used to advertise vendor-specific Diameter applications
+// RFC 6733 - No Vendor-ID
+avp Vendor-Specific-Application-Id {
+  code = 260;
+  type = Grouped;
+  must = true;
+  may_encrypt = false;
+  description = "Contains vendor-specific application identifier";
+
+  grouped {
+    optional Vendor-Id vendor_id = 1;
+    optional Auth-Application-Id auth_application_id = 2;
+    optional Acct-Application-Id acct_application_id = 3;
+  }
+}
+
+// Auth-Application-Id (AVP Code 258)
+// Authentication and authorization application identifier
+// RFC 6733 - No Vendor-ID
+avp Auth-Application-Id {
+  code = 258;
+  type = Unsigned32;
+  must = true;
+  may_encrypt = false;
+  description = "Authentication application identifier";
+}
+
+// Acct-Application-Id (AVP Code 259)
+// Accounting application identifier
+// RFC 6733 - No Vendor-ID
+avp Acct-Application-Id {
+  code = 259;
+  type = Unsigned32;
+  must = true;
+  may_encrypt = false;
+  description = "Accounting application identifier";
+}
+
+// Failed-AVP (AVP Code 279)
+// Contains AVPs that caused a request to fail
+// RFC 6733 - No Vendor-ID
+avp Failed-AVP {
+  code = 279;
+  type = Grouped;
+  must = true;
+  may_encrypt = false;
+  description = "Contains AVPs that could not be processed successfully";
+
+  grouped {
+    repeated optional AVP avp = 1;  // Any AVP that failed
+  }
+}
+
+// Proxy-Info (AVP Code 284)
+// Contains state information from a proxy
+// RFC 6733 - No Vendor-ID
+avp Proxy-Info {
+  code = 284;
+  type = Grouped;
+  must = true;
+  may_encrypt = false;
+  description = "Contains proxy state information";
+
+  grouped {
+    required Proxy-Host proxy_host = 1;    // Code 280
+    optional Proxy-State proxy_state = 2;  // Code 33
+  }
+}
+
+// Proxy-Host (AVP Code 280)
+// Identity of the proxy that added the Proxy-Info AVP
+// RFC 6733 - No Vendor-ID
+avp Proxy-Host {
+  code = 280;
+  type = DiameterIdentity;
+  must = true;
+  may_encrypt = false;
+  description = "Identity of the proxy server";
+}
+
+// Proxy-State (AVP Code 33)
+// State information from a proxy
+// RFC 6733 - No Vendor-ID
+avp Proxy-State {
+  code = 33;
+  type = OctetString;
+  must = true;
+  may_encrypt = false;
+  description = "State information added by a proxy";
+}
+
+// Route-Record (AVP Code 282)
+// Identity of a node that processed the message
+// RFC 6733 - No Vendor-ID
+avp Route-Record {
+  code = 282;
+  type = DiameterIdentity;
+  must = true;
+  may_encrypt = false;
+  description = "Identity of a Diameter node in the path";
+}
+
+// DRMP (AVP Code 301)
+// Diameter Routing Message Priority
+// RFC 7944 - No Vendor-ID
+avp DRMP {
+  code = 301;
+  type = Enumerated;
+  must = false;
+  may_encrypt = false;
+  description = "Diameter Routing Message Priority";
+  // Values:
+  //   0 = PRIORITY_0 (lowest)
+  //   ...
+  //   15 = PRIORITY_15 (highest)
+}
+
+// ================================================================================
 //                         S13 SPECIFIC AVP DEFINITIONS
 // ================================================================================
+// All S13-specific AVPs have Vendor-ID = 10415 (3GPP)
+// Flag notation: M (Mandatory), V (Vendor-specific)
+// All S13 AVPs use M,V flags as per Table 7.3.1/1 in TS 29.272
 
 // Terminal-Information (AVP Code 1401) - Grouped
 // Contains information about the mobile equipment being checked
+// Flags: M, V
 avp Terminal-Information {
   code = 1401;
   vendor_id = 10415;
@@ -61,18 +322,18 @@ avp Terminal-Information {
   description = "Contains information about the user's mobile equipment";
 
   grouped {
-    // IMEI: International Mobile Equipment Identity (15 or 16 digits)
+    // IMEI: International Mobile Equipment Identity (14-16 digits)
     // The EIR uses the first 14 digits (TAC + SNR) for identification
     // The 15th digit (check digit) is ignored by EIR
     // The 16th digit (SVN) is optional
-    optional IMEI imei = 1;                        // Code 1402, UTF8String
-    
+    optional IMEI imei = 1;                        // Code 1402, UTF8String, M,V
+
     // 3GPP2-MEID: Mobile Equipment Identifier for 3GPP2 networks
-    optional 3GPP2-MEID meid = 2;                  // Code 1471, OctetString
-    
+    optional 3GPP2-MEID meid = 2;                  // Code 1471, OctetString, M,V
+
     // Software-Version: IMEISV software version (2 digits)
     // May be used by EIR in addition to IMEI for black/grey list checks
-    optional Software-Version software_version = 3; // Code 1403, UTF8String
+    optional Software-Version software_version = 3; // Code 1403, UTF8String, M,V
   }
 }
 
@@ -80,6 +341,7 @@ avp Terminal-Information {
 // International Mobile Equipment Identity
 // Format: 14-16 digits as UTF8String
 // Structure: TAC (8 digits) + SNR (6 digits) + optional CD (1 digit) + optional SVN (2 digits)
+// Flags: M, V
 avp IMEI {
   code = 1402;
   vendor_id = 10415;
@@ -92,6 +354,7 @@ avp IMEI {
 // Software-Version (AVP Code 1403)
 // Software Version Number from IMEISV
 // Format: 2 digits as UTF8String
+// Flags: M, V
 avp Software-Version {
   code = 1403;
   vendor_id = 10415;
@@ -104,6 +367,8 @@ avp Software-Version {
 // 3GPP2-MEID (AVP Code 1471)
 // Mobile Equipment Identifier for 3GPP2 networks
 // Format: 56 bits as OctetString
+// Encoding: See 3GPP2 A.S0022 Annex A (Mobile Identity octets 3-10)
+// Flags: M, V
 avp 3GPP2-MEID {
   code = 1471;
   vendor_id = 10415;
@@ -115,6 +380,8 @@ avp 3GPP2-MEID {
 
 // Equipment-Status (AVP Code 1445)
 // Result of the ME identity check
+// Section 7.3.51 of TS 29.272
+// Flags: M, V
 avp Equipment-Status {
   code = 1445;
   vendor_id = 10415;
@@ -122,7 +389,7 @@ avp Equipment-Status {
   must = true;
   may_encrypt = false;
   description = "Status of the mobile equipment from EIR check";
-  // Values:
+  // Values as defined in TS 29.272:
   //   0 = WHITELISTED - Equipment is on white list (allowed)
   //   1 = BLACKLISTED - Equipment is on black list (not allowed, e.g., stolen)
   //   2 = GREYLISTED  - Equipment is on grey list (under investigation)
@@ -254,17 +521,64 @@ command ME-Identity-Check-Answer {
 //         |                                        |
 //
 // ================================================================================
+//                         AVP VENDOR-ID SUMMARY
+// ================================================================================
+//
+// S13-SPECIFIC AVPs (Vendor-ID = 10415 / 3GPP):
+// -----------------------------------------------
+//   Terminal-Information      (1401)  - Grouped      - M,V flags
+//   IMEI                      (1402)  - UTF8String   - M,V flags
+//   Software-Version          (1403)  - UTF8String   - M,V flags
+//   Equipment-Status          (1445)  - Enumerated   - M,V flags
+//   3GPP2-MEID                (1471)  - OctetString  - M,V flags
+//
+// BASE PROTOCOL AVPs (No Vendor-ID / RFC 6733):
+// -----------------------------------------------
+//   User-Name                 (1)     - UTF8String
+//   Proxy-State               (33)    - OctetString
+//   Auth-Application-Id       (258)   - Unsigned32
+//   Acct-Application-Id       (259)   - Unsigned32
+//   Vendor-Specific-App-Id    (260)   - Grouped
+//   Session-Id                (263)   - UTF8String
+//   Origin-Host               (264)   - DiameterIdentity
+//   Vendor-Id                 (266)   - Unsigned32
+//   Result-Code               (268)   - Unsigned32
+//   Auth-Session-State        (277)   - Enumerated
+//   Failed-AVP                (279)   - Grouped
+//   Proxy-Host                (280)   - DiameterIdentity
+//   Route-Record              (282)   - DiameterIdentity
+//   Destination-Realm         (283)   - DiameterIdentity
+//   Proxy-Info                (284)   - Grouped
+//   Destination-Host          (293)   - DiameterIdentity
+//   Origin-Realm              (296)   - DiameterIdentity
+//   Experimental-Result       (297)   - Grouped
+//   Experimental-Result-Code  (298)   - Unsigned32
+//   DRMP                      (301)   - Enumerated (RFC 7944)
+//
+// ================================================================================
 //                         GROUPED AVP STRUCTURE SUMMARY
 // ================================================================================
 //
-// Terminal-Information (1401):
-//   +-- IMEI (1402)              [Optional, UTF8String]
-//   +-- 3GPP2-MEID (1471)        [Optional, OctetString]
-//   +-- Software-Version (1403)  [Optional, UTF8String]
+// Terminal-Information (1401) [Vendor-ID: 10415]:
+//   +-- IMEI (1402)              [Optional, UTF8String, Vendor-ID: 10415]
+//   +-- 3GPP2-MEID (1471)        [Optional, OctetString, Vendor-ID: 10415]
+//   +-- Software-Version (1403)  [Optional, UTF8String, Vendor-ID: 10415]
 //
-// Experimental-Result (297) - Base Protocol:
+// Experimental-Result (297) [No Vendor-ID - Base Protocol]:
 //   +-- Vendor-Id (266)                    [Required, Unsigned32] = 10415
 //   +-- Experimental-Result-Code (298)     [Required, Unsigned32]
+//
+// Vendor-Specific-Application-Id (260) [No Vendor-ID - Base Protocol]:
+//   +-- Vendor-Id (266)                [1* Optional, Unsigned32]
+//   +-- Auth-Application-Id (258)      [Optional, Unsigned32]
+//   +-- Acct-Application-Id (259)      [Optional, Unsigned32]
+//
+// Proxy-Info (284) [No Vendor-ID - Base Protocol]:
+//   +-- Proxy-Host (280)               [Required, DiameterIdentity]
+//   +-- Proxy-State (33)               [Optional, OctetString]
+//
+// Failed-AVP (279) [No Vendor-ID - Base Protocol]:
+//   +-- AVP (*)                        [0* Optional, Any AVP]
 //
 // ================================================================================
 //                         RELATED SPECIFICATIONS
