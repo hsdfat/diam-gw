@@ -1,0 +1,153 @@
+# Diameter Gateway Configuration Example
+
+# Gateway Identity
+gateway:
+  origin_host: "diameter-gw.example.com"
+  origin_realm: "example.com"
+  product_name: "Diameter-Gateway"
+  vendor_id: 10415  # 3GPP
+
+  # Session management
+  session_timeout: 30s
+
+  # Logging
+  enable_request_logging: false
+  enable_response_logging: false
+  log_level: "info"  # debug, info, warn, error
+
+# Inbound Server Configuration (from Logic Apps)
+server:
+  listen_address: "0.0.0.0:3868"
+  max_connections: 1000
+
+  connection:
+    read_timeout: 30s
+    write_timeout: 10s
+    watchdog_interval: 30s
+    watchdog_timeout: 10s
+    max_message_size: 65535
+    send_channel_size: 100
+    recv_channel_size: 100
+    handle_watchdog: true
+
+  recv_channel_size: 1000
+
+# DRA Pool Configuration (outbound to DRA servers)
+dra_pool:
+  # DRA servers with priority-based routing
+  dras:
+    - name: "DRA-Primary-1"
+      host: "10.0.1.100"
+      port: 3868
+      priority: 1  # Highest priority
+      weight: 100
+
+    - name: "DRA-Primary-2"
+      host: "10.0.1.101"
+      port: 3868
+      priority: 1  # Same priority, load balanced
+      weight: 100
+
+    - name: "DRA-Secondary-1"
+      host: "10.0.2.100"
+      port: 3868
+      priority: 2  # Lower priority, used when primary fails
+      weight: 100
+
+    - name: "DRA-Secondary-2"
+      host: "10.0.2.101"
+      port: 3868
+      priority: 2  # Same as DRA-Secondary-1
+      weight: 100
+
+  # Connection settings
+  connections_per_dra: 1  # Only one connection per DRA at a time
+
+  # Timeouts
+  connect_timeout: 10s
+  cer_timeout: 5s
+  dwr_interval: 30s
+  dwr_timeout: 10s
+  max_dwr_failures: 3
+
+  # Health monitoring
+  health_check_interval: 10s
+
+  # Reconnection strategy
+  reconnect_interval: 5s
+  max_reconnect_delay: 5m
+  reconnect_backoff: 1.5  # Exponential backoff multiplier
+
+  # Buffer sizes
+  send_buffer_size: 100
+  recv_buffer_size: 100
+
+# Monitoring
+monitoring:
+  stats_interval: 60s  # Statistics logging interval
+  enable_metrics: true
+  metrics_port: 9090
+
+# Example deployment scenarios:
+
+# Scenario 1: Single DRA (no redundancy)
+# dras:
+#   - name: "DRA-1"
+#     host: "10.0.1.100"
+#     port: 3868
+#     priority: 1
+#     weight: 100
+
+# Scenario 2: Active-Standby (Priority-based failover)
+# dras:
+#   - name: "DRA-Primary"
+#     host: "10.0.1.100"
+#     port: 3868
+#     priority: 1
+#     weight: 100
+#   - name: "DRA-Standby"
+#     host: "10.0.2.100"
+#     port: 3868
+#     priority: 2
+#     weight: 100
+
+# Scenario 3: Active-Active with Failover (Load balancing + Priority)
+# dras:
+#   - name: "DRA-Primary-1"
+#     host: "10.0.1.100"
+#     port: 3868
+#     priority: 1
+#     weight: 100
+#   - name: "DRA-Primary-2"
+#     host: "10.0.1.101"
+#     port: 3868
+#     priority: 1
+#     weight: 100
+#   - name: "DRA-Secondary"
+#     host: "10.0.2.100"
+#     port: 3868
+#     priority: 2
+#     weight: 100
+
+# Scenario 4: Geographic Distribution
+# dras:
+#   - name: "DRA-Local-DC1"
+#     host: "10.0.1.100"
+#     port: 3868
+#     priority: 1
+#     weight: 100
+#   - name: "DRA-Local-DC2"
+#     host: "10.0.1.101"
+#     port: 3868
+#     priority: 1
+#     weight: 100
+#   - name: "DRA-Remote-DC1"
+#     host: "10.0.2.100"
+#     port: 3868
+#     priority: 2
+#     weight: 100
+#   - name: "DRA-Remote-DC2"
+#     host: "10.0.2.101"
+#     port: 3868
+#     priority: 2
+#     weight: 100

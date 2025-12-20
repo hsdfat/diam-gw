@@ -1241,3 +1241,512 @@ func BenchmarkClientMessageSend(b *testing.B) {
 		<-pool.Receive()
 	}
 }
+
+// ============================================================================
+// AddressClient Tests (Per-Remote-Address Connection Pool)
+// ============================================================================
+
+// Helper to create test pool config
+func newTestPoolConfig() *client.PoolConfig {
+	config := client.DefaultPoolConfig()
+	config.OriginHost = "test-client.example.com"
+	config.OriginRealm = "example.com"
+	config.ProductName = "TestClient/1.0"
+	config.VendorID = 10415
+	config.DialTimeout = 2 * time.Second
+	config.CERTimeout = 2 * time.Second
+	config.DWRInterval = 30 * time.Second
+	config.DWRTimeout = 5 * time.Second
+	config.MaxDWRFailures = 3
+	config.ReconnectEnabled = true
+	config.ReconnectInterval = 1 * time.Second
+	config.MaxReconnectDelay = 30 * time.Second
+	config.ReconnectBackoff = 2.0
+	config.SendBufferSize = 1000
+	config.RecvBufferSize = 1000
+	config.AuthAppIDs = []uint32{16777252} // S13
+	config.HealthCheckInterval = 30 * time.Second
+	return config
+}
+
+func TestAddressClient_BasicConnectionEstablishment(t *testing.T) {
+	// Start test server
+	testSrv := newTestServer(t)
+	if err := testSrv.Start(); err != nil {
+		t.Fatalf("Failed to start test server: %v", err)
+	}
+	defer testSrv.Stop()
+
+	// Create address client
+	config := newTestPoolConfig()
+	ctx := context.Background()
+	log := logger.New("test-address-client", "error")
+
+	addressClient, err := client.NewAddressClient(ctx, config, log)
+	if err != nil {
+		t.Fatalf("Failed to create address client: %v", err)
+	}
+	defer addressClient.Close()
+
+	// Create test message
+	ecr := s13.NewMEIdentityCheckRequest()
+	ecr.SessionId = models_base.UTF8String("test-session-1")
+	ecr.AuthSessionState = models_base.Enumerated(1)
+	ecr.OriginHost = models_base.DiameterIdentity(config.OriginHost)
+	ecr.OriginRealm = models_base.DiameterIdentity(config.OriginRealm)
+	ecr.DestinationRealm = models_base.DiameterIdentity("example.com")
+	ecr.TerminalInformation = &s13.TerminalInformation{
+		Imei:            ptrUTF8String("123456789012345"),
+		SoftwareVersion: ptrUTF8String("01"),
+	}
+
+	// Register handler on server
+	var handlerCalled atomic.Bool
+	testSrv.RegisterS13Handler(func(msg *server.Message, conn server.Conn) {
+		handlerCalled.Store(true)
+
+		ecr := &s13.MEIdentityCheckRequest{}
+		fullMsg := append(msg.Header, msg.Body...)
+		ecr.Unmarshal(fullMsg)
+
+		eca := s13.NewMEIdentityCheckAnswer()
+		eca.SessionId = ecr.SessionId
+		eca.AuthSessionState = ecr.AuthSessionState
+		eca.OriginHost = models_base.DiameterIdentity("test-server.example.com")
+		eca.OriginRealm = models_base.DiameterIdentity("example.com")
+		eca.Header.HopByHopID = ecr.Header.HopByHopID
+		eca.Header.EndToEndID = ecr.Header.EndToEndID
+		resultCode := models_base.Unsigned32(2001)
+		eca.ResultCode = &resultCode
+		equipmentStatus := models_base.Enumerated(0)
+		eca.EquipmentStatus = &equipmentStatus
+
+		ecaBytes, _ := eca.Marshal()
+		conn.Write(ecaBytes)
+	})
+
+	// Marshal message
+	ecrBytes, err := ecr.Marshal()
+	if err != nil {
+		t.Fatalf("Failed to marshal ECR: %v", err)
+	}
+
+	// Send to remote address - connection should be created automatically
+	remoteAddr := testSrv.Address()
+	err = addressClient.SendWithTimeout(remoteAddr, ecrBytes, 5*time.Second)
+	if err != nil {
+		t.Fatalf("Failed to send message: %v", err)
+	}
+
+	// Verify connection was established
+	time.Sleep(100 * time.Millisecond)
+	if addressClient.GetActiveConnections() != 1 {
+		t.Errorf("Expected 1 active connection, got %d", addressClient.GetActiveConnections())
+	}
+
+	// Verify handler was called
+	if !handlerCalled.Load() {
+		t.Error("Server handler was not called")
+	}
+
+	// Send another message - should reuse existing connection
+	ecr.SessionId = models_base.UTF8String("test-session-2")
+	ecrBytes, _ = ecr.Marshal()
+
+	err = addressClient.SendWithTimeout(remoteAddr, ecrBytes, 5*time.Second)
+	if err != nil {
+		t.Fatalf("Failed to send second message: %v", err)
+	}
+
+	// Should still have only 1 connection
+	if addressClient.GetActiveConnections() != 1 {
+		t.Errorf("Expected 1 active connection after second send, got %d", addressClient.GetActiveConnections())
+	}
+
+	// Verify statistics
+	stats := addressClient.GetStats()
+	if stats.TotalRequests < 2 {
+		t.Errorf("Expected at least 2 requests, got %d", stats.TotalRequests)
+	}
+}
+
+func TestAddressClient_MultipleAddresses(t *testing.T) {
+	// Start 3 test servers
+	testSrv1 := newTestServer(t)
+	if err := testSrv1.Start(); err != nil {
+		t.Fatalf("Failed to start test server 1: %v", err)
+	}
+	defer testSrv1.Stop()
+
+	testSrv2 := newTestServer(t)
+	if err := testSrv2.Start(); err != nil {
+		t.Fatalf("Failed to start test server 2: %v", err)
+	}
+	defer testSrv2.Stop()
+
+	testSrv3 := newTestServer(t)
+	if err := testSrv3.Start(); err != nil {
+		t.Fatalf("Failed to start test server 3: %v", err)
+	}
+	defer testSrv3.Stop()
+
+	// Register handlers
+	registerEchoHandler := func(srv *testServer) {
+		srv.RegisterS13Handler(func(msg *server.Message, conn server.Conn) {
+			ecr := &s13.MEIdentityCheckRequest{}
+			fullMsg := append(msg.Header, msg.Body...)
+			ecr.Unmarshal(fullMsg)
+
+			eca := s13.NewMEIdentityCheckAnswer()
+			eca.SessionId = ecr.SessionId
+			eca.AuthSessionState = ecr.AuthSessionState
+			eca.OriginHost = models_base.DiameterIdentity("test-server.example.com")
+			eca.OriginRealm = models_base.DiameterIdentity("example.com")
+			eca.Header.HopByHopID = ecr.Header.HopByHopID
+			eca.Header.EndToEndID = ecr.Header.EndToEndID
+			resultCode := models_base.Unsigned32(2001)
+			eca.ResultCode = &resultCode
+			equipmentStatus := models_base.Enumerated(0)
+			eca.EquipmentStatus = &equipmentStatus
+
+			ecaBytes, _ := eca.Marshal()
+			conn.Write(ecaBytes)
+		})
+	}
+
+	registerEchoHandler(testSrv1)
+	registerEchoHandler(testSrv2)
+	registerEchoHandler(testSrv3)
+
+	// Create address client
+	config := newTestPoolConfig()
+	ctx := context.Background()
+	log := logger.New("test-address-client", "error")
+
+	addressClient, err := client.NewAddressClient(ctx, config, log)
+	if err != nil {
+		t.Fatalf("Failed to create address client: %v", err)
+	}
+	defer addressClient.Close()
+
+	// Create test message
+	ecr := s13.NewMEIdentityCheckRequest()
+	ecr.SessionId = models_base.UTF8String("test-session")
+	ecr.AuthSessionState = models_base.Enumerated(1)
+	ecr.OriginHost = models_base.DiameterIdentity(config.OriginHost)
+	ecr.OriginRealm = models_base.DiameterIdentity(config.OriginRealm)
+	ecr.DestinationRealm = models_base.DiameterIdentity("example.com")
+	ecr.TerminalInformation = &s13.TerminalInformation{
+		Imei:            ptrUTF8String("123456789012345"),
+		SoftwareVersion: ptrUTF8String("01"),
+	}
+	ecrBytes, _ := ecr.Marshal()
+
+	// Send to all 3 servers
+	addresses := []string{
+		testSrv1.Address(),
+		testSrv2.Address(),
+		testSrv3.Address(),
+	}
+
+	for _, addr := range addresses {
+		err := addressClient.SendWithTimeout(addr, ecrBytes, 5*time.Second)
+		if err != nil {
+			t.Errorf("Failed to send to %s: %v", addr, err)
+		}
+	}
+
+	// Should have 3 connections now
+	time.Sleep(100 * time.Millisecond)
+	activeConns := addressClient.GetActiveConnections()
+	if activeConns != 3 {
+		t.Errorf("Expected 3 active connections, got %d", activeConns)
+	}
+
+	// Verify all addresses are in the list
+	connAddrs := addressClient.ListConnections()
+	if len(connAddrs) != 3 {
+		t.Errorf("Expected 3 connection addresses, got %d", len(connAddrs))
+	}
+
+	// Send multiple messages to each address
+	for i := 0; i < 5; i++ {
+		for _, addr := range addresses {
+			err := addressClient.SendWithTimeout(addr, ecrBytes, 5*time.Second)
+			if err != nil {
+				t.Errorf("Failed to send iteration %d to %s: %v", i, addr, err)
+			}
+		}
+	}
+
+	// Should still have 3 connections (reused)
+	activeConns = addressClient.GetActiveConnections()
+	if activeConns != 3 {
+		t.Errorf("Expected 3 active connections after multiple sends, got %d", activeConns)
+	}
+}
+
+func TestAddressClient_ConcurrentSends(t *testing.T) {
+	// Start test server
+	testSrv := newTestServer(t)
+
+	var requestCount atomic.Int64
+	testSrv.RegisterS13Handler(func(msg *server.Message, conn server.Conn) {
+		requestCount.Add(1)
+
+		ecr := &s13.MEIdentityCheckRequest{}
+		fullMsg := append(msg.Header, msg.Body...)
+		ecr.Unmarshal(fullMsg)
+
+		eca := s13.NewMEIdentityCheckAnswer()
+		eca.SessionId = ecr.SessionId
+		eca.AuthSessionState = ecr.AuthSessionState
+		eca.OriginHost = models_base.DiameterIdentity("test-server.example.com")
+		eca.OriginRealm = models_base.DiameterIdentity("example.com")
+		eca.Header.HopByHopID = ecr.Header.HopByHopID
+		eca.Header.EndToEndID = ecr.Header.EndToEndID
+		resultCode := models_base.Unsigned32(2001)
+		eca.ResultCode = &resultCode
+		equipmentStatus := models_base.Enumerated(0)
+		eca.EquipmentStatus = &equipmentStatus
+
+		ecaBytes, _ := eca.Marshal()
+		conn.Write(ecaBytes)
+	})
+
+	if err := testSrv.Start(); err != nil {
+		t.Fatalf("Failed to start test server: %v", err)
+	}
+	defer testSrv.Stop()
+
+	// Create address client
+	config := newTestPoolConfig()
+	ctx := context.Background()
+	log := logger.New("test-address-client", "error")
+
+	addressClient, err := client.NewAddressClient(ctx, config, log)
+	if err != nil {
+		t.Fatalf("Failed to create address client: %v", err)
+	}
+	defer addressClient.Close()
+
+	// Create test message
+	ecr := s13.NewMEIdentityCheckRequest()
+	ecr.SessionId = models_base.UTF8String("test-session")
+	ecr.AuthSessionState = models_base.Enumerated(1)
+	ecr.OriginHost = models_base.DiameterIdentity(config.OriginHost)
+	ecr.OriginRealm = models_base.DiameterIdentity(config.OriginRealm)
+	ecr.DestinationRealm = models_base.DiameterIdentity("example.com")
+	ecr.TerminalInformation = &s13.TerminalInformation{
+		Imei:            ptrUTF8String("123456789012345"),
+		SoftwareVersion: ptrUTF8String("01"),
+	}
+	ecrBytes, _ := ecr.Marshal()
+
+	// Launch multiple goroutines sending to the same address concurrently
+	// This tests the concurrent caller blocking during connection establishment
+	numGoroutines := 20
+	messagesPerGoroutine := 5
+	var wg sync.WaitGroup
+	remoteAddr := testSrv.Address()
+
+	for i := 0; i < numGoroutines; i++ {
+		wg.Add(1)
+		go func(id int) {
+			defer wg.Done()
+
+			for j := 0; j < messagesPerGoroutine; j++ {
+				err := addressClient.SendWithTimeout(remoteAddr, ecrBytes, 10*time.Second)
+				if err != nil {
+					t.Errorf("Goroutine %d message %d failed: %v", id, j, err)
+				}
+			}
+		}(i)
+	}
+
+	wg.Wait()
+
+	// Should have exactly 1 connection despite concurrent establishment attempts
+	time.Sleep(200 * time.Millisecond)
+	activeConns := addressClient.GetActiveConnections()
+	if activeConns != 1 {
+		t.Errorf("Expected 1 active connection, got %d", activeConns)
+	}
+
+	// Verify all messages were processed
+	expectedCount := int64(numGoroutines * messagesPerGoroutine)
+	actualCount := requestCount.Load()
+	if actualCount < expectedCount {
+		t.Errorf("Expected at least %d requests processed, got %d", expectedCount, actualCount)
+	}
+
+	// Verify client stats
+	stats := addressClient.GetStats()
+	t.Logf("Stats: Requests=%d, Responses=%d, Errors=%d, Active=%d",
+		stats.TotalRequests, stats.TotalResponses, stats.TotalErrors,
+		stats.PoolMetrics.ActiveConnections)
+}
+
+func TestAddressClient_Metrics(t *testing.T) {
+	testSrv := newTestServer(t)
+
+	testSrv.RegisterS13Handler(func(msg *server.Message, conn server.Conn) {
+		ecr := &s13.MEIdentityCheckRequest{}
+		fullMsg := append(msg.Header, msg.Body...)
+		ecr.Unmarshal(fullMsg)
+
+		eca := s13.NewMEIdentityCheckAnswer()
+		eca.SessionId = ecr.SessionId
+		eca.AuthSessionState = ecr.AuthSessionState
+		eca.OriginHost = models_base.DiameterIdentity("test-server.example.com")
+		eca.OriginRealm = models_base.DiameterIdentity("example.com")
+		eca.Header.HopByHopID = ecr.Header.HopByHopID
+		eca.Header.EndToEndID = ecr.Header.EndToEndID
+		resultCode := models_base.Unsigned32(2001)
+		eca.ResultCode = &resultCode
+		equipmentStatus := models_base.Enumerated(0)
+		eca.EquipmentStatus = &equipmentStatus
+
+		ecaBytes, _ := eca.Marshal()
+		conn.Write(ecaBytes)
+	})
+
+	if err := testSrv.Start(); err != nil {
+		t.Fatalf("Failed to start test server: %v", err)
+	}
+	defer testSrv.Stop()
+
+	config := newTestPoolConfig()
+	ctx := context.Background()
+	log := logger.New("test-address-client", "error")
+
+	addressClient, err := client.NewAddressClient(ctx, config, log)
+	if err != nil {
+		t.Fatalf("Failed to create address client: %v", err)
+	}
+	defer addressClient.Close()
+
+	// Initial stats
+	initialStats := addressClient.GetStats()
+	if initialStats.TotalRequests != 0 {
+		t.Errorf("Expected 0 initial requests, got %d", initialStats.TotalRequests)
+	}
+
+	// Send messages
+	ecr := s13.NewMEIdentityCheckRequest()
+	ecr.SessionId = models_base.UTF8String("test-session")
+	ecr.AuthSessionState = models_base.Enumerated(1)
+	ecr.OriginHost = models_base.DiameterIdentity(config.OriginHost)
+	ecr.OriginRealm = models_base.DiameterIdentity(config.OriginRealm)
+	ecr.DestinationRealm = models_base.DiameterIdentity("example.com")
+	ecr.TerminalInformation = &s13.TerminalInformation{
+		Imei:            ptrUTF8String("123456789012345"),
+		SoftwareVersion: ptrUTF8String("01"),
+	}
+	ecrBytes, _ := ecr.Marshal()
+
+	numMessages := 10
+	for i := 0; i < numMessages; i++ {
+		err := addressClient.SendWithTimeout(testSrv.Address(), ecrBytes, 5*time.Second)
+		if err != nil {
+			t.Errorf("Failed to send message %d: %v", i, err)
+		}
+	}
+
+	time.Sleep(200 * time.Millisecond)
+
+	// Check final stats
+	finalStats := addressClient.GetStats()
+
+	if finalStats.TotalRequests != uint64(numMessages) {
+		t.Errorf("Expected %d total requests, got %d", numMessages, finalStats.TotalRequests)
+	}
+
+	if finalStats.PoolMetrics.ActiveConnections != 1 {
+		t.Errorf("Expected 1 active connection, got %d", finalStats.PoolMetrics.ActiveConnections)
+	}
+
+	if finalStats.PoolMetrics.TotalConnections < 1 {
+		t.Errorf("Expected at least 1 total connection created, got %d", finalStats.PoolMetrics.TotalConnections)
+	}
+
+	if finalStats.PoolMetrics.MessagesSent < uint64(numMessages) {
+		t.Errorf("Expected at least %d messages sent, got %d", numMessages, finalStats.PoolMetrics.MessagesSent)
+	}
+
+	t.Logf("Final stats: Requests=%d, Responses=%d, Errors=%d, ActiveConns=%d, TotalConns=%d",
+		finalStats.TotalRequests, finalStats.TotalResponses, finalStats.TotalErrors,
+		finalStats.PoolMetrics.ActiveConnections, finalStats.PoolMetrics.TotalConnections)
+}
+
+func TestAddressClient_ContextCancellation(t *testing.T) {
+	testSrv := newTestServer(t)
+	if err := testSrv.Start(); err != nil {
+		t.Fatalf("Failed to start test server: %v", err)
+	}
+	defer testSrv.Stop()
+
+	config := newTestPoolConfig()
+	ctx, cancel := context.WithCancel(context.Background())
+	log := logger.New("test-address-client", "error")
+
+	addressClient, err := client.NewAddressClient(ctx, config, log)
+	if err != nil {
+		t.Fatalf("Failed to create address client: %v", err)
+	}
+	defer addressClient.Close()
+
+	// Cancel context immediately
+	cancel()
+
+	// Attempt to send should fail
+	ecr := s13.NewMEIdentityCheckRequest()
+	ecr.SessionId = models_base.UTF8String("test-session")
+	ecr.AuthSessionState = models_base.Enumerated(1)
+	ecr.OriginHost = models_base.DiameterIdentity(config.OriginHost)
+	ecr.OriginRealm = models_base.DiameterIdentity(config.OriginRealm)
+	ecr.DestinationRealm = models_base.DiameterIdentity("example.com")
+	ecr.TerminalInformation = &s13.TerminalInformation{
+		Imei:            ptrUTF8String("123456789012345"),
+		SoftwareVersion: ptrUTF8String("01"),
+	}
+	ecrBytes, _ := ecr.Marshal()
+
+	sendCtx, sendCancel := context.WithTimeout(context.Background(), 1*time.Second)
+	defer sendCancel()
+
+	err = addressClient.SendWithContext(sendCtx, testSrv.Address(), ecrBytes)
+	if err == nil {
+		t.Error("Expected error when sending with cancelled context")
+	}
+}
+
+func TestAddressClient_InvalidAddress(t *testing.T) {
+	config := newTestPoolConfig()
+	ctx := context.Background()
+	log := logger.New("test-address-client", "error")
+
+	addressClient, err := client.NewAddressClient(ctx, config, log)
+	if err != nil {
+		t.Fatalf("Failed to create address client: %v", err)
+	}
+	defer addressClient.Close()
+
+	message := []byte("test message")
+
+	// Test various invalid address formats
+	invalidAddrs := []string{
+		"invalid",
+		"192.168.1.100",      // missing port
+		"192.168.1.100:",     // empty port
+		":3868",              // missing host
+		"example.com",        // missing port
+	}
+
+	for _, addr := range invalidAddrs {
+		err := addressClient.SendWithTimeout(addr, message, 1*time.Second)
+		if err == nil {
+			t.Errorf("Expected error for invalid address %q, got nil", addr)
+		}
+	}
+}

@@ -827,3 +827,28 @@ func (c *Connection) unregisterPending(hopByHopID uint32) {
 func (c *Connection) GetStats() ConnectionStats {
 	return c.stats
 }
+
+// SendWithContext sends a Diameter message with context support
+func (c *Connection) SendWithContext(ctx context.Context, data []byte) error {
+	if !c.IsActive() {
+		return ErrConnectionClosed{ConnectionID: c.id}
+	}
+
+	select {
+	case c.sendCh <- data:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-c.ctx.Done():
+		return c.ctx.Err()
+	default:
+		return fmt.Errorf("send buffer full")
+	}
+}
+
+// GetLastActivity returns the time of last activity on this connection
+func (c *Connection) GetLastActivity() time.Time {
+	c.activityMu.RLock()
+	defer c.activityMu.RUnlock()
+	return c.lastActivity
+}

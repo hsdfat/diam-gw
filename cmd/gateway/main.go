@@ -1,12 +1,11 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"os"
 	"os/signal"
-	"strconv"
-	"strings"
 	"syscall"
 	"time"
 
@@ -16,211 +15,187 @@ import (
 	"github.com/hsdfat/diam-gw/server"
 )
 
+var (
+	listenAddr = flag.String("listen", "0.0.0.0:3868", "Gateway listen address")
+	logLevel   = flag.String("log", "info", "Log level (debug, info, warn, error)")
+
+	// Gateway identity
+	originHost  = flag.String("origin-host", "diameter-gw.example.com", "Gateway Origin-Host")
+	originRealm = flag.String("origin-realm", "example.com", "Gateway Origin-Realm")
+	productName = flag.String("product", "Diameter-Gateway", "Product name")
+
+	// DRA configuration
+	dra1Host     = flag.String("dra1-host", "127.0.0.1", "Primary DRA host")
+	dra1Port     = flag.Int("dra1-port", 3869, "Primary DRA port")
+	dra2Host     = flag.String("dra2-host", "127.0.0.1", "Secondary DRA host")
+	dra2Port     = flag.Int("dra2-port", 3870, "Secondary DRA port")
+
+	// Advanced settings
+	maxConnections  = flag.Int("max-connections", 1000, "Maximum inbound connections")
+	connsPerDRA     = flag.Int("conns-per-dra", 1, "Connections per DRA")
+	sessionTimeout  = flag.Duration("session-timeout", 30*time.Second, "Session timeout")
+	enableReqLog    = flag.Bool("log-requests", false, "Enable request logging")
+	enableRespLog   = flag.Bool("log-responses", false, "Enable response logging")
+	statsInterval   = flag.Duration("stats-interval", 60*time.Second, "Statistics logging interval")
+)
+
 func main() {
-	// Command line flags
-	appListen := flag.String("app-listen", "", "Address to listen for application connections (empty to disable server mode)")
-	appAddrs := flag.String("app-addrs", "", "Comma-separated application addresses for bidirectional mode (host:port)")
-	appPriorities := flag.String("app-priorities", "1", "Comma-separated app priorities (same order as app addresses)")
-	appConnsPerServer := flag.Int("app-conns", 2, "Number of connections per application (bidirectional mode)")
-	draAddrs := flag.String("dra-addrs", "127.0.0.1:3869", "Comma-separated DRA addresses (host:port)")
-	draPriorities := flag.String("dra-priorities", "1", "Comma-separated DRA priorities (same order as addresses)")
-	draConnsPerServer := flag.Int("dra-conns", 2, "Number of connections per DRA")
-	originHost := flag.String("origin-host", "gateway.example.com", "Gateway Origin-Host")
-	originRealm := flag.String("origin-realm", "example.com", "Gateway Origin-Realm")
-	logLevel := flag.String("log-level", "info", "Log level (debug, info, warn, error)")
 	flag.Parse()
 
-	// Set log level
-	logger.SetLevel(*logLevel)
-
-	logger.Log.Infow("Starting Diameter Gateway...")
-
-	// Parse DRA configuration
-	draConfigs, err := parseDRAConfig(*draAddrs, *draPriorities, *draConnsPerServer)
-	if err != nil {
-		logger.Log.Errorw("Failed to parse DRA configuration", "error", err)
-		os.Exit(1)
-	}
-
-	// Parse App configuration (for bidirectional mode)
-	var appConfigs []*client.DRAServerConfig
-	if *appAddrs != "" {
-		appConfigs, err = parseDRAConfig(*appAddrs, *appPriorities, *appConnsPerServer)
-		if err != nil {
-			logger.Log.Errorw("Failed to parse App configuration", "error", err)
-			os.Exit(1)
-		}
-	}
+	// Initialize logger
+	log := logger.New("gateway-main", *logLevel)
+	log.Infow("Starting Diameter Gateway",
+		"version", "1.0.0",
+		"listen", *listenAddr,
+		"origin_host", *originHost)
 
 	// Create gateway configuration
-	config := &gateway.Config{
-		Name:            "diameter-gateway",
-		AppServerConfig: nil, // Will be set below if appListen is specified
-		AppPoolConfig:   nil, // Will be set below if appAddrs is specified
-		DRAPoolConfig: &client.DRAPoolConfig{
-			DRAs:                draConfigs,
-			OriginHost:          *originHost,
-			OriginRealm:         *originRealm,
-			ProductName:         "Diameter Gateway",
-			VendorID:            10415,
-			ConnectionsPerDRA:   *draConnsPerServer,
-			ConnectTimeout:      5 * time.Second,
-			CERTimeout:          5 * time.Second,
-			DWRInterval:         30 * time.Second,
-			DWRTimeout:          10 * time.Second,
-			MaxDWRFailures:      3,
-			HealthCheckInterval: 5 * time.Second,
-			ReconnectInterval:   5 * time.Second,
-			MaxReconnectDelay:   60 * time.Second,
-			ReconnectBackoff:    1.5,
-			SendBufferSize:      100,
-			RecvBufferSize:      1000,
-		},
-		MessageTimeout:  10 * time.Second,
-		EnableMetrics:   true,
-		MetricsInterval: 30 * time.Second,
-	}
+	config := createGatewayConfig()
 
-	// Configure application server mode (apps connect TO gateway)
-	if *appListen != "" {
-		config.AppServerConfig = &server.ServerConfig{
-			ListenAddress:  *appListen,
-			MaxConnections: 1000,
-			ConnectionConfig: &server.ConnectionConfig{
-				ReadTimeout:      30 * time.Second,
-				WriteTimeout:     10 * time.Second,
-				WatchdogInterval: 30 * time.Second,
-				WatchdogTimeout:  10 * time.Second,
-				MaxMessageSize:   65535,
-				SendChannelSize:  100,
-				RecvChannelSize:  100,
-				OriginHost:       *originHost,
-				OriginRealm:      *originRealm,
-				ProductName:      "Diameter Gateway",
-				VendorID:         10415,
-				HandleWatchdog:   true,
-			},
-			RecvChannelSize: 1000,
-		}
-	}
-
-	// Configure application pool mode (gateway connects TO apps) - bidirectional
-	if len(appConfigs) > 0 {
-		config.AppPoolConfig = &client.DRAPoolConfig{
-			DRAs:                appConfigs,
-			OriginHost:          *originHost,
-			OriginRealm:         *originRealm,
-			ProductName:         "Diameter Gateway",
-			VendorID:            10415,
-			ConnectionsPerDRA:   *appConnsPerServer,
-			ConnectTimeout:      5 * time.Second,
-			CERTimeout:          5 * time.Second,
-			DWRInterval:         30 * time.Second,
-			DWRTimeout:          10 * time.Second,
-			MaxDWRFailures:      3,
-			HealthCheckInterval: 5 * time.Second,
-			ReconnectInterval:   5 * time.Second,
-			MaxReconnectDelay:   60 * time.Second,
-			ReconnectBackoff:    1.5,
-			SendBufferSize:      100,
-			RecvBufferSize:      1000,
-		}
-	}
-
-	// Validate configuration
-	if config.AppServerConfig == nil && config.AppPoolConfig == nil {
-		logger.Log.Errorw("Must specify either --app-listen or --app-addrs (or both)")
-		os.Exit(1)
-	}
-
-	// Create and start gateway
-	gw, err := gateway.New(config)
+	// Create gateway
+	gw, err := gateway.NewGateway(config, log)
 	if err != nil {
-		logger.Log.Errorw("Failed to create gateway", "error", err)
-		os.Exit(1)
+		log.Fatalw("Failed to create gateway", "error", err)
 	}
 
+	// Start gateway
 	if err := gw.Start(); err != nil {
-		logger.Log.Errorw("Failed to start gateway", "error", err)
-		os.Exit(1)
+		log.Fatalw("Failed to start gateway", "error", err)
 	}
 
-	logger.Log.Infow("Gateway started successfully")
-	if *appListen != "" {
-		logger.Log.Infow("Listening for applications (server mode)", "address", *appListen)
-	}
-	if *appAddrs != "" {
-		logger.Log.Infow("Connecting to applications (bidirectional mode)", "addresses", *appAddrs, "priorities", *appPriorities)
-	}
-	logger.Log.Infow("Connecting to DRAs", "addresses", *draAddrs, "priorities", *draPriorities)
+	// Start statistics reporter
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go statsReporter(ctx, gw, log)
 
-	// Wait for shutdown signal
+	log.Infow("Gateway is running",
+		"listen_address", *listenAddr,
+		"primary_dra", fmt.Sprintf("%s:%d", *dra1Host, *dra1Port),
+		"secondary_dra", fmt.Sprintf("%s:%d", *dra2Host, *dra2Port))
+
+	// Wait for interrupt signal
 	sigChan := make(chan os.Signal, 1)
-	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
+	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
 	<-sigChan
 
-	logger.Log.Infow("Shutdown signal received, stopping gateway...")
+	log.Infow("Shutting down gracefully...")
+	cancel()
+
+	// Stop gateway
 	if err := gw.Stop(); err != nil {
-		logger.Log.Errorw("Error during shutdown", "error", err)
-		os.Exit(1)
+		log.Errorw("Error stopping gateway", "error", err)
 	}
 
-	logger.Log.Infow("Gateway stopped successfully")
+	log.Infow("Gateway stopped successfully")
 }
 
-// parseDRAConfig parses DRA configuration from command line flags
-func parseDRAConfig(addrs, priorities string, connsPerServer int) ([]*client.DRAServerConfig, error) {
-	if addrs == "" {
-		return nil, fmt.Errorf("no DRA addresses specified")
+func createGatewayConfig() *gateway.GatewayConfig {
+	// Server configuration (inbound from Logic Apps)
+	serverConfig := &server.ServerConfig{
+		ListenAddress:  *listenAddr,
+		MaxConnections: *maxConnections,
+		ConnectionConfig: &server.ConnectionConfig{
+			ReadTimeout:      30 * time.Second,
+			WriteTimeout:     10 * time.Second,
+			WatchdogInterval: 30 * time.Second,
+			WatchdogTimeout:  10 * time.Second,
+			MaxMessageSize:   65535,
+			SendChannelSize:  100,
+			RecvChannelSize:  100,
+			HandleWatchdog:   true,
+		},
+		RecvChannelSize: 1000,
 	}
 
-	// Split addresses and priorities
-	addrList := strings.Split(addrs, ",")
-	prioList := strings.Split(priorities, ",")
-
-	// Default priorities to 1 if not enough provided
-	for len(prioList) < len(addrList) {
-		prioList = append(prioList, "1")
+	// DRA pool configuration (outbound to DRA servers)
+	draPoolConfig := &client.DRAPoolConfig{
+		DRAs: []*client.DRAServerConfig{
+			{
+				Name:     "DRA-1",
+				Host:     *dra1Host,
+				Port:     *dra1Port,
+				Priority: 1, // Higher priority (primary)
+				Weight:   100,
+			},
+			{
+				Name:     "DRA-2",
+				Host:     *dra2Host,
+				Port:     *dra2Port,
+				Priority: 2, // Lower priority (secondary)
+				Weight:   100,
+			},
+		},
+		ConnectionsPerDRA:   *connsPerDRA,
+		ConnectTimeout:      10 * time.Second,
+		CERTimeout:          5 * time.Second,
+		DWRInterval:         30 * time.Second,
+		DWRTimeout:          10 * time.Second,
+		MaxDWRFailures:      3,
+		HealthCheckInterval: 10 * time.Second,
+		ReconnectInterval:   5 * time.Second,
+		MaxReconnectDelay:   5 * time.Minute,
+		ReconnectBackoff:    1.5,
+		SendBufferSize:      100,
+		RecvBufferSize:      100,
 	}
 
-	configs := make([]*client.DRAServerConfig, 0, len(addrList))
-	for i, addr := range addrList {
-		addr = strings.TrimSpace(addr)
-		if addr == "" {
-			continue
-		}
-
-		// Parse host:port
-		parts := strings.Split(addr, ":")
-		if len(parts) != 2 {
-			return nil, fmt.Errorf("invalid address format: %s (expected host:port)", addr)
-		}
-
-		host := strings.TrimSpace(parts[0])
-		port, err := strconv.Atoi(strings.TrimSpace(parts[1]))
-		if err != nil {
-			return nil, fmt.Errorf("invalid port in address %s: %w", addr, err)
-		}
-
-		priority := 1
-		if i < len(prioList) {
-			if p, err := strconv.Atoi(strings.TrimSpace(prioList[i])); err == nil {
-				priority = p
-			}
-		}
-
-		configs = append(configs, &client.DRAServerConfig{
-			Name:     fmt.Sprintf("DRA-%d", i+1),
-			Host:     host,
-			Port:     port,
-			Priority: priority,
-			Weight:   1,
-		})
+	return &gateway.GatewayConfig{
+		ServerConfig:          serverConfig,
+		DRAPoolConfig:         draPoolConfig,
+		OriginHost:            *originHost,
+		OriginRealm:           *originRealm,
+		ProductName:           *productName,
+		VendorID:              10415, // 3GPP
+		SessionTimeout:        *sessionTimeout,
+		EnableRequestLogging:  *enableReqLog,
+		EnableResponseLogging: *enableRespLog,
 	}
+}
 
-	if len(configs) == 0 {
-		return nil, fmt.Errorf("no valid DRA configurations")
+func statsReporter(ctx context.Context, gw *gateway.Gateway, log logger.Logger) {
+	ticker := time.NewTicker(*statsInterval)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			stats := gw.GetStats()
+			draStats := gw.GetDRAPool().GetStats()
+
+			log.Infow("=== Gateway Statistics ===")
+			log.Infow("Gateway",
+				"total_requests", stats.TotalRequests,
+				"total_responses", stats.TotalResponses,
+				"active_sessions", stats.ActiveSessions,
+				"total_errors", stats.TotalErrors,
+				"avg_latency_ms", fmt.Sprintf("%.2f", stats.AverageLatencyMs))
+
+			log.Infow("Forwarding",
+				"to_dra", stats.TotalForwarded,
+				"from_dra", stats.TotalFromDRA,
+				"timeout_errors", stats.TimeoutErrors,
+				"routing_errors", stats.RoutingErrors)
+
+			log.Infow("Sessions",
+				"created", stats.SessionsCreated,
+				"completed", stats.SessionsCompleted,
+				"expired", stats.SessionsExpired)
+
+			log.Infow("DRA Pool",
+				"active_priority", draStats.CurrentPriority,
+				"total_dras", draStats.TotalDRAs,
+				"active_dras", draStats.ActiveDRAs,
+				"total_connections", draStats.TotalConnections,
+				"active_connections", draStats.ActiveConnections,
+				"failover_count", draStats.FailoverCount.Load())
+
+			log.Infow("DRA Messages",
+				"sent", draStats.TotalMessagesSent,
+				"received", draStats.TotalMessagesRecv)
+
+			log.Infow("==========================")
+		}
 	}
-
-	return configs, nil
 }
