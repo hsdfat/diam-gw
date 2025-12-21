@@ -11,6 +11,8 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/hsdfat/go-zlog/logger"
 )
 
 // PerformanceMetrics tracks performance test metrics
@@ -299,7 +301,7 @@ func TestPerformance_ConnectionPool_Throughput(t *testing.T) {
 
 	for _, scenario := range scenarios {
 		t.Run(scenario.name, func(t *testing.T) {
-			pool, err := NewConnectionPool(ctx, config)
+			pool, err := NewConnectionPool(ctx, config, logger.NewLogger())
 			if err != nil {
 				t.Fatalf("Failed to create pool: %v", err)
 			}
@@ -347,7 +349,7 @@ func TestPerformance_ConnectionPool_Latency(t *testing.T) {
 	config.OriginRealm = "example.com"
 	config.ConnectionCount = 5
 
-	pool, err := NewConnectionPool(ctx, config)
+	pool, err := NewConnectionPool(ctx, config, logger.NewLogger())
 	if err != nil {
 		t.Fatalf("Failed to create pool: %v", err)
 	}
@@ -412,7 +414,7 @@ func BenchmarkConnectionPool_Send(b *testing.B) {
 	config.OriginRealm = "example.com"
 	config.ConnectionCount = 5
 
-	pool, err := NewConnectionPool(ctx, config)
+	pool, err := NewConnectionPool(ctx, config, logger.NewLogger())
 	if err != nil {
 		b.Fatalf("Failed to create pool: %v", err)
 	}
@@ -453,7 +455,7 @@ func BenchmarkConnectionPool_SendLarge(b *testing.B) {
 	config.OriginRealm = "example.com"
 	config.ConnectionCount = 5
 
-	pool, err := NewConnectionPool(ctx, config)
+	pool, err := NewConnectionPool(ctx, config, logger.NewLogger())
 	if err != nil {
 		b.Fatalf("Failed to create pool: %v", err)
 	}

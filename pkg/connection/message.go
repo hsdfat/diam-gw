@@ -2,6 +2,7 @@ package connection
 
 import (
 	"bytes"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"io"
@@ -13,6 +14,11 @@ type Message struct {
 	Length uint32
 	Header []byte
 	Body   []byte
+}
+
+type DiamConnectionInfo struct {
+	Message  *Message
+	DiamConn Conn
 }
 
 // Buffer pool for message reading
@@ -42,6 +48,125 @@ func readerBufferSlice(buf *bytes.Buffer, l int) []byte {
 		return b[:l]
 	}
 	return make([]byte, l)
+}
+
+// DiameterMessageType represents the type of Diameter message
+type DiameterMessageType int
+
+const (
+	// Message types based on command code
+	MessageTypeCER DiameterMessageType = 257 // Capabilities-Exchange-Request
+	MessageTypeCEA DiameterMessageType = 257 // Capabilities-Exchange-Answer
+	MessageTypeDWR DiameterMessageType = 280 // Device-Watchdog-Request
+	MessageTypeDWA DiameterMessageType = 280 // Device-Watchdog-Answer
+	MessageTypeDPR DiameterMessageType = 282 // Disconnect-Peer-Request
+	MessageTypeDPA DiameterMessageType = 282 // Disconnect-Peer-Answer
+)
+
+// MessageFlags represents Diameter message flags
+type MessageFlags struct {
+	Request   bool
+	Proxiable bool
+	Error     bool
+	Retrans   bool
+}
+
+// MessageInfo holds parsed information from a Diameter message header
+type MessageInfo struct {
+	Version       uint8
+	Length        uint32
+	CommandCode   uint32
+	ApplicationID uint32
+	HopByHopID    uint32
+	EndToEndID    uint32
+	Flags         MessageFlags
+	IsRequest     bool
+	IsProxiable   bool
+	IsError       bool
+	IsRetrans     bool
+}
+
+// ErrInvalidMessage indicates an invalid Diameter message
+type ErrInvalidMessage struct {
+	Reason string
+}
+
+func (e ErrInvalidMessage) Error() string {
+	return fmt.Sprintf("invalid message: %s", e.Reason)
+}
+
+// ParseMessageHeader parses a Diameter message header
+func ParseMessageHeader(data []byte) (*MessageInfo, error) {
+	if len(data) < 20 {
+		return nil, ErrInvalidMessage{Reason: "message too short for header"}
+	}
+
+	info := &MessageInfo{
+		Version:       data[0],
+		Length:        binary.BigEndian.Uint32([]byte{0, data[1], data[2], data[3]}),
+		CommandCode:   binary.BigEndian.Uint32([]byte{0, data[5], data[6], data[7]}),
+		ApplicationID: binary.BigEndian.Uint32(data[8:12]),
+		HopByHopID:    binary.BigEndian.Uint32(data[12:16]),
+		EndToEndID:    binary.BigEndian.Uint32(data[16:20]),
+	}
+
+	// Parse flags
+	flags := data[4]
+	info.IsRequest = (flags & 0x80) != 0
+	info.IsProxiable = (flags & 0x40) != 0
+	info.IsError = (flags & 0x20) != 0
+	info.IsRetrans = (flags & 0x10) != 0
+
+	// Also set Flags struct
+	info.Flags.Request = info.IsRequest
+	info.Flags.Proxiable = info.IsProxiable
+	info.Flags.Error = info.IsError
+	info.Flags.Retrans = info.IsRetrans
+
+	// Validate version
+	if info.Version != 1 {
+		return nil, ErrInvalidMessage{Reason: fmt.Sprintf("unsupported version: %d", info.Version)}
+	}
+
+	// Validate length
+	if info.Length < 20 {
+		return nil, ErrInvalidMessage{Reason: fmt.Sprintf("invalid length: %d", info.Length)}
+	}
+
+	return info, nil
+}
+
+// IsBaseProtocol returns true if the message is a base protocol message
+func (m *MessageInfo) IsBaseProtocol() bool {
+	return m.ApplicationID == 0
+}
+
+// GetMessageType returns the message type
+func (m *MessageInfo) GetMessageType() DiameterMessageType {
+	return DiameterMessageType(m.CommandCode)
+}
+
+// String returns a string representation of the message info
+func (m *MessageInfo) String() string {
+	msgType := "Answer"
+	if m.IsRequest {
+		msgType = "Request"
+	}
+
+	cmdName := "Unknown"
+	switch m.CommandCode {
+	case 257:
+		cmdName = "CER/CEA"
+	case 280:
+		cmdName = "DWR/DWA"
+	case 282:
+		cmdName = "DPR/DPA"
+	case 324:
+		cmdName = "ECR/ECA"
+	}
+
+	return fmt.Sprintf("%s %s (Code=%d, AppID=%d, H2H=%d, E2E=%d)",
+		cmdName, msgType, m.CommandCode, m.ApplicationID, m.HopByHopID, m.EndToEndID)
 }
 
 // ReadMessage reads a binary stream from the reader and parses it into a Message

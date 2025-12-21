@@ -32,7 +32,8 @@ type AddressConnectionPool struct {
 	closed atomic.Bool
 
 	// Metrics
-	metrics PoolMetrics
+	metrics  PoolMetrics
+	handleFn func(DiamConnectionInfo)
 
 	// Logger
 	logger logger.Logger
@@ -102,6 +103,8 @@ type ManagedConnection struct {
 	ctx    context.Context
 	cancel context.CancelFunc
 	wg     sync.WaitGroup
+
+	handleFn func(DiamConnectionInfo)
 }
 
 // PoolMetricsSnapshot is a point-in-time snapshot of pool metrics
@@ -130,16 +133,38 @@ func DefaultPoolConfig() *PoolConfig {
 		DWRInterval:         30 * time.Second,
 		DWRTimeout:          10 * time.Second,
 		MaxDWRFailures:      3,
-		ReconnectEnabled:    true,
+		ReconnectEnabled:    false,
 		ReconnectInterval:   5 * time.Second,
 		MaxReconnectDelay:   5 * time.Minute,
 		ReconnectBackoff:    1.5,
-		SendBufferSize:      100,
-		RecvBufferSize:      100,
+		SendBufferSize:      1000,
+		RecvBufferSize:      1000,
 		IdleTimeout:         0, // Never close idle connections
 		MaxConnLifetime:     0, // Unlimited lifetime
 		HealthCheckInterval: 30 * time.Second,
 	}
+}
+
+func (mc *ManagedConnection) ReceiveChan() <-chan DiamConnectionInfo {
+	if mc.conn == nil {
+		return nil
+	}
+	return mc.conn.Receive()
+}
+
+func (p *AddressConnectionPool) GetReceiveChan(remote string) (<-chan DiamConnectionInfo, error) {
+	p.establishingMu.Lock()
+	_, ok := p.establishing[remote]
+	p.establishingMu.Unlock()
+	if !ok {
+		return nil, fmt.Errorf("not establishment yet")
+	}
+
+	conn, ok := p.GetConnection(remote)
+	if !ok {
+		return nil, fmt.Errorf("not found any connection")
+	}
+	return conn.Receive(), nil
 }
 
 // Validate validates the pool configuration
@@ -376,12 +401,15 @@ func (p *AddressConnectionPool) establishConnection(ctx context.Context, remoteA
 	connID := fmt.Sprintf("conn-%s", remoteAddr)
 
 	// Create the connection
-	conn := NewConnection(connCtx, connID, draConfig)
+	conn := NewConnection(connCtx, connID, draConfig, p.logger)
 
 	// Start the connection (this performs CER/CEA)
 	if err := conn.Start(); err != nil {
 		connCancel()
 		return nil, fmt.Errorf("failed to start connection: %w", err)
+	}
+	if !p.config.ReconnectEnabled {
+		conn.DisableReconnect()
 	}
 
 	// Create managed connection
@@ -392,10 +420,21 @@ func (p *AddressConnectionPool) establishConnection(ctx context.Context, remoteA
 		pool:      p,
 		ctx:       connCtx,
 		cancel:    connCancel,
+		handleFn:  p.handleFn,
 	}
 
 	// Start lifecycle management
 	mc.startLifecycleManager()
+
+	if mc.handleFn != nil {
+		for range 8 {
+			go func() {
+				for v := range mc.ReceiveChan() {
+					go mc.handleFn(v)
+				}
+			}()
+		}
+	}
 
 	// Add to pool
 	p.connectionsMu.Lock()

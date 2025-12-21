@@ -8,6 +8,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/hsdfat/diam-gw/pkg/connection"
 	"github.com/hsdfat/diam-gw/pkg/logger"
 )
 
@@ -19,6 +20,8 @@ type DRAServerConfig struct {
 	Priority int // Lower number = higher priority (1 = highest)
 	Weight   int // For load balancing within same priority
 }
+
+type Command = connection.Command
 
 // DRAPoolConfig holds configuration for multiple DRAs with priorities
 type DRAPoolConfig struct {
@@ -68,7 +71,11 @@ type DRAPool struct {
 	priorityMu     sync.RWMutex
 
 	// Message aggregation
-	recvCh chan []byte
+	recvCh chan DiamConnectionInfo
+
+	handlers   map[connection.Command]Handler
+	handlerMu  sync.RWMutex
+	middleware []func()
 
 	// Lifecycle
 	ctx    context.Context
@@ -76,7 +83,8 @@ type DRAPool struct {
 	wg     sync.WaitGroup
 
 	// Statistics
-	stats DRAPoolStats
+	stats  DRAPoolStats
+	logger logger.Logger
 }
 
 // DRAPoolStats holds statistics for the entire DRA pool
@@ -88,11 +96,27 @@ type DRAPoolStats struct {
 	ActiveConnections int
 	TotalMessagesSent uint64
 	TotalMessagesRecv uint64
+	TotalMessagesDrop uint64
 	FailoverCount     atomic.Uint32
 }
 
+func (p *DRAPool) SetHandler(h map[connection.Command]Handler) {
+	p.handlers = h
+}
+
+func (p *DRAPool) GetHandler() map[Command]Handler {
+	return p.handlers
+}
+
+func (p *DRAPool) NewMiddleware(fn func()) {
+	if fn == nil {
+		return
+	}
+	p.middleware = append(p.middleware, fn)
+}
+
 // NewDRAPool creates a new priority-based DRA pool
-func NewDRAPool(ctx context.Context, config *DRAPoolConfig) (*DRAPool, error) {
+func NewDRAPool(ctx context.Context, config *DRAPoolConfig, log logger.Logger) (*DRAPool, error) {
 	if err := validateDRAPoolConfig(config); err != nil {
 		return nil, err
 	}
@@ -120,9 +144,11 @@ func NewDRAPool(ctx context.Context, config *DRAPoolConfig) (*DRAPool, error) {
 		draPools:       make(map[string]*ConnectionPool),
 		draConfigs:     sortedDRAs,
 		priorityGroups: priorityGroups,
-		recvCh:         make(chan []byte, config.RecvBufferSize*len(config.DRAs)*config.ConnectionsPerDRA),
+		recvCh:         make(chan DiamConnectionInfo, config.RecvBufferSize*len(config.DRAs)*config.ConnectionsPerDRA),
 		ctx:            ctx,
 		cancel:         cancel,
+		handlers:       make(map[connection.Command]Handler),
+		logger:         log,
 	}
 
 	// Initialize with highest priority (lowest number)
@@ -152,7 +178,7 @@ func NewDRAPool(ctx context.Context, config *DRAPoolConfig) (*DRAPool, error) {
 			RecvBufferSize:    config.RecvBufferSize,
 		}
 
-		connPool, err := NewConnectionPool(ctx, poolConfig)
+		connPool, err := NewConnectionPool(ctx, poolConfig, log)
 		if err != nil {
 			cancel()
 			return nil, fmt.Errorf("failed to create connection pool for %s: %w", draConfig.Name, err)
@@ -164,9 +190,17 @@ func NewDRAPool(ctx context.Context, config *DRAPoolConfig) (*DRAPool, error) {
 	return pool, nil
 }
 
+// HandleFunc registers a response handler for a specific command
+func (p *DRAPool) HandleFunc(cmd connection.Command, handler Handler) {
+	p.handlerMu.Lock()
+	defer p.handlerMu.Unlock()
+	p.handlers[cmd] = handler
+	p.logger.Infow("Registered handler for command", "interface", cmd.Interface, "code", cmd.Code)
+}
+
 // Start starts all DRA connection pools
 func (p *DRAPool) Start() error {
-	logger.Log.Infow("Starting DRA pool", "total_dras", len(p.draConfigs), "connections_per_dra", p.config.ConnectionsPerDRA)
+	p.logger.Infow("Starting DRA pool", "total_dras", len(p.draConfigs), "connections_per_dra", p.config.ConnectionsPerDRA)
 
 	// Start all connection pools
 	var startWg sync.WaitGroup
@@ -179,10 +213,10 @@ func (p *DRAPool) Start() error {
 
 			pool := p.draPools[dra.Name]
 			if err := pool.Start(); err != nil {
-				logger.Log.Errorw("Failed to start DRA pool", "dra", dra.Name, "error", err)
+				p.logger.Errorw("Failed to start DRA pool", "dra", dra.Name, "error", err)
 				errCh <- fmt.Errorf("%s: %w", dra.Name, err)
 			} else {
-				logger.Log.Infow("DRA pool started", "dra", dra.Name, "priority", dra.Priority, "host", dra.Host, "port", dra.Port)
+				p.logger.Infow("DRA pool started", "dra", dra.Name, "priority", dra.Priority, "host", dra.Host, "port", dra.Port)
 			}
 		}(draConfig)
 	}
@@ -196,6 +230,8 @@ func (p *DRAPool) Start() error {
 		errors = append(errors, err)
 	}
 
+	p.startHandleReceive()
+
 	// Start message aggregator
 	p.startMessageAggregator()
 
@@ -206,13 +242,13 @@ func (p *DRAPool) Start() error {
 	p.startPriorityManager()
 
 	if len(errors) > 0 {
-		logger.Log.Warnw("Some DRAs failed to start", "errors", len(errors))
+		p.logger.Warnw("Some DRAs failed to start", "errors", len(errors))
 	}
 
 	// Update initial stats
 	p.updateStats()
 
-	logger.Log.Infow("DRA pool started successfully",
+	p.logger.Infow("DRA pool started successfully",
 		"active_priority", p.activePriority.Load(),
 		"total_dras", p.stats.TotalDRAs,
 		"active_dras", p.stats.ActiveDRAs)
@@ -256,9 +292,50 @@ func (p *DRAPool) SendToDRA(draName string, data []byte) error {
 	return pool.Send(data)
 }
 
+const (
+	nworker = 4
+)
+
+func (p *DRAPool) startHandleReceive() {
+
+	for i := 0; i < nworker; i++ {
+		go p.handleReceive()
+	}
+}
+
 // Receive returns the aggregated receive channel
-func (p *DRAPool) Receive() <-chan []byte {
-	return p.recvCh
+func (p *DRAPool) handleReceive() {
+	for rev := range p.recvCh {
+		go func() {
+			msg := rev.Message
+			if msg == nil {
+				p.logger.Errorw("recv msg is nil")
+				return
+			}
+			header, err := ParseMessageHeader(msg.Header)
+			if err != nil {
+				p.logger.Errorw("parse header error", "err", err)
+				return
+			}
+			command := connection.Command{
+				Interface: int(header.ApplicationID),
+				Request:   header.IsRequest,
+				Code:      int(header.CommandCode),
+			}
+			p.handlerMu.RLock()
+			fn, ok := p.handlers[command]
+			p.handlerMu.RUnlock()
+			if !ok {
+				p.logger.Errorw("cannot found any handler", "app-id",
+					header.ApplicationID, "code", header.CommandCode, "request", header.IsRequest)
+				return
+			}
+			for _, middleFunc := range p.middleware {
+				middleFunc()
+			}
+			fn(rev.Message, rev.DiamConn)
+		}()
+	}
 }
 
 // startMessageAggregator aggregates messages from all DRA pools
@@ -268,7 +345,7 @@ func (p *DRAPool) startMessageAggregator() {
 		defer p.wg.Done()
 
 		// Collect receive channels from all pools
-		channels := make([]<-chan []byte, 0, len(p.draPools))
+		channels := make([]<-chan DiamConnectionInfo, 0, len(p.draPools))
 		for _, pool := range p.draPools {
 			channels = append(channels, pool.Receive())
 		}
@@ -287,7 +364,8 @@ func (p *DRAPool) startMessageAggregator() {
 					case <-p.ctx.Done():
 						return
 					default:
-						logger.Log.Warn("DRA pool receive buffer full, dropping message")
+						p.logger.Warn("DRA pool receive buffer full, dropping message")
+						atomic.AddUint64(&p.stats.TotalMessagesDrop, 1)
 					}
 				default:
 				}
@@ -350,7 +428,7 @@ func (p *DRAPool) checkAndUpdatePriority() {
 		for priority := 1; priority < currentPriority; priority++ {
 			healthyCount := p.countHealthyDRAsAtPriority(priority)
 			if healthyCount > 0 {
-				logger.Log.Infow("Failing back to higher priority",
+				p.logger.Infow("Failing back to higher priority",
 					"old_priority", currentPriority,
 					"new_priority", priority,
 					"healthy_dras", healthyCount)
@@ -366,7 +444,7 @@ func (p *DRAPool) checkAndUpdatePriority() {
 	for priority := currentPriority + 1; priority <= 10; priority++ {
 		healthyCount := p.countHealthyDRAsAtPriority(priority)
 		if healthyCount > 0 {
-			logger.Log.Warnw("Failing over to lower priority",
+			p.logger.Warnw("Failing over to lower priority",
 				"old_priority", currentPriority,
 				"new_priority", priority,
 				"healthy_dras", healthyCount)
@@ -376,7 +454,7 @@ func (p *DRAPool) checkAndUpdatePriority() {
 		}
 	}
 
-	logger.Log.Errorw("No healthy DRAs at any priority level")
+	p.logger.Errorw("No healthy DRAs at any priority level")
 }
 
 // countHealthyDRAsAtPriority returns count of healthy DRAs at given priority
@@ -421,8 +499,8 @@ func (p *DRAPool) updateStats() {
 
 // logHealthStatus logs health status of all DRAs
 func (p *DRAPool) logHealthStatus() {
-	logger.Log.Infow("=== DRA Pool Health Status ===")
-	logger.Log.Infow("Overall",
+	p.logger.Infow("=== DRA Pool Health Status ===")
+	p.logger.Infow("Overall",
 		"active_priority", p.stats.CurrentPriority,
 		"total_dras", p.stats.TotalDRAs,
 		"active_dras", p.stats.ActiveDRAs,
@@ -440,7 +518,7 @@ func (p *DRAPool) logHealthStatus() {
 			status = "DOWN"
 		}
 
-		logger.Log.Infow("DRA Status",
+		p.logger.Infow("DRA Status",
 			"name", dra.Name,
 			"priority", dra.Priority,
 			"status", status,
@@ -448,7 +526,7 @@ func (p *DRAPool) logHealthStatus() {
 			"msgs_sent", stats.TotalMessagesSent,
 			"msgs_recv", stats.TotalMessagesRecv)
 	}
-	logger.Log.Infow("================================")
+	p.logger.Infow("================================")
 }
 
 // GetStats returns aggregated statistics
@@ -490,7 +568,7 @@ func (p *DRAPool) IsHealthy() bool {
 
 // Close gracefully closes all DRA pools
 func (p *DRAPool) Close() error {
-	logger.Log.Infow("Closing DRA pool")
+	p.logger.Infow("Closing DRA pool")
 
 	p.cancel()
 
@@ -498,10 +576,10 @@ func (p *DRAPool) Close() error {
 	var closeWg sync.WaitGroup
 	for name, pool := range p.draPools {
 		closeWg.Add(1)
-		go func(n string, p *ConnectionPool) {
+		go func(n string, cp *ConnectionPool) {
 			defer closeWg.Done()
-			if err := p.Close(); err != nil {
-				logger.Log.Errorw("Error closing DRA pool", "dra", n, "error", err)
+			if err := cp.Close(); err != nil {
+				p.logger.Errorw("Error closing DRA pool", "dra", n, "error", err)
 			}
 		}(name, pool)
 	}
@@ -510,7 +588,7 @@ func (p *DRAPool) Close() error {
 	p.wg.Wait()
 	close(p.recvCh)
 
-	logger.Log.Infow("DRA pool closed")
+	p.logger.Infow("DRA pool closed")
 	return nil
 }
 

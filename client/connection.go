@@ -2,7 +2,6 @@ package client
 
 import (
 	"context"
-	"encoding/binary"
 	"fmt"
 	"io"
 	"net"
@@ -13,8 +12,12 @@ import (
 	"github.com/hsdfat/diam-gw/commands/base"
 	"github.com/hsdfat/diam-gw/commands/s13"
 	"github.com/hsdfat/diam-gw/models_base"
+	"github.com/hsdfat/diam-gw/pkg/connection"
 	"github.com/hsdfat/diam-gw/pkg/logger"
 )
+
+type Message = connection.Message
+type DiamConnectionInfo = connection.DiamConnectionInfo
 
 // Connection represents a single Diameter connection to a DRA
 type Connection struct {
@@ -22,7 +25,7 @@ type Connection struct {
 	config *DRAConfig
 
 	// TCP connection
-	conn   net.Conn
+	conn   connection.Conn
 	connMu sync.RWMutex
 
 	// State management
@@ -47,7 +50,7 @@ type Connection struct {
 
 	// Message channels
 	sendCh chan []byte
-	recvCh chan []byte
+	recvCh chan DiamConnectionInfo
 
 	// Pending responses
 	pendingMu sync.RWMutex
@@ -58,8 +61,11 @@ type Connection struct {
 	cancel context.CancelFunc
 	wg     sync.WaitGroup
 
+	reconnectDisabled bool
+
 	// Statistics
-	stats ConnectionStats
+	stats  ConnectionStats
+	logger logger.Logger
 }
 
 // ConnectionStats holds connection statistics
@@ -71,6 +77,10 @@ type ConnectionStats struct {
 	Reconnects       atomic.Uint32
 	lastErrorMu      sync.RWMutex
 	lastError        error
+}
+
+func (c *Connection) DisableReconnect() {
+	c.reconnectDisabled = true
 }
 
 // GetLastError returns the last error
@@ -88,17 +98,18 @@ func (cs *ConnectionStats) SetLastError(err error) {
 }
 
 // NewConnection creates a new Diameter connection
-func NewConnection(ctx context.Context, id string, config *DRAConfig) *Connection {
+func NewConnection(ctx context.Context, id string, config *DRAConfig, log logger.Logger) *Connection {
 	ctx, cancel := context.WithCancel(ctx)
 
 	c := &Connection{
 		id:      id,
 		config:  config,
 		sendCh:  make(chan []byte, config.SendBufferSize),
-		recvCh:  make(chan []byte, config.RecvBufferSize),
+		recvCh:  make(chan DiamConnectionInfo, config.RecvBufferSize),
 		pending: make(map[uint32]chan []byte),
 		ctx:     ctx,
 		cancel:  cancel,
+		logger:  log,
 	}
 
 	c.state.Store(StateDisconnected)
@@ -126,7 +137,7 @@ func (c *Connection) setState(newState ConnectionState) {
 	}
 
 	c.state.Store(newState)
-	logger.Log.Infow("State transition", "conn_id", c.id, "old_state", oldState.String(), "new_state", newState.String())
+	c.logger.Infow("State transition", "conn_id", c.id, "old_state", oldState.String(), "new_state", newState.String())
 }
 
 // IsActive returns true if the connection is active
@@ -136,7 +147,7 @@ func (c *Connection) IsActive() bool {
 
 // Start initiates the connection
 func (c *Connection) Start() error {
-	logger.Log.Infow("Starting connection", "conn_id", c.id, "host", c.config.Host, "port", c.config.Port)
+	c.logger.Infow("Starting connection", "conn_id", c.id, "host", c.config.Host, "port", c.config.Port)
 
 	if err := c.connect(); err != nil {
 		return err
@@ -163,10 +174,10 @@ func (c *Connection) connect() error {
 	}
 
 	c.connMu.Lock()
-	c.conn = conn
+	c.conn = connection.NewConn(conn, connection.DefaultConnectionConfig())
 	c.connMu.Unlock()
 
-	logger.Log.Infow("TCP connection established", "conn_id", c.id)
+	c.logger.Infow("TCP connection established", "conn_id", c.id)
 
 	// Start read and write loops
 	c.startReadLoop()
@@ -181,7 +192,7 @@ func (c *Connection) connect() error {
 		return fmt.Errorf("handshake failed: %w", err)
 	}
 
-	logger.Log.Infow("Connection established successfully", "conn_id", c.id)
+	c.logger.Infow("Connection established successfully", "conn_id", c.id)
 	c.setState(StateOpen)
 	c.updateActivity()
 
@@ -196,7 +207,7 @@ func (c *Connection) connect() error {
 
 // performHandshake performs CER/CEA exchange
 func (c *Connection) performHandshake() error {
-	logger.Log.Infow("Performing CER/CEA handshake", "conn_id", c.id)
+	c.logger.Infow("Performing CER/CEA handshake", "conn_id", c.id)
 
 	// Create CER message
 	cer := base.NewCapabilitiesExchangeRequest()
@@ -282,7 +293,7 @@ func (c *Connection) handleCEA(data []byte) error {
 		}
 	}
 
-	logger.Log.Infow("CEA received successfully", "conn_id", c.id, "result_code", resultCode.String())
+	c.logger.Infow("CEA received successfully", "conn_id", c.id, "result_code", resultCode.String())
 	return nil
 }
 
@@ -311,7 +322,7 @@ func (c *Connection) startWatchdog() {
 				return
 			case <-ticker.C:
 				if err := c.sendDWR(); err != nil {
-					logger.Log.Errorw("Failed to send DWR", "conn_id", c.id, "error", err)
+					c.logger.Errorw("Failed to send DWR", "conn_id", c.id, "error", err)
 					c.handleFailure(err)
 					return
 				}
@@ -338,7 +349,7 @@ func (c *Connection) sendDWR() error {
 		return ErrConnectionClosed{ConnectionID: c.id}
 	}
 
-	logger.Log.Debugw("Sending DWR", "conn_id", c.id)
+	c.logger.Debugw("Sending DWR", "conn_id", c.id)
 
 	dwr := base.NewDeviceWatchdogRequest()
 	dwr.OriginHost = models_base.DiameterIdentity(c.config.OriginHost)
@@ -373,7 +384,7 @@ func (c *Connection) sendDWR() error {
 		select {
 		case dwaData := <-respCh:
 			if err := c.handleDWA(dwaData); err != nil {
-				logger.Log.Errorw("Failed to handle DWA", "conn_id", c.id, "error", err)
+				c.logger.Errorw("Failed to handle DWA", "conn_id", c.id, "error", err)
 				c.handleDWRFailure(err)
 			}
 		case <-time.After(c.config.DWRTimeout):
@@ -398,7 +409,7 @@ func (c *Connection) handleDWA(data []byte) error {
 		return fmt.Errorf("DWA failed: %s", resultCode.String())
 	}
 
-	logger.Log.Debugw("DWA received successfully", "conn_id", c.id)
+	c.logger.Debugw("DWA received successfully", "conn_id", c.id)
 	c.setState(StateOpen)
 	c.updateActivity()
 
@@ -418,7 +429,7 @@ func (c *Connection) handleDWRFailure(err error) {
 	c.dwrLastFailTime = time.Now()
 	c.dwrLastFailTimeMu.Unlock()
 
-	logger.Log.Warnw("DWR failure",
+	c.logger.Warnw("DWR failure",
 		"conn_id", c.id,
 		"error", err,
 		"failure_count", failureCount,
@@ -426,7 +437,7 @@ func (c *Connection) handleDWRFailure(err error) {
 
 	// Check if we've exceeded the failure threshold
 	if int(failureCount) >= c.config.MaxDWRFailures {
-		logger.Log.Errorw("DWR failure threshold exceeded, triggering reconnection",
+		c.logger.Errorw("DWR failure threshold exceeded, triggering reconnection",
 			"conn_id", c.id,
 			"failure_count", failureCount,
 			"max_failures", c.config.MaxDWRFailures)
@@ -435,13 +446,13 @@ func (c *Connection) handleDWRFailure(err error) {
 }
 
 // handleDWR processes Device-Watchdog-Request (from peer)
-func (c *Connection) handleDWR(data []byte) error {
+func (c *Connection) handleDWR(data *Message) error {
 	dwr := &base.DeviceWatchdogRequest{}
-	if err := dwr.Unmarshal(data); err != nil {
+	if err := dwr.Unmarshal(append(data.Header, data.Body...)); err != nil {
 		return fmt.Errorf("failed to unmarshal DWR: %w", err)
 	}
 
-	logger.Log.Debugw("DWR received, sending DWA", "conn_id", c.id)
+	c.logger.Debugw("DWR received, sending DWA", "conn_id", c.id)
 
 	// Create DWA
 	dwa := base.NewDeviceWatchdogAnswer()
@@ -486,7 +497,7 @@ func (c *Connection) Send(data []byte) error {
 }
 
 // Receive returns the receive channel
-func (c *Connection) Receive() <-chan []byte {
+func (c *Connection) Receive() <-chan DiamConnectionInfo {
 	return c.recvCh
 }
 
@@ -495,12 +506,14 @@ func (c *Connection) startReadLoop() {
 	c.wg.Add(1)
 	go func() {
 		defer c.wg.Done()
-		defer logger.Log.Infow("Read loop exited", "conn_id", c.id)
+		defer c.logger.Infow("Read loop exited", "conn_id", c.id)
 
 		for {
 			select {
 			case <-c.ctx.Done():
 				return
+			case <-c.conn.(connection.CloseNotifier).CloseNotify():
+				c.handleFailure(fmt.Errorf("connect closed"))
 			default:
 			}
 
@@ -512,44 +525,17 @@ func (c *Connection) startReadLoop() {
 				return
 			}
 
-			// Read header (20 bytes)
-			header := make([]byte, 20)
-			if err := c.readFull(conn, header); err != nil {
-				if c.ctx.Err() == nil {
-					logger.Log.Errorw("Failed to read header", "conn_id", c.id, "error", err)
-					c.handleFailure(err)
-				}
+			message, err := connection.ReadMessage(conn.Connection())
+			if err != nil {
+				c.handleFailure(err)
 				return
 			}
-
-			// Parse message length
-			length := binary.BigEndian.Uint32([]byte{0, header[1], header[2], header[3]})
-			if length < 20 || length > 1<<24 {
-				logger.Log.Errorw("Invalid message length", "conn_id", c.id, "length", length)
-				c.handleFailure(fmt.Errorf("invalid message length: %d", length))
-				return
-			}
-
-			// Read full message
-			message := make([]byte, length)
-			copy(message[:20], header)
-
-			if length > 20 {
-				if err := c.readFull(conn, message[20:]); err != nil {
-					if c.ctx.Err() == nil {
-						logger.Log.Errorw("Failed to read body", "conn_id", c.id, "error", err)
-						c.handleFailure(err)
-					}
-					return
-				}
-			}
-
 			c.stats.MessagesReceived.Add(1)
-			c.stats.BytesReceived.Add(uint64(length))
+			c.stats.BytesReceived.Add(uint64(message.Length))
 
 			// Dispatch message
 			if err := c.dispatchMessage(message); err != nil {
-				logger.Log.Errorw("Failed to dispatch message", "conn_id", c.id, "error", err)
+				c.logger.Errorw("Failed to dispatch message", "conn_id", c.id, "error", err)
 			}
 		}
 	}()
@@ -562,13 +548,13 @@ func (c *Connection) readFull(conn net.Conn, buf []byte) error {
 }
 
 // dispatchMessage dispatches a message based on its type
-func (c *Connection) dispatchMessage(data []byte) error {
-	info, err := ParseMessageHeader(data)
+func (c *Connection) dispatchMessage(data *Message) error {
+	info, err := ParseMessageHeader(data.Header)
 	if err != nil {
 		return err
 	}
 
-	logger.Log.Debugw("Received message", "conn_id", c.id, "message", info.String())
+	c.logger.Debugw("Received message", "conn_id", c.id, "message", info.String())
 
 	// Handle base protocol messages
 	if info.IsBaseProtocol() {
@@ -588,31 +574,34 @@ func (c *Connection) dispatchMessage(data []byte) error {
 
 	// Forward application messages to receive channel
 	select {
-	case c.recvCh <- data:
+	case c.recvCh <- DiamConnectionInfo{
+		Message:  data,
+		DiamConn: c.conn,
+	}:
 	case <-c.ctx.Done():
 		return c.ctx.Err()
 	default:
-		logger.Log.Warn("Receive buffer full, dropping message", "conn_id", c.id)
+		c.logger.Warn("Receive buffer full, dropping message", "conn_id", c.id)
 	}
 
 	return nil
 }
 
 // deliverResponse delivers a response to a waiting request
-func (c *Connection) deliverResponse(hopByHopID uint32, data []byte) error {
+func (c *Connection) deliverResponse(hopByHopID uint32, data *Message) error {
 	c.pendingMu.RLock()
 	respCh, exists := c.pending[hopByHopID]
 	c.pendingMu.RUnlock()
 
 	if !exists {
-		logger.Log.Debugw("No pending request for H2H ID", "conn_id", c.id, "hop_by_hop_id", hopByHopID)
+		c.logger.Debugw("No pending request for H2H ID", "conn_id", c.id, "hop_by_hop_id", hopByHopID)
 		return nil
 	}
 
 	select {
-	case respCh <- data:
+	case respCh <- append(data.Header, data.Body...):
 	default:
-		logger.Log.Warn("Response channel full for H2H ID", "conn_id", c.id, "hop_by_hop_id", hopByHopID)
+		c.logger.Warn("Response channel full for H2H ID", "conn_id", c.id, "hop_by_hop_id", hopByHopID)
 	}
 
 	return nil
@@ -620,37 +609,39 @@ func (c *Connection) deliverResponse(hopByHopID uint32, data []byte) error {
 
 // startWriteLoop starts the message write loop
 func (c *Connection) startWriteLoop() {
-	c.wg.Add(1)
-	go func() {
-		defer c.wg.Done()
-		defer logger.Log.Infow("Write loop exited", "conn_id", c.id)
+	c.wg.Add(8)
+	for range 8 {
+		go func() {
+			defer c.wg.Done()
+			defer c.logger.Infow("Write loop exited", "conn_id", c.id)
 
-		for {
-			select {
-			case <-c.ctx.Done():
-				return
-			case data := <-c.sendCh:
-				c.connMu.RLock()
-				conn := c.conn
-				c.connMu.RUnlock()
-
-				if conn == nil {
-					continue
-				}
-
-				if err := c.write(conn, data); err != nil {
-					if c.ctx.Err() == nil {
-						logger.Log.Errorw("Failed to write", "conn_id", c.id, "error", err)
-						c.handleFailure(err)
-					}
+			for {
+				select {
+				case <-c.ctx.Done():
 					return
-				}
+				case data := <-c.sendCh:
+					c.connMu.RLock()
+					conn := c.conn
+					c.connMu.RUnlock()
 
-				c.stats.MessagesSent.Add(1)
-				c.stats.BytesSent.Add(uint64(len(data)))
+					if conn == nil {
+						continue
+					}
+
+					if _, err := conn.Write(data); err != nil {
+						if c.ctx.Err() == nil {
+							c.logger.Errorw("Failed to write", "conn_id", c.id, "error", err)
+							c.handleFailure(err)
+						}
+						return
+					}
+
+					c.stats.MessagesSent.Add(1)
+					c.stats.BytesSent.Add(uint64(len(data)))
+				}
 			}
-		}
-	}()
+		}()
+	}
 }
 
 // write writes data to the connection
@@ -682,7 +673,7 @@ func (c *Connection) startHealthMonitor() {
 						// If we've exceeded max failures and it's been more than DWRTimeout since last failure
 						// trigger reconnection (safety net)
 						if timeSinceLastFail > c.config.DWRTimeout {
-							logger.Log.Errorw("Health check failed: DWR failure threshold exceeded",
+							c.logger.Errorw("Health check failed: DWR failure threshold exceeded",
 								"conn_id", c.id,
 								"failure_count", failureCount)
 							c.handleFailure(fmt.Errorf("health check: exceeded max DWR failures (%d)", c.config.MaxDWRFailures))
@@ -697,14 +688,16 @@ func (c *Connection) startHealthMonitor() {
 
 // handleFailure handles connection failure
 func (c *Connection) handleFailure(err error) {
-	logger.Log.Errorw("Handling failure", "conn_id", c.id, "error", err)
+	c.logger.Errorw("Handling failure", "conn_id", c.id, "error", err, "reconnect", !c.reconnectDisabled)
 
 	c.stats.SetLastError(err)
 	c.setState(StateFailed)
 	c.close()
 
 	// Attempt reconnection
-	c.reconnect()
+	if !c.reconnectDisabled {
+		c.reconnect()
+	}
 }
 
 // reconnect attempts to reconnect with exponential backoff
@@ -720,12 +713,12 @@ func (c *Connection) reconnect() {
 			return
 		case <-time.After(backoff):
 			attempts++
-			logger.Log.Infow("Reconnection attempt", "conn_id", c.id, "attempt", attempts)
+			c.logger.Infow("Reconnection attempt", "conn_id", c.id, "attempt", attempts)
 
 			c.setState(StateReconnecting)
 
 			if err := c.connect(); err != nil {
-				logger.Log.Warn("Reconnection failed", "conn_id", c.id, "error", err)
+				c.logger.Warn("Reconnection failed", "conn_id", c.id, "error", err)
 
 				// Exponential backoff
 				backoff = time.Duration(float64(backoff) * c.config.ReconnectBackoff)
@@ -735,7 +728,7 @@ func (c *Connection) reconnect() {
 				continue
 			}
 
-			logger.Log.Infow("Reconnection successful", "conn_id", c.id, "attempts", attempts)
+			c.logger.Infow("Reconnection successful", "conn_id", c.id, "attempts", attempts)
 			return
 		}
 	}
@@ -755,7 +748,7 @@ func (c *Connection) close() {
 
 // Close gracefully closes the connection
 func (c *Connection) Close() error {
-	logger.Log.Infow("Closing connection", "conn_id", c.id)
+	c.logger.Infow("Closing connection", "conn_id", c.id)
 
 	c.setState(StateClosed)
 	c.cancel()
@@ -785,12 +778,6 @@ func (c *Connection) updateActivity() {
 	c.activityMu.Lock()
 	c.lastActivity = time.Now()
 	c.activityMu.Unlock()
-}
-
-func (c *Connection) getLastActivity() time.Time {
-	c.activityMu.RLock()
-	defer c.activityMu.RUnlock()
-	return c.lastActivity
 }
 
 func (c *Connection) getDWRLastFailTime() time.Time {

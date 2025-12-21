@@ -24,7 +24,7 @@ type ConnectionPool struct {
 	closed      bool
 
 	// Message aggregation
-	recvCh chan []byte
+	recvCh chan DiamConnectionInfo
 
 	// Lifecycle
 	ctx    context.Context
@@ -47,7 +47,7 @@ type PoolStats struct {
 }
 
 // NewConnectionPool creates a new connection pool
-func NewConnectionPool(ctx context.Context, config *DRAConfig) (*ConnectionPool, error) {
+func NewConnectionPool(ctx context.Context, config *DRAConfig, log logger.Logger) (*ConnectionPool, error) {
 	if err := config.Validate(); err != nil {
 		return nil, err
 	}
@@ -57,7 +57,7 @@ func NewConnectionPool(ctx context.Context, config *DRAConfig) (*ConnectionPool,
 	pool := &ConnectionPool{
 		config:      config,
 		connections: make([]*Connection, config.ConnectionCount),
-		recvCh:      make(chan []byte, config.RecvBufferSize*config.ConnectionCount),
+		recvCh:      make(chan DiamConnectionInfo, config.RecvBufferSize*config.ConnectionCount),
 		ctx:         ctx,
 		cancel:      cancel,
 	}
@@ -65,7 +65,7 @@ func NewConnectionPool(ctx context.Context, config *DRAConfig) (*ConnectionPool,
 	// Create connections
 	for i := 0; i < config.ConnectionCount; i++ {
 		connID := fmt.Sprintf("%s:%d-conn%d", config.Host, config.Port, i)
-		pool.connections[i] = NewConnection(ctx, connID, config)
+		pool.connections[i] = NewConnection(ctx, connID, config, log)
 	}
 
 	return pool, nil
@@ -137,7 +137,7 @@ func (p *ConnectionPool) startMessageAggregator() {
 		defer p.wg.Done()
 
 		// Create a slice of receive channels
-		channels := make([]<-chan []byte, len(p.connections))
+		channels := make([]<-chan DiamConnectionInfo, len(p.connections))
 		for i, conn := range p.connections {
 			channels[i] = conn.Receive()
 		}
@@ -261,7 +261,7 @@ func (p *ConnectionPool) SendToConnection(connID string, data []byte) error {
 }
 
 // Receive returns the aggregated receive channel
-func (p *ConnectionPool) Receive() <-chan []byte {
+func (p *ConnectionPool) Receive() <-chan DiamConnectionInfo {
 	return p.recvCh
 }
 
@@ -382,6 +382,7 @@ func (p *ConnectionPool) Close() error {
 			if err := c.Close(); err != nil {
 				logger.Log.Errorw("Error closing connection", "conn_id", c.ID(), "error", err)
 			}
+			p.decrementActive()
 		}(conn)
 	}
 

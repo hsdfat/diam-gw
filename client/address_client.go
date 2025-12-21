@@ -2,19 +2,35 @@ package client
 
 import (
 	"context"
+	"encoding/binary"
 	"fmt"
+	"sync"
 	"sync/atomic"
 	"time"
 
+	"github.com/hsdfat/diam-gw/pkg/connection"
 	"github.com/hsdfat/diam-gw/pkg/logger"
 )
+
+// Session tracks a request-response pair through the gateway
+type Session struct {
+	Conn connection.Conn
+
+	// Timestamps
+	CreatedAt  time.Time
+	ResponseAt time.Time
+
+	ResponseChan chan *Message
+}
 
 // AddressClient is a Diameter client that manages connections per remote address
 // This client accepts (remoteAddr, message) pairs and automatically manages
 // connection pooling, ensuring one connection per remote address
 type AddressClient struct {
-	pool   *AddressConnectionPool
-	logger logger.Logger
+	pool       *AddressConnectionPool
+	logger     logger.Logger
+	sessions   map[uint32]*Session
+	sessionsMu sync.RWMutex
 
 	// Client-level statistics
 	stats AddressClientStats
@@ -60,15 +76,45 @@ func NewAddressClient(ctx context.Context, config *PoolConfig, log logger.Logger
 	ctx, cancel := context.WithCancel(ctx)
 
 	client := &AddressClient{
-		pool:   pool,
-		logger: log,
-		ctx:    ctx,
-		cancel: cancel,
+		pool:     pool,
+		logger:   log,
+		ctx:      ctx,
+		cancel:   cancel,
+		sessions: map[uint32]*Session{},
+	}
+	pool.handleFn = func(dci DiamConnectionInfo) {
+		messageInfo, err := ParseMessageHeader(dci.Message.Header)
+		if err != nil {
+			log.Errorw("parse message error")
+			return
+		}
+		session, err := client.FindSession(messageInfo.HopByHopID)
+		if err != nil {
+			log.Errorw("not found any session")
+			return
+		}
+		session.ResponseChan <- dci.Message
 	}
 
 	client.logger.Infow("Address-based Diameter client created")
 
 	return client, nil
+}
+
+func (c *AddressClient) StoreSession(hopbyhop uint32, s *Session) {
+	c.sessionsMu.Lock()
+	c.sessions[hopbyhop] = s
+	c.sessionsMu.Unlock()
+}
+
+func (c *AddressClient) FindSession(hopbyhop uint32) (*Session, error) {
+	c.sessionsMu.RLock()
+	s, ok := c.sessions[hopbyhop]
+	c.sessionsMu.RUnlock()
+	if !ok {
+		return nil, fmt.Errorf("not found session")
+	}
+	return s, nil
 }
 
 // Send sends a Diameter message to the specified remote address
@@ -77,7 +123,7 @@ func NewAddressClient(ctx context.Context, config *PoolConfig, log logger.Logger
 // If a connection is already being established by another goroutine, this call will block until ready
 //
 // Thread-safe: Multiple goroutines can call this method concurrently
-func (c *AddressClient) Send(remoteAddr string, message []byte) error {
+func (c *AddressClient) Send(remoteAddr string, message []byte) ([]byte, error) {
 	return c.SendWithContext(c.ctx, remoteAddr, message)
 }
 
@@ -86,7 +132,10 @@ func (c *AddressClient) Send(remoteAddr string, message []byte) error {
 // The context can be used to set timeouts or cancel the operation
 //
 // Thread-safe: Multiple goroutines can call this method concurrently
-func (c *AddressClient) SendWithContext(ctx context.Context, remoteAddr string, message []byte) error {
+func (c *AddressClient) SendWithContext(ctx context.Context, remoteAddr string, message []byte) ([]byte, error) {
+	if len(message) < 20 {
+		return nil, fmt.Errorf("invalid diamter error")
+	}
 	c.stats.TotalRequests.Add(1)
 
 	// Send via pool (pool handles connection lookup/creation)
@@ -102,23 +151,31 @@ func (c *AddressClient) SendWithContext(ctx context.Context, remoteAddr string, 
 			"remote_addr", remoteAddr,
 			"message_len", len(message),
 			"error", err)
-		return err
+		return nil, err
 	}
-
-	c.stats.TotalResponses.Add(1)
-
 	c.logger.Debugw("Message sent successfully",
 		"remote_addr", remoteAddr,
 		"message_len", len(message))
-
-	return nil
+	rspChan := make(chan *Message, 1)
+	c.StoreSession(binary.BigEndian.Uint32(message[12:16]), &Session{
+		CreatedAt:    time.Now(),
+		ResponseChan: rspChan,
+	})
+	select {
+	case rsp := <-rspChan:
+		c.stats.TotalResponses.Add(1)
+		c.logger.Debugw("receive response", "msg", rsp)
+		return append(rsp.Header, rsp.Body...), nil
+	case <-ctx.Done():
+		return nil, fmt.Errorf("not receive response")
+	}
 }
 
 // SendWithTimeout sends a Diameter message with a specific timeout
 // This is a convenience method that creates a context with timeout
 //
 // Thread-safe: Multiple goroutines can call this method concurrently
-func (c *AddressClient) SendWithTimeout(remoteAddr string, message []byte, timeout time.Duration) error {
+func (c *AddressClient) SendWithTimeout(remoteAddr string, message []byte, timeout time.Duration) ([]byte, error) {
 	ctx, cancel := context.WithTimeout(c.ctx, timeout)
 	defer cancel()
 

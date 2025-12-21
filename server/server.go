@@ -11,6 +11,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/hsdfat/diam-gw/commands/base"
+	"github.com/hsdfat/diam-gw/models_base"
 	"github.com/hsdfat/diam-gw/pkg/connection"
 	"github.com/hsdfat/diam-gw/pkg/logger"
 )
@@ -100,7 +102,7 @@ type Command = connection.Command
 //	})
 //
 //	server.Start()
-type Handler func(msg *Message, conn Conn)
+type Handler = connection.Handler
 
 // Server represents a Diameter server
 type Server struct {
@@ -228,7 +230,7 @@ func NewServer(config *ServerConfig, log logger.Logger) *Server {
 
 	ctx, cancel := context.WithCancel(context.Background())
 
-	return &Server{
+	s := &Server{
 		config:      config,
 		connections: make(map[string]*Connection),
 		ctx:         ctx,
@@ -240,6 +242,73 @@ func NewServer(config *ServerConfig, log logger.Logger) *Server {
 			InterfaceStats: make(map[int]*InterfaceStats),
 		},
 	}
+	s.HandleFunc(connection.Command{Interface: 0, Code: 257, Request: true}, func(msg *connection.Message, conn connection.Conn) {
+		cer := &base.CapabilitiesExchangeRequest{}
+		fullMsg := append(msg.Header, msg.Body...)
+		if err := cer.Unmarshal(fullMsg); err != nil {
+			s.logger.Errorf("Failed to unmarshal CER: %v", err)
+			return
+		}
+
+		cea := base.NewCapabilitiesExchangeAnswer()
+		cea.ResultCode = 2001
+		cea.OriginHost = models_base.DiameterIdentity(s.config.ConnectionConfig.OriginHost)
+		cea.OriginRealm = models_base.DiameterIdentity(s.config.ConnectionConfig.OriginRealm)
+		cea.HostIpAddress = []models_base.Address{models_base.Address(net.ParseIP(s.config.ListenAddress))}
+		cea.VendorId = models_base.Unsigned32(10415)
+		cea.ProductName = models_base.UTF8String(s.config.ConnectionConfig.ProductName)
+		cea.Header.HopByHopID = cer.Header.HopByHopID
+		cea.Header.EndToEndID = cer.Header.EndToEndID
+
+		ceaBytes, _ := cea.Marshal()
+		conn.Write(ceaBytes)
+	})
+
+	// DWR/DWA handler
+	s.HandleFunc(connection.Command{Interface: 0, Code: 280, Request: true}, func(msg *connection.Message, conn connection.Conn) {
+		dwr := &base.DeviceWatchdogRequest{}
+		fullMsg := append(msg.Header, msg.Body...)
+		if err := dwr.Unmarshal(fullMsg); err != nil {
+			s.logger.Errorf("Failed to unmarshal DWR: %v", err)
+			return
+		}
+
+		dwa := base.NewDeviceWatchdogAnswer()
+		dwa.ResultCode = 2001
+		dwa.OriginHost = models_base.DiameterIdentity(s.config.ConnectionConfig.OriginHost)
+		dwa.OriginRealm = models_base.DiameterIdentity(s.config.ConnectionConfig.OriginRealm)
+		dwa.Header.HopByHopID = dwr.Header.HopByHopID
+		dwa.Header.EndToEndID = dwr.Header.EndToEndID
+
+		dwaBytes, _ := dwa.Marshal()
+		conn.Write(dwaBytes)
+	})
+
+	// DPR/DPA handler
+	s.HandleFunc(connection.Command{Interface: 0, Code: 282, Request: true}, func(msg *connection.Message, conn connection.Conn) {
+		dpr := &base.DisconnectPeerRequest{}
+		fullMsg := append(msg.Header, msg.Body...)
+		if err := dpr.Unmarshal(fullMsg); err != nil {
+			s.logger.Errorf("Failed to unmarshal DPR: %v", err)
+			return
+		}
+
+		dpa := base.NewDisconnectPeerAnswer()
+		dpa.ResultCode = 2001
+		dpa.OriginHost = models_base.DiameterIdentity(s.config.ConnectionConfig.OriginHost)
+		dpa.OriginRealm = models_base.DiameterIdentity(s.config.ConnectionConfig.OriginRealm)
+		dpa.Header.HopByHopID = dpr.Header.HopByHopID
+		dpa.Header.EndToEndID = dpr.Header.EndToEndID
+
+		dpaBytes, _ := dpa.Marshal()
+		conn.Write(dpaBytes)
+
+		// Close connection after sending DPA
+		time.AfterFunc(100*time.Millisecond, func() {
+			conn.Close()
+		})
+	})
+	return s
 }
 
 // Start starts the server with http.Server-style accept loop
@@ -515,7 +584,7 @@ func (s *Server) HandleFunc(cmd Command, handler Handler) {
 	s.handlerMu.Lock()
 	defer s.handlerMu.Unlock()
 	s.HandlerMux[cmd] = handler
-	s.logger.Infow("Registered handler for command", "interface", cmd.Interface, "code", cmd.Code)
+	s.logger.Infow("Registered handler for command", "interface", cmd.Interface, "code", cmd.Code, "request", cmd.Request)
 }
 
 // getHandler retrieves a handler for a given command
@@ -654,7 +723,7 @@ func (c *conn) serve() {
 		if !exists {
 			c.server.logger.Warnw("No handler registered for command",
 				"interface", cmd.Interface,
-				"code", cmd.Code)
+				"code", cmd.Code, "request", cmd.Request)
 			continue
 		}
 

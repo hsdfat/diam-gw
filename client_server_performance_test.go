@@ -149,7 +149,7 @@ func TestPerformance_ClientServer_EndToEnd(t *testing.T) {
 	clientConfig.SendBufferSize = 1000
 	clientConfig.RecvBufferSize = 1000
 
-	pool, err := client.NewConnectionPool(ctx, clientConfig)
+	pool, err := client.NewConnectionPool(ctx, clientConfig, logger.NewLogger())
 	if err != nil {
 		t.Fatalf("Failed to create pool: %v", err)
 	}
@@ -260,7 +260,7 @@ func TestPerformance_ClientServer_Latency(t *testing.T) {
 	clientConfig.OriginRealm = "example.com"
 	clientConfig.ConnectionCount = 5
 
-	pool, err := client.NewConnectionPool(ctx, clientConfig)
+	pool, err := client.NewConnectionPool(ctx, clientConfig, logger.NewLogger())
 	if err != nil {
 		t.Fatalf("Failed to create pool: %v", err)
 	}
@@ -347,7 +347,7 @@ func BenchmarkClientServer_EndToEnd(b *testing.B) {
 	clientConfig.OriginRealm = "example.com"
 	clientConfig.ConnectionCount = 5
 
-	pool, err := client.NewConnectionPool(ctx, clientConfig)
+	pool, err := client.NewConnectionPool(ctx, clientConfig, logger.NewLogger())
 	if err != nil {
 		b.Fatalf("Failed to create pool: %v", err)
 	}

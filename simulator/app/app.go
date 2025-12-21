@@ -128,7 +128,7 @@ func main() {
 
 		// Create connection pool
 		var err error
-		pool, err = client.NewConnectionPool(ctx, config)
+		pool, err = client.NewConnectionPool(ctx, config, log)
 		if err != nil {
 			log.Error("Failed to create connection pool: %v", err)
 			os.Exit(1)

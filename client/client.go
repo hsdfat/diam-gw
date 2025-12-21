@@ -80,7 +80,7 @@ type CommandStats struct {
 }
 
 // Handler is a function that handles a Diameter response message
-type Handler func(msg *connection.Message, conn connection.Conn)
+type Handler = connection.Handler
 
 // ClientStatsSnapshot is a snapshot of client statistics for reading
 type ClientStatsSnapshot struct {
@@ -175,7 +175,7 @@ func NewClient(config *ClientConfig, log logger.Logger) (*Client, error) {
 		ReconnectBackoff:  1.5,
 	}
 
-	pool, err := NewConnectionPool(ctx, poolConfig)
+	pool, err := NewConnectionPool(ctx, poolConfig, log)
 	if err != nil {
 		cancel()
 		return nil, fmt.Errorf("failed to create connection pool: %w", err)
@@ -247,22 +247,23 @@ func (c *Client) SendWithTimeout(msg []byte, timeout time.Duration) ([]byte, err
 	select {
 	case resp := <-c.pool.Receive():
 		c.stats.TotalResponses.Add(1)
-		c.stats.BytesReceived.Add(uint64(len(resp)))
+		data := append(resp.Message.Header, resp.Message.Body...)
+		c.stats.BytesReceived.Add(uint64(len(data)))
 
 		// Update interface and command stats for response
-		if len(resp) >= 20 {
-			cmd, err := connection.ParseCommand(resp[:20])
+		if len(data) >= 20 {
+			cmd, err := connection.ParseCommand(resp.Message.Header)
 			if err == nil {
 				ifStats := c.getOrCreateInterfaceStats(cmd.Interface)
 				ifStats.MessagesReceived.Add(1)
-				ifStats.BytesReceived.Add(uint64(len(resp)))
+				ifStats.BytesReceived.Add(uint64(len(data)))
 				cmdStats := ifStats.getOrCreateCommandStats(cmd.Code)
 				cmdStats.MessagesReceived.Add(1)
-				cmdStats.BytesReceived.Add(uint64(len(resp)))
+				cmdStats.BytesReceived.Add(uint64(len(data)))
 			}
 		}
 
-		return resp, nil
+		return data, nil
 	case <-time.After(timeout):
 		c.stats.TotalErrors.Add(1)
 		return nil, fmt.Errorf("request timeout after %v", timeout)

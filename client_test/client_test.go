@@ -212,7 +212,7 @@ func TestClientBasicSetup(t *testing.T) {
 	config := newTestDRAConfig(testSrv.Address())
 	ctx := context.Background()
 
-	pool, err := client.NewConnectionPool(ctx, config)
+	pool, err := client.NewConnectionPool(ctx, config, logger.Log)
 	if err != nil {
 		t.Fatalf("Failed to create connection pool: %v", err)
 	}
@@ -308,7 +308,7 @@ func TestClientConnectionEstablishment(t *testing.T) {
 	config := newTestDRAConfig(testSrv.Address())
 	ctx := context.Background()
 
-	conn := client.NewConnection(ctx, "test-conn-1", config)
+	conn := client.NewConnection(ctx, "test-conn-1", config, logger.Log)
 	defer conn.Close()
 
 	if err := conn.Start(); err != nil {
@@ -339,7 +339,7 @@ func TestClientCERCEAExchange(t *testing.T) {
 	config := newTestDRAConfig(testSrv.Address())
 	ctx := context.Background()
 
-	conn := client.NewConnection(ctx, "test-conn-1", config)
+	conn := client.NewConnection(ctx, "test-conn-1", config, logger.Log)
 	defer conn.Close()
 
 	if err := conn.Start(); err != nil {
@@ -393,7 +393,7 @@ func TestClientCERTimeout(t *testing.T) {
 	config.CERTimeout = 500 * time.Millisecond
 	ctx := context.Background()
 
-	conn := client.NewConnection(ctx, "test-conn-1", config)
+	conn := client.NewConnection(ctx, "test-conn-1", config, logger.Log)
 	defer conn.Close()
 
 	err = conn.Start()
@@ -421,7 +421,7 @@ func TestClientDWRDWAExchange(t *testing.T) {
 	config.DWRInterval = 1 * time.Second // Short interval for testing
 	ctx := context.Background()
 
-	conn := client.NewConnection(ctx, "test-conn-1", config)
+	conn := client.NewConnection(ctx, "test-conn-1", config, logger.Log)
 	defer conn.Close()
 
 	if err := conn.Start(); err != nil {
@@ -452,7 +452,7 @@ func TestClientWatchdogAutomatic(t *testing.T) {
 	config.DWRInterval = 500 * time.Millisecond
 	ctx := context.Background()
 
-	conn := client.NewConnection(ctx, "test-conn-1", config)
+	conn := client.NewConnection(ctx, "test-conn-1", config, logger.Log)
 	defer conn.Close()
 
 	if err := conn.Start(); err != nil {
@@ -486,7 +486,7 @@ func TestClientDPRDPADisconnect(t *testing.T) {
 	config := newTestDRAConfig(testSrv.Address())
 	ctx := context.Background()
 
-	conn := client.NewConnection(ctx, "test-conn-1", config)
+	conn := client.NewConnection(ctx, "test-conn-1", config, logger.Log)
 
 	if err := conn.Start(); err != nil {
 		t.Fatalf("Failed to start connection: %v", err)
@@ -519,7 +519,7 @@ func TestClientDisconnectCleanup(t *testing.T) {
 	config := newTestDRAConfig(testSrv.Address())
 	ctx := context.Background()
 
-	pool, err := client.NewConnectionPool(ctx, config)
+	pool, err := client.NewConnectionPool(ctx, config, logger.Log)
 	if err != nil {
 		t.Fatalf("Failed to create connection pool: %v", err)
 	}
@@ -589,7 +589,7 @@ func TestClientS13ECRExchange(t *testing.T) {
 	config := newTestDRAConfig(testSrv.Address())
 	ctx := context.Background()
 
-	conn := client.NewConnection(ctx, "test-conn-1", config)
+	conn := client.NewConnection(ctx, "test-conn-1", config, logger.Log)
 	defer conn.Close()
 
 	if err := conn.Start(); err != nil {
@@ -625,9 +625,9 @@ func TestClientS13ECRExchange(t *testing.T) {
 
 	// Read response
 	select {
-	case ecaBytes := <-conn.Receive():
+	case rsp := <-conn.Receive():
 		eca := &s13.MEIdentityCheckAnswer{}
-		if err := eca.Unmarshal(ecaBytes); err != nil {
+		if err := eca.Unmarshal(append(rsp.Message.Header, rsp.Message.Body...)); err != nil {
 			t.Fatalf("Failed to unmarshal ECA: %v", err)
 		}
 
@@ -686,7 +686,7 @@ func TestClientS13MultipleRequests(t *testing.T) {
 	config := newTestDRAConfig(testSrv.Address())
 	ctx := context.Background()
 
-	pool, err := client.NewConnectionPool(ctx, config)
+	pool, err := client.NewConnectionPool(ctx, config, logger.Log)
 	if err != nil {
 		t.Fatalf("Failed to create pool: %v", err)
 	}
@@ -760,7 +760,7 @@ func TestClientNetworkError(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	conn := client.NewConnection(ctx, "test-conn-1", config)
+	conn := client.NewConnection(ctx, "test-conn-1", config, logger.Log)
 	defer conn.Close()
 
 	err := conn.Start()
@@ -779,7 +779,7 @@ func TestClientServerDisconnect(t *testing.T) {
 	config := newTestDRAConfig(testSrv.Address())
 	ctx := context.Background()
 
-	conn := client.NewConnection(ctx, "test-conn-1", config)
+	conn := client.NewConnection(ctx, "test-conn-1", config, logger.Log)
 	defer conn.Close()
 
 	if err := conn.Start(); err != nil {
@@ -844,7 +844,7 @@ func TestClientPerformanceThroughput(t *testing.T) {
 	config := newTestDRAConfig(testSrv.Address())
 	ctx := context.Background()
 
-	pool, err := client.NewConnectionPool(ctx, config)
+	pool, err := client.NewConnectionPool(ctx, config, logger.Log)
 	if err != nil {
 		t.Fatalf("Failed to create pool: %v", err)
 	}
@@ -908,7 +908,7 @@ func TestClientPerformanceThroughput(t *testing.T) {
 
 	wg.Wait()
 	duration := time.Since(startTime)
-	time.Sleep(3*time.Second)
+	time.Sleep(3 * time.Second)
 	close(errors)
 	for err := range errors {
 		t.Errorf("Error during throughput test: %v", err)
@@ -963,7 +963,7 @@ func TestClientPerformanceConcurrent(t *testing.T) {
 	config.ConnectionCount = 3
 	ctx := context.Background()
 
-	pool, err := client.NewConnectionPool(ctx, config)
+	pool, err := client.NewConnectionPool(ctx, config, logger.Log)
 	if err != nil {
 		t.Fatalf("Failed to create pool: %v", err)
 	}
@@ -1070,7 +1070,7 @@ func TestClientStatsTracking(t *testing.T) {
 	config := newTestDRAConfig(testSrv.Address())
 	ctx := context.Background()
 
-	pool, err := client.NewConnectionPool(ctx, config)
+	pool, err := client.NewConnectionPool(ctx, config, logger.Log)
 	if err != nil {
 		t.Fatalf("Failed to create pool: %v", err)
 	}
@@ -1142,7 +1142,7 @@ func BenchmarkClientCERCEA(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		conn := client.NewConnection(ctx, fmt.Sprintf("bench-conn-%d", i), config)
+		conn := client.NewConnection(ctx, fmt.Sprintf("bench-conn-%d", i), config, logger.Log)
 		conn.Start()
 		waitForConnectionState(conn, client.StateOpen, 3*time.Second)
 		conn.Close()
@@ -1179,7 +1179,7 @@ func BenchmarkClientS13ECR(b *testing.B) {
 	config := newTestDRAConfig(testSrv.Address())
 	ctx := context.Background()
 
-	pool, _ := client.NewConnectionPool(ctx, config)
+	pool, _ := client.NewConnectionPool(ctx, config, logger.Log)
 	pool.Start()
 	pool.WaitForConnection(3 * time.Second)
 	defer pool.Close()
@@ -1217,7 +1217,7 @@ func BenchmarkClientMessageSend(b *testing.B) {
 	config := newTestDRAConfig(testSrv.Address())
 	ctx := context.Background()
 
-	pool, _ := client.NewConnectionPool(ctx, config)
+	pool, _ := client.NewConnectionPool(ctx, config, logger.Log)
 	pool.Start()
 	pool.WaitForConnection(3 * time.Second)
 	defer pool.Close()
@@ -1333,7 +1333,7 @@ func TestAddressClient_BasicConnectionEstablishment(t *testing.T) {
 
 	// Send to remote address - connection should be created automatically
 	remoteAddr := testSrv.Address()
-	err = addressClient.SendWithTimeout(remoteAddr, ecrBytes, 5*time.Second)
+	_, err = addressClient.SendWithTimeout(remoteAddr, ecrBytes, 5*time.Second)
 	if err != nil {
 		t.Fatalf("Failed to send message: %v", err)
 	}
@@ -1353,7 +1353,7 @@ func TestAddressClient_BasicConnectionEstablishment(t *testing.T) {
 	ecr.SessionId = models_base.UTF8String("test-session-2")
 	ecrBytes, _ = ecr.Marshal()
 
-	err = addressClient.SendWithTimeout(remoteAddr, ecrBytes, 5*time.Second)
+	_, err = addressClient.SendWithTimeout(remoteAddr, ecrBytes, 5*time.Second)
 	if err != nil {
 		t.Fatalf("Failed to send second message: %v", err)
 	}
@@ -1450,7 +1450,7 @@ func TestAddressClient_MultipleAddresses(t *testing.T) {
 	}
 
 	for _, addr := range addresses {
-		err := addressClient.SendWithTimeout(addr, ecrBytes, 5*time.Second)
+		_, err := addressClient.SendWithTimeout(addr, ecrBytes, 5*time.Second)
 		if err != nil {
 			t.Errorf("Failed to send to %s: %v", addr, err)
 		}
@@ -1472,7 +1472,7 @@ func TestAddressClient_MultipleAddresses(t *testing.T) {
 	// Send multiple messages to each address
 	for i := 0; i < 5; i++ {
 		for _, addr := range addresses {
-			err := addressClient.SendWithTimeout(addr, ecrBytes, 5*time.Second)
+			_, err := addressClient.SendWithTimeout(addr, ecrBytes, 5*time.Second)
 			if err != nil {
 				t.Errorf("Failed to send iteration %d to %s: %v", i, addr, err)
 			}
@@ -1556,7 +1556,7 @@ func TestAddressClient_ConcurrentSends(t *testing.T) {
 			defer wg.Done()
 
 			for j := 0; j < messagesPerGoroutine; j++ {
-				err := addressClient.SendWithTimeout(remoteAddr, ecrBytes, 10*time.Second)
+				_, err := addressClient.SendWithTimeout(remoteAddr, ecrBytes, 10*time.Second)
 				if err != nil {
 					t.Errorf("Goroutine %d message %d failed: %v", id, j, err)
 				}
@@ -1647,7 +1647,7 @@ func TestAddressClient_Metrics(t *testing.T) {
 
 	numMessages := 10
 	for i := 0; i < numMessages; i++ {
-		err := addressClient.SendWithTimeout(testSrv.Address(), ecrBytes, 5*time.Second)
+		_, err := addressClient.SendWithTimeout(testSrv.Address(), ecrBytes, 5*time.Second)
 		if err != nil {
 			t.Errorf("Failed to send message %d: %v", i, err)
 		}
@@ -1715,7 +1715,7 @@ func TestAddressClient_ContextCancellation(t *testing.T) {
 	sendCtx, sendCancel := context.WithTimeout(context.Background(), 1*time.Second)
 	defer sendCancel()
 
-	err = addressClient.SendWithContext(sendCtx, testSrv.Address(), ecrBytes)
+	_, err = addressClient.SendWithContext(sendCtx, testSrv.Address(), ecrBytes)
 	if err == nil {
 		t.Error("Expected error when sending with cancelled context")
 	}
@@ -1737,14 +1737,14 @@ func TestAddressClient_InvalidAddress(t *testing.T) {
 	// Test various invalid address formats
 	invalidAddrs := []string{
 		"invalid",
-		"192.168.1.100",      // missing port
-		"192.168.1.100:",     // empty port
-		":3868",              // missing host
-		"example.com",        // missing port
+		"192.168.1.100",  // missing port
+		"192.168.1.100:", // empty port
+		":3868",          // missing host
+		"example.com",    // missing port
 	}
 
 	for _, addr := range invalidAddrs {
-		err := addressClient.SendWithTimeout(addr, message, 1*time.Second)
+		_, err := addressClient.SendWithTimeout(addr, message, 1*time.Second)
 		if err == nil {
 			t.Errorf("Expected error for invalid address %q, got nil", addr)
 		}

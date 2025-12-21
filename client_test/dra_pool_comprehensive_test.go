@@ -11,7 +11,9 @@ import (
 	"github.com/hsdfat/diam-gw/client"
 	"github.com/hsdfat/diam-gw/commands/s13"
 	"github.com/hsdfat/diam-gw/models_base"
+	"github.com/hsdfat/diam-gw/pkg/connection"
 	"github.com/hsdfat/diam-gw/server"
+	"github.com/hsdfat/go-zlog/logger"
 )
 
 // ============================================================================
@@ -53,26 +55,26 @@ func TestDRAPoolBasic(t *testing.T) {
 				Weight:   50,
 			},
 		},
-		OriginHost:        "test-client.example.com",
-		OriginRealm:       "example.com",
-		ProductName:       "TestClient/1.0",
-		VendorID:          10415,
-		ConnectionsPerDRA: 1,
-		ConnectTimeout:    2 * time.Second,
-		CERTimeout:        2 * time.Second,
-		DWRInterval:       30 * time.Second,
-		DWRTimeout:        5 * time.Second,
-		MaxDWRFailures:    3,
-		ReconnectInterval: 1 * time.Second,
-		SendBufferSize:    100,
+		OriginHost:          "test-client.example.com",
+		OriginRealm:         "example.com",
+		ProductName:         "TestClient/1.0",
+		VendorID:            10415,
+		ConnectionsPerDRA:   1,
+		ConnectTimeout:      2 * time.Second,
+		CERTimeout:          2 * time.Second,
+		DWRInterval:         30 * time.Second,
+		DWRTimeout:          5 * time.Second,
+		MaxDWRFailures:      3,
+		ReconnectInterval:   1 * time.Second,
+		SendBufferSize:      100,
 		HealthCheckInterval: 10 * time.Second,
 		MaxReconnectDelay:   30 * time.Second,
 		ReconnectBackoff:    2.0,
-		RecvBufferSize:    100,
+		RecvBufferSize:      100,
 	}
 
 	ctx := context.Background()
-	pool, err := client.NewDRAPool(ctx, config)
+	pool, err := client.NewDRAPool(ctx, config, logger.NewLogger())
 	if err != nil {
 		t.Fatalf("Failed to create DRA pool: %v", err)
 	}
@@ -202,26 +204,26 @@ func TestDRAPoolRouting(t *testing.T) {
 				Weight:   50,
 			},
 		},
-		OriginHost:        "test-client.example.com",
-		OriginRealm:       "example.com",
-		ProductName:       "TestClient/1.0",
-		VendorID:          10415,
-		ConnectionsPerDRA: 1,
-		ConnectTimeout:    2 * time.Second,
-		CERTimeout:        2 * time.Second,
-		DWRInterval:       30 * time.Second,
-		DWRTimeout:        5 * time.Second,
-		MaxDWRFailures:    3,
-		ReconnectInterval: 1 * time.Second,
-		SendBufferSize:    100,
+		OriginHost:          "test-client.example.com",
+		OriginRealm:         "example.com",
+		ProductName:         "TestClient/1.0",
+		VendorID:            10415,
+		ConnectionsPerDRA:   1,
+		ConnectTimeout:      2 * time.Second,
+		CERTimeout:          2 * time.Second,
+		DWRInterval:         30 * time.Second,
+		DWRTimeout:          5 * time.Second,
+		MaxDWRFailures:      3,
+		ReconnectInterval:   1 * time.Second,
+		SendBufferSize:      100,
 		HealthCheckInterval: 10 * time.Second,
 		MaxReconnectDelay:   30 * time.Second,
 		ReconnectBackoff:    2.0,
-		RecvBufferSize:    100,
+		RecvBufferSize:      100,
 	}
 
 	ctx := context.Background()
-	pool, err := client.NewDRAPool(ctx, config)
+	pool, err := client.NewDRAPool(ctx, config, logger.NewLogger())
 	if err != nil {
 		t.Fatalf("Failed to create DRA pool: %v", err)
 	}
@@ -230,7 +232,16 @@ func TestDRAPoolRouting(t *testing.T) {
 	if err := pool.Start(); err != nil {
 		t.Fatalf("Failed to start DRA pool: %v", err)
 	}
-
+	var totalResp = 0
+	pool.HandleFunc(
+		connection.Command{
+			Interface: 16777252,
+			Request:   false,
+			Code:      324,
+		}, func(msg *connection.Message, conn connection.Conn) {
+			totalResp++
+		},
+	)
 	// Wait for connections
 	time.Sleep(2 * time.Second)
 
@@ -252,12 +263,6 @@ func TestDRAPoolRouting(t *testing.T) {
 		if err := pool.Send(ecrBytes); err != nil {
 			t.Errorf("Failed to send message %d: %v", i, err)
 		}
-
-		select {
-		case <-pool.Receive():
-		case <-time.After(2 * time.Second):
-			t.Errorf("Timeout on message %d", i)
-		}
 	}
 
 	time.Sleep(200 * time.Millisecond)
@@ -271,6 +276,9 @@ func TestDRAPoolRouting(t *testing.T) {
 	// Both should have received messages (approximately balanced)
 	if count1 == 0 && count2 == 0 {
 		t.Error("No messages were routed to any DRA")
+	}
+	if count1+count2 != int32(totalResp) {
+		t.Errorf("No receive right expected number, send %d, receive %d", count1+count2, totalResp)
 	}
 }
 
@@ -360,26 +368,26 @@ func TestDRAPoolFailover(t *testing.T) {
 				Weight:   100,
 			},
 		},
-		OriginHost:        "test-client.example.com",
-		OriginRealm:       "example.com",
-		ProductName:       "TestClient/1.0",
-		VendorID:          10415,
-		ConnectionsPerDRA: 1,
-		ConnectTimeout:    2 * time.Second,
-		CERTimeout:        2 * time.Second,
-		DWRInterval:       30 * time.Second,
-		DWRTimeout:        5 * time.Second,
-		MaxDWRFailures:    3,
-		ReconnectInterval: 1 * time.Second,
-		SendBufferSize:    100,
+		OriginHost:          "test-client.example.com",
+		OriginRealm:         "example.com",
+		ProductName:         "TestClient/1.0",
+		VendorID:            10415,
+		ConnectionsPerDRA:   1,
+		ConnectTimeout:      2 * time.Second,
+		CERTimeout:          2 * time.Second,
+		DWRInterval:         30 * time.Second,
+		DWRTimeout:          5 * time.Second,
+		MaxDWRFailures:      3,
+		ReconnectInterval:   1 * time.Second,
+		SendBufferSize:      100,
 		HealthCheckInterval: 10 * time.Second,
 		MaxReconnectDelay:   30 * time.Second,
 		ReconnectBackoff:    2.0,
-		RecvBufferSize:    100,
+		RecvBufferSize:      100,
 	}
 
 	ctx := context.Background()
-	pool, err := client.NewDRAPool(ctx, config)
+	pool, err := client.NewDRAPool(ctx, config, logger.NewLogger())
 	if err != nil {
 		t.Fatalf("Failed to create DRA pool: %v", err)
 	}
@@ -409,12 +417,6 @@ func TestDRAPoolFailover(t *testing.T) {
 
 		ecrBytes, _ := ecr.Marshal()
 		pool.Send(ecrBytes)
-
-		select {
-		case <-pool.Receive():
-		case <-time.After(2 * time.Second):
-			t.Logf("Warning: Timeout on message %d", i)
-		}
 	}
 
 	time.Sleep(500 * time.Millisecond)
@@ -451,12 +453,6 @@ func TestDRAPoolFailover(t *testing.T) {
 
 		ecrBytes, _ := ecr.Marshal()
 		pool.Send(ecrBytes)
-
-		select {
-		case <-pool.Receive():
-		case <-time.After(2 * time.Second):
-			t.Logf("Warning: Timeout on failover message %d", i)
-		}
 	}
 
 	time.Sleep(500 * time.Millisecond)
@@ -558,26 +554,26 @@ func TestDRAPoolSendToDRA(t *testing.T) {
 				Weight:   50,
 			},
 		},
-		OriginHost:        "test-client.example.com",
-		OriginRealm:       "example.com",
-		ProductName:       "TestClient/1.0",
-		VendorID:          10415,
-		ConnectionsPerDRA: 1,
-		ConnectTimeout:    2 * time.Second,
-		CERTimeout:        2 * time.Second,
-		DWRInterval:       30 * time.Second,
-		DWRTimeout:        5 * time.Second,
-		MaxDWRFailures:    3,
-		ReconnectInterval: 1 * time.Second,
-		SendBufferSize:    100,
+		OriginHost:          "test-client.example.com",
+		OriginRealm:         "example.com",
+		ProductName:         "TestClient/1.0",
+		VendorID:            10415,
+		ConnectionsPerDRA:   1,
+		ConnectTimeout:      2 * time.Second,
+		CERTimeout:          2 * time.Second,
+		DWRInterval:         30 * time.Second,
+		DWRTimeout:          5 * time.Second,
+		MaxDWRFailures:      3,
+		ReconnectInterval:   1 * time.Second,
+		SendBufferSize:      100,
 		HealthCheckInterval: 10 * time.Second,
 		MaxReconnectDelay:   30 * time.Second,
 		ReconnectBackoff:    2.0,
-		RecvBufferSize:    100,
+		RecvBufferSize:      100,
 	}
 
 	ctx := context.Background()
-	pool, err := client.NewDRAPool(ctx, config)
+	pool, err := client.NewDRAPool(ctx, config, logger.NewLogger())
 	if err != nil {
 		t.Fatalf("Failed to create DRA pool: %v", err)
 	}
@@ -607,13 +603,6 @@ func TestDRAPoolSendToDRA(t *testing.T) {
 	// Send to dra2
 	if err := pool.SendToDRA("dra2", ecrBytes); err != nil {
 		t.Fatalf("Failed to send to DRA2: %v", err)
-	}
-
-	select {
-	case <-pool.Receive():
-		t.Log("Received response from DRA2")
-	case <-time.After(2 * time.Second):
-		t.Fatal("Timeout waiting for response")
 	}
 
 	time.Sleep(200 * time.Millisecond)
@@ -676,26 +665,26 @@ func TestDRAPoolGetDRAsByPriority(t *testing.T) {
 				Weight:   100,
 			},
 		},
-		OriginHost:        "test-client.example.com",
-		OriginRealm:       "example.com",
-		ProductName:       "TestClient/1.0",
-		VendorID:          10415,
-		ConnectionsPerDRA: 1,
-		ConnectTimeout:    2 * time.Second,
-		CERTimeout:        2 * time.Second,
-		DWRInterval:       30 * time.Second,
-		DWRTimeout:        5 * time.Second,
-		MaxDWRFailures:    3,
-		ReconnectInterval: 1 * time.Second,
-		SendBufferSize:    100,
+		OriginHost:          "test-client.example.com",
+		OriginRealm:         "example.com",
+		ProductName:         "TestClient/1.0",
+		VendorID:            10415,
+		ConnectionsPerDRA:   1,
+		ConnectTimeout:      2 * time.Second,
+		CERTimeout:          2 * time.Second,
+		DWRInterval:         30 * time.Second,
+		DWRTimeout:          5 * time.Second,
+		MaxDWRFailures:      3,
+		ReconnectInterval:   1 * time.Second,
+		SendBufferSize:      100,
 		HealthCheckInterval: 10 * time.Second,
 		MaxReconnectDelay:   30 * time.Second,
 		ReconnectBackoff:    2.0,
-		RecvBufferSize:    100,
+		RecvBufferSize:      100,
 	}
 
 	ctx := context.Background()
-	pool, err := client.NewDRAPool(ctx, config)
+	pool, err := client.NewDRAPool(ctx, config, logger.NewLogger())
 	if err != nil {
 		t.Fatalf("Failed to create DRA pool: %v", err)
 	}
@@ -735,26 +724,26 @@ func TestDRAPoolIsHealthy(t *testing.T) {
 				Weight:   100,
 			},
 		},
-		OriginHost:        "test-client.example.com",
-		OriginRealm:       "example.com",
-		ProductName:       "TestClient/1.0",
-		VendorID:          10415,
-		ConnectionsPerDRA: 1,
-		ConnectTimeout:    2 * time.Second,
-		CERTimeout:        2 * time.Second,
-		DWRInterval:       30 * time.Second,
-		DWRTimeout:        5 * time.Second,
-		MaxDWRFailures:    3,
-		ReconnectInterval: 1 * time.Second,
-		SendBufferSize:    100,
+		OriginHost:          "test-client.example.com",
+		OriginRealm:         "example.com",
+		ProductName:         "TestClient/1.0",
+		VendorID:            10415,
+		ConnectionsPerDRA:   1,
+		ConnectTimeout:      2 * time.Second,
+		CERTimeout:          2 * time.Second,
+		DWRInterval:         30 * time.Second,
+		DWRTimeout:          5 * time.Second,
+		MaxDWRFailures:      3,
+		ReconnectInterval:   1 * time.Second,
+		SendBufferSize:      100,
 		HealthCheckInterval: 10 * time.Second,
 		MaxReconnectDelay:   30 * time.Second,
 		ReconnectBackoff:    2.0,
-		RecvBufferSize:    100,
+		RecvBufferSize:      100,
 	}
 
 	ctx := context.Background()
-	pool, err := client.NewDRAPool(ctx, config)
+	pool, err := client.NewDRAPool(ctx, config, logger.NewLogger())
 	if err != nil {
 		t.Fatalf("Failed to create DRA pool: %v", err)
 	}
@@ -799,26 +788,26 @@ func BenchmarkDRAPoolSend(b *testing.B) {
 				Weight:   100,
 			},
 		},
-		OriginHost:        "test-client.example.com",
-		OriginRealm:       "example.com",
-		ProductName:       "TestClient/1.0",
-		VendorID:          10415,
-		ConnectionsPerDRA: 1,
-		ConnectTimeout:    2 * time.Second,
-		CERTimeout:        2 * time.Second,
-		DWRInterval:       30 * time.Second,
-		DWRTimeout:        5 * time.Second,
-		MaxDWRFailures:    3,
-		ReconnectInterval: 1 * time.Second,
-		SendBufferSize:    100,
+		OriginHost:          "test-client.example.com",
+		OriginRealm:         "example.com",
+		ProductName:         "TestClient/1.0",
+		VendorID:            10415,
+		ConnectionsPerDRA:   1,
+		ConnectTimeout:      2 * time.Second,
+		CERTimeout:          2 * time.Second,
+		DWRInterval:         30 * time.Second,
+		DWRTimeout:          5 * time.Second,
+		MaxDWRFailures:      3,
+		ReconnectInterval:   1 * time.Second,
+		SendBufferSize:      100,
 		HealthCheckInterval: 10 * time.Second,
 		MaxReconnectDelay:   30 * time.Second,
 		ReconnectBackoff:    2.0,
-		RecvBufferSize:    100,
+		RecvBufferSize:      100,
 	}
 
 	ctx := context.Background()
-	pool, _ := client.NewDRAPool(ctx, config)
+	pool, _ := client.NewDRAPool(ctx, config, logger.NewLogger())
 	pool.Start()
 	time.Sleep(2 * time.Second)
 	defer pool.Close()
@@ -834,16 +823,6 @@ func BenchmarkDRAPoolSend(b *testing.B) {
 		SoftwareVersion: ptrUTF8String("01"),
 	}
 	ecrBytes, _ := ecr.Marshal()
-
-	go func() {
-		for {
-			select {
-			case <-pool.Receive():
-			case <-ctx.Done():
-				return
-			}
-		}
-	}()
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {

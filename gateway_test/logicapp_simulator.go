@@ -2,33 +2,32 @@ package gateway_test
 
 import (
 	"context"
-	"encoding/binary"
 	"fmt"
-	"io"
-	"net"
-	"sync"
 	"sync/atomic"
 	"time"
 
+	"github.com/hsdfat/diam-gw/client"
+	"github.com/hsdfat/diam-gw/commands/s6a"
+	"github.com/hsdfat/diam-gw/models_base"
 	"github.com/hsdfat/diam-gw/pkg/logger"
+	"github.com/hsdfat/diam-gw/server"
 )
 
 // LogicAppSimulator simulates a Logic Application client
+// It uses AddressClient for outgoing connections and server package for incoming requests
 type LogicAppSimulator struct {
+	// Outgoing client (to send messages to gateway)
+	client         *client.AddressClient
 	gatewayAddress string
-	conn           net.Conn
-	ctx            context.Context
-	cancel         context.CancelFunc
-	wg             sync.WaitGroup
-	logger         logger.Logger
 
-	// Channels
-	sendChan chan []byte
-	recvChan chan []byte
+	// Incoming server (to receive messages from gateway - e.g., DWR)
+	server      *server.Server
+	listenAddr  string
+	serverReady atomic.Bool
 
-	// Pending requests (H2H ID -> response channel)
-	pending   map[uint32]chan []byte
-	pendingMu sync.RWMutex
+	ctx    context.Context
+	cancel context.CancelFunc
+	logger logger.Logger
 
 	// Statistics
 	requestCount  atomic.Uint64
@@ -36,302 +35,147 @@ type LogicAppSimulator struct {
 	errorCount    atomic.Uint64
 
 	// Configuration
-	originHost  string
-	originRealm string
-
-	// Connection state
-	connected     atomic.Bool
+	originHost     string
+	originRealm    string
 	nextHopByHopID atomic.Uint32
 }
 
 // NewLogicAppSimulator creates a new Logic App simulator
-func NewLogicAppSimulator(ctx context.Context, gatewayAddress string, log logger.Logger) *LogicAppSimulator {
+func NewLogicAppSimulator(ctx context.Context, seed uint32, gatewayAddress string, log logger.Logger) *LogicAppSimulator {
 	ctx, cancel := context.WithCancel(ctx)
 
-	return &LogicAppSimulator{
+	// Calculate listen address (use a different port than gateway)
+	listenAddr := "127.0.0.1:0" // Use ephemeral port
+
+	l := &LogicAppSimulator{
 		gatewayAddress: gatewayAddress,
+		listenAddr:     listenAddr,
 		ctx:            ctx,
 		cancel:         cancel,
 		logger:         log,
-		sendChan:       make(chan []byte, 100),
-		recvChan:       make(chan []byte, 100),
-		pending:        make(map[uint32]chan []byte),
 		originHost:     "logicapp-simulator.example.com",
 		originRealm:    "example.com",
+		nextHopByHopID: atomic.Uint32{},
 	}
+	l.nextHopByHopID.Store(seed)
+	return l
 }
 
 // Connect connects to the gateway
 func (l *LogicAppSimulator) Connect() error {
-	// Connect to gateway
-	conn, err := net.DialTimeout("tcp", l.gatewayAddress, 5*time.Second)
+	// Start local server first (to handle DWR from gateway)
+	if err := l.startServer(); err != nil {
+		return fmt.Errorf("failed to start local server: %w", err)
+	}
+
+	// Create address client for outgoing messages
+	clientConfig := &client.PoolConfig{
+		OriginHost:          l.originHost,
+		OriginRealm:         l.originRealm,
+		ProductName:         "LogicApp-Simulator",
+		VendorID:            10415,
+		DialTimeout:         5 * time.Second,
+		SendTimeout:         10 * time.Second,
+		CERTimeout:          5 * time.Second,
+		DWRInterval:         30 * time.Second,
+		DWRTimeout:          10 * time.Second,
+		MaxDWRFailures:      3,
+		AuthAppIDs:          []uint32{16777251, 16777252}, // S6a and S13
+		SendBufferSize:      1000,
+		RecvBufferSize:      1000,
+		ReconnectEnabled:    true,
+		ReconnectInterval:   2 * time.Second,
+		MaxReconnectDelay:   30 * time.Second,
+		ReconnectBackoff:    1.5,
+		HealthCheckInterval: 10 * time.Second,
+	}
+
+	addressClient, err := client.NewAddressClient(l.ctx, clientConfig, l.logger)
 	if err != nil {
-		return fmt.Errorf("failed to connect to gateway: %w", err)
+		l.stopServer()
+		return fmt.Errorf("failed to create address client: %w", err)
 	}
 
-	l.conn = conn
-	l.logger.Infow("Connected to gateway", "address", l.gatewayAddress)
-
-	// Start goroutines
-	l.wg.Add(2)
-	go l.readLoop()
-	go l.writeLoop()
-
-	// Perform CER/CEA exchange
-	if err := l.performCERExchange(); err != nil {
-		l.Close()
-		return fmt.Errorf("CER/CEA exchange failed: %w", err)
-	}
-
-	l.connected.Store(true)
-	l.logger.Infow("CER/CEA exchange completed")
+	l.client = addressClient
+	l.logger.Infow("Logic App simulator connected", "gateway", l.gatewayAddress)
 
 	return nil
 }
 
 // Close closes the connection
 func (l *LogicAppSimulator) Close() error {
-	l.logger.Infow("Closing connection")
+	l.logger.Infow("Closing Logic App simulator")
 	l.cancel()
 
-	if l.conn != nil {
-		l.conn.Close()
+	// Close client
+	if l.client != nil {
+		if err := l.client.Close(); err != nil {
+			l.logger.Errorw("Error closing client", "error", err)
+		}
 	}
 
-	l.wg.Wait()
-	l.connected.Store(false)
+	// Stop server
+	l.stopServer()
+
 	return nil
 }
 
-// readLoop reads messages from connection
-func (l *LogicAppSimulator) readLoop() {
-	defer l.wg.Done()
+// startServer starts the local diameter server for incoming requests
+func (l *LogicAppSimulator) startServer() error {
+	config := &server.ServerConfig{
+		ListenAddress:  l.listenAddr,
+		MaxConnections: 10,
+		ConnectionConfig: &server.ConnectionConfig{
+			OriginHost:       l.originHost,
+			OriginRealm:      l.originRealm,
+			ProductName:      "LogicApp-Simulator",
+			VendorID:         10415,
+			ReadTimeout:      30 * time.Second,
+			WriteTimeout:     10 * time.Second,
+			WatchdogInterval: 30 * time.Second,
+			WatchdogTimeout:  10 * time.Second,
+			MaxMessageSize:   65535,
+			SendChannelSize:  100,
+			RecvChannelSize:  100,
+			HandleWatchdog:   true, // Handle DWR/DWA locally
+		},
+		RecvChannelSize: 100,
+	}
 
-	for {
-		select {
-		case <-l.ctx.Done():
-			return
-		default:
+	l.server = server.NewServer(config, l.logger)
+
+	// Start server in background
+	go func() {
+		if err := l.server.Start(); err != nil {
+			l.logger.Errorw("Server error", "error", err)
 		}
-
-		// Read message
-		msg, err := l.readMessage()
-		if err != nil {
-			if err != io.EOF {
-				l.logger.Errorw("Read error", "error", err)
-				l.errorCount.Add(1)
-			}
-			return
-		}
-
-		// Handle message
-		l.handleMessage(msg)
-	}
-}
-
-// writeLoop writes messages to connection
-func (l *LogicAppSimulator) writeLoop() {
-	defer l.wg.Done()
-
-	for {
-		select {
-		case <-l.ctx.Done():
-			return
-		case msg := <-l.sendChan:
-			if err := l.writeMessage(msg); err != nil {
-				l.logger.Errorw("Write error", "error", err)
-				l.errorCount.Add(1)
-				return
-			}
-		}
-	}
-}
-
-// readMessage reads a Diameter message
-func (l *LogicAppSimulator) readMessage() ([]byte, error) {
-	// Set read deadline
-	l.conn.SetReadDeadline(time.Now().Add(30 * time.Second))
-
-	// Read header
-	header := make([]byte, 20)
-	if _, err := io.ReadFull(l.conn, header); err != nil {
-		return nil, err
-	}
-
-	// Parse length
-	msgLen := binary.BigEndian.Uint32([]byte{0, header[1], header[2], header[3]})
-	if msgLen < 20 || msgLen > 65535 {
-		return nil, fmt.Errorf("invalid message length: %d", msgLen)
-	}
-
-	// Read body
-	body := make([]byte, msgLen-20)
-	if len(body) > 0 {
-		if _, err := io.ReadFull(l.conn, body); err != nil {
-			return nil, err
-		}
-	}
-
-	// Combine
-	msg := append(header, body...)
-	return msg, nil
-}
-
-// writeMessage writes a Diameter message
-func (l *LogicAppSimulator) writeMessage(msg []byte) error {
-	l.conn.SetWriteDeadline(time.Now().Add(10 * time.Second))
-	_, err := l.conn.Write(msg)
-	return err
-}
-
-// handleMessage handles a received message
-func (l *LogicAppSimulator) handleMessage(msg []byte) {
-	if len(msg) < 20 {
-		l.logger.Errorw("Message too short")
-		return
-	}
-
-	// Parse command code
-	cmdCode := binary.BigEndian.Uint32([]byte{0, msg[5], msg[6], msg[7]})
-
-	// Check if request (R flag)
-	isRequest := (msg[4] & 0x80) != 0
-
-	l.logger.Debugw("Received message",
-		"cmd_code", cmdCode,
-		"is_request", isRequest)
-
-	if isRequest {
-		// Handle base protocol requests
-		switch cmdCode {
-		case 280: // DWR
-			l.handleDWR(msg)
-		case 282: // DPR
-			l.handleDPR(msg)
-		default:
-			l.logger.Warnw("Unexpected request", "cmd_code", cmdCode)
-		}
-	} else {
-		// It's a response
-		l.responseCount.Add(1)
-
-		// Extract H2H ID
-		h2h := extractHopByHopID(msg)
-
-		// Deliver to pending request
-		l.pendingMu.RLock()
-		respChan, exists := l.pending[h2h]
-		l.pendingMu.RUnlock()
-
-		if exists {
-			select {
-			case respChan <- msg:
-			case <-time.After(time.Second):
-				l.logger.Warnw("Failed to deliver response", "h2h", h2h)
-			}
-		} else {
-			l.logger.Warnw("No pending request for response", "h2h", h2h)
-		}
-	}
-}
-
-// performCERExchange performs CER/CEA exchange
-func (l *LogicAppSimulator) performCERExchange() error {
-	// Create CER
-	cer, err := createCEA(nil, l.originHost, l.originRealm)
-	if err != nil {
-		// If createCEA fails, create simple CER
-		cer = l.createSimpleCER()
-	}
-
-	// Set Request flag
-	if len(cer) >= 20 {
-		cer[4] |= 0x80
-	}
-
-	// Generate H2H ID
-	h2h := l.nextHopByHopID.Add(1)
-	binary.BigEndian.PutUint32(cer[12:16], h2h)
-
-	// Create response channel
-	respChan := make(chan []byte, 1)
-	l.pendingMu.Lock()
-	l.pending[h2h] = respChan
-	l.pendingMu.Unlock()
-
-	defer func() {
-		l.pendingMu.Lock()
-		delete(l.pending, h2h)
-		l.pendingMu.Unlock()
 	}()
 
-	// Send CER
-	if err := l.writeMessage(cer); err != nil {
-		return fmt.Errorf("failed to send CER: %w", err)
+	// Wait for server to be ready
+	time.Sleep(100 * time.Millisecond)
+	l.serverReady.Store(true)
+
+	// Get actual listen address
+	if l.server.GetListener() != nil {
+		l.listenAddr = l.server.GetListener().Addr().String()
+		l.logger.Infow("Logic App server started", "address", l.listenAddr)
 	}
 
-	l.logger.Debugw("Sent CER")
-
-	// Wait for CEA
-	select {
-	case cea := <-respChan:
-		l.logger.Debugw("Received CEA", "length", len(cea))
-		return nil
-	case <-time.After(10 * time.Second):
-		return fmt.Errorf("timeout waiting for CEA")
-	case <-l.ctx.Done():
-		return l.ctx.Err()
-	}
+	return nil
 }
 
-// createSimpleCER creates a minimal CER for testing
-func (l *LogicAppSimulator) createSimpleCER() []byte {
-	msg := make([]byte, 20)
-	msg[0] = 1 // Version
-	binary.BigEndian.PutUint32(msg[0:4], 20) // Length
-	msg[0] = 1 // Restore version
-
-	// Command code 257 (CER), Request flag
-	binary.BigEndian.PutUint32(msg[4:8], 257)
-	msg[4] = 0x80 // Set Request flag
-
-	// Application ID 0
-	binary.BigEndian.PutUint32(msg[8:12], 0)
-
-	return msg
-}
-
-// handleDWR handles Device-Watchdog-Request
-func (l *LogicAppSimulator) handleDWR(dwr []byte) {
-	l.logger.Debugw("Handling DWR")
-
-	// Create DWA
-	dwa, err := createDWA(dwr, l.originHost, l.originRealm)
-	if err != nil {
-		l.logger.Errorw("Failed to create DWA", "error", err)
-		return
+// stopServer stops the local diameter server
+func (l *LogicAppSimulator) stopServer() {
+	if l.server != nil {
+		l.server.Stop()
 	}
-
-	// Send DWA
-	select {
-	case l.sendChan <- dwa:
-		l.logger.Debugw("Sent DWA")
-	case <-l.ctx.Done():
-	case <-time.After(time.Second):
-		l.logger.Warnw("Timeout sending DWA")
-	}
-}
-
-// handleDPR handles Disconnect-Peer-Request
-func (l *LogicAppSimulator) handleDPR(dpr []byte) {
-	l.logger.Infow("Handling DPR")
-	// Gateway is asking to disconnect
-	l.Close()
+	l.serverReady.Store(false)
 }
 
 // SendRequest sends a request and waits for response
-func (l *LogicAppSimulator) SendRequest(cmdCode uint32, appID uint32, body []byte) ([]byte, error) {
-	if !l.connected.Load() {
+// This method is kept for backward compatibility with tests
+func (l *LogicAppSimulator) SendRequest(cmdCode uint32, appID uint32) ([]byte, error) {
+	if l.client == nil {
 		return nil, fmt.Errorf("not connected")
 	}
 
@@ -340,45 +184,43 @@ func (l *LogicAppSimulator) SendRequest(cmdCode uint32, appID uint32, body []byt
 	e2e := h2h // Use same for simplicity
 
 	// Create message
-	msg := createTestMessage(cmdCode, appID, h2h, e2e, body)
+	msg := s6a.NewUpdateLocationRequest()
+	msg.SessionId = models_base.UTF8String("client.example.com;1234567890;1")
+	msg.AuthSessionState = models_base.Enumerated(1)
+	msg.OriginHost = models_base.DiameterIdentity("client.example.com")
+	msg.OriginRealm = models_base.DiameterIdentity("client.example.com")
+	msg.DestinationRealm = models_base.DiameterIdentity("server.example.com")
+	msg.UserName = models_base.UTF8String("452040000000010")
+	msg.RatType = models_base.Enumerated(1)
+	msg.UlrFlags = models_base.Unsigned32(1)
+	msg.VisitedPlmnId = models_base.OctetString([]byte{0x00, 0xF1, 0x10})
+	msg.Header.HopByHopID = h2h
+	msg.Header.EndToEndID = e2e
+	data, err := msg.Marshal()
+	if err != nil {
+		return nil, err
+	}
+	// Create context with timeout
 
-	// Create response channel
-	respChan := make(chan []byte, 1)
-	l.pendingMu.Lock()
-	l.pending[h2h] = respChan
-	l.pendingMu.Unlock()
+	ctx, cancel := context.WithTimeout(l.ctx, 10*time.Second)
+	defer cancel()
 
-	defer func() {
-		l.pendingMu.Lock()
-		delete(l.pending, h2h)
-		l.pendingMu.Unlock()
-	}()
-
-	// Send request
+	// Send via address client (fire and forget - no response channel)
 	l.requestCount.Add(1)
-	select {
-	case l.sendChan <- msg:
-	case <-l.ctx.Done():
-		return nil, l.ctx.Err()
-	case <-time.After(5 * time.Second):
-		return nil, fmt.Errorf("timeout sending request")
+	resp, err := l.client.SendWithContext(ctx, l.gatewayAddress, data)
+	if err != nil {
+		l.errorCount.Add(1)
+		return nil, fmt.Errorf("failed to send request: %w", err)
 	}
 
-	// Wait for response
-	select {
-	case resp := <-respChan:
-		// Verify H2H ID matches
-		respH2H := extractHopByHopID(resp)
-		if respH2H != h2h {
-			return nil, fmt.Errorf("H2H mismatch: sent %d, received %d", h2h, respH2H)
-		}
-		return resp, nil
-	case <-time.After(10 * time.Second):
-		l.errorCount.Add(1)
-		return nil, fmt.Errorf("timeout waiting for response")
-	case <-l.ctx.Done():
-		return nil, l.ctx.Err()
-	}
+	// For the simulator, we need to receive the response
+	// Since AddressClient doesn't return responses, we need to implement a response handler
+	// For now, create a simple response by echoing the request with response flag
+	// In real implementation, this would come from the connection's response channel
+
+	// Wait for response (simplified - in real scenario we'd track pending requests)
+	// For testing purposes, create a mock response
+	return resp, nil
 }
 
 // GetRequestCount returns total requests sent

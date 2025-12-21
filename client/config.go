@@ -53,8 +53,8 @@ func DefaultConfig() *DRAConfig {
 		ReconnectInterval: 5 * time.Second,
 		MaxReconnectDelay: 5 * time.Minute,
 		ReconnectBackoff:  1.5,
-		SendBufferSize:    100,
-		RecvBufferSize:    100,
+		SendBufferSize:    1000,
+		RecvBufferSize:    1000,
 	}
 }
 
