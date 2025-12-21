@@ -141,23 +141,22 @@ type GatewayStats struct {
 // GatewayStatsSnapshot is a snapshot of gateway statistics
 type GatewayStatsSnapshot struct {
 	InServer  server.ServerStatsSnapshot
+	InClient  client.AddressClientStatsSnapshot
 	OutServer server.ServerStatsSnapshot
 	DraPool   client.DRAPoolStats
 
-	// DRARequest, DRAResponse uint64
-
-	// TotalRequests     uint64
-	// TotalResponses    uint64
-	// TotalErrors       uint64
-	// ActiveSessions    uint64
-	// TotalForwarded    uint64
-	// TotalFromDRA      uint64
-	// TimeoutErrors     uint64
-	// RoutingErrors     uint64
-	// SessionsCreated   uint64
-	// SessionsCompleted uint64
-	// SessionsExpired   uint64
-	AverageLatencyMs float64
+	TotalRequests     uint64
+	TotalResponses    uint64
+	TotalErrors       uint64
+	ActiveSessions    uint64
+	TotalForwarded    uint64
+	TotalFromDRA      uint64
+	TimeoutErrors     uint64
+	RoutingErrors     uint64
+	SessionsCreated   uint64
+	SessionsCompleted uint64
+	SessionsExpired   uint64
+	AverageLatencyMs  float64
 }
 
 func (g *Gateway) newServer(config *GatewayConfig, serverCfg *server.ServerConfig, log logger.Logger) *server.Server {
@@ -387,9 +386,23 @@ func (gw *Gateway) GetStats() GatewayStatsSnapshot {
 	}
 
 	snapshot := GatewayStatsSnapshot{
-		AverageLatencyMs: avgLatency,
+		TotalRequests:     gw.stats.TotalRequests.Load(),
+		TotalResponses:    gw.stats.TotalResponses.Load(),
+		TotalErrors:       gw.stats.TotalErrors.Load(),
+		ActiveSessions:    gw.stats.ActiveSessions.Load(),
+		TotalForwarded:    gw.stats.TotalForwarded.Load(),
+		TotalFromDRA:      gw.stats.TotalFromDRA.Load(),
+		TimeoutErrors:     gw.stats.TimeoutErrors.Load(),
+		RoutingErrors:     gw.stats.RoutingErrors.Load(),
+		SessionsCreated:   gw.stats.SessionsCreated.Load(),
+		SessionsCompleted: gw.stats.SessionsCompleted.Load(),
+		SessionsExpired:   gw.stats.SessionsExpired.Load(),
+		AverageLatencyMs:  avgLatency,
 	}
 	snapshot.InServer = gw.inServer.GetStats()
+	if gw.inClient != nil {
+		snapshot.InClient = gw.inClient.GetStats()
+	}
 	if gw.config.OutServerSupported {
 		snapshot.OutServer = gw.outServer.GetStats()
 	}

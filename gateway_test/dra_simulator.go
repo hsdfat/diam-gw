@@ -69,8 +69,8 @@ func (d *DRASimulator) Start() error {
 			WatchdogInterval: 30 * time.Second,
 			WatchdogTimeout:  10 * time.Second,
 			MaxMessageSize:   65535,
-			SendChannelSize:  100,
-			RecvChannelSize:  100,
+			SendChannelSize:  1000,
+			RecvChannelSize:  1000,
 			HandleWatchdog:   true, // Handle DWR/DWA locally
 		},
 		RecvChannelSize: 1000,

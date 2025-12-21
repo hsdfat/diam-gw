@@ -20,7 +20,7 @@ func TestS13Interface(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
 
-	log := logger.New("perf-test", "info")
+	log := logger.New("perf-test", "error")
 	draLog := log.With("mod", "dra").(logger.Logger)
 	gwLog := log.With("mod", "gw").(logger.Logger)
 	appLog := log.With("mod", "eir").(logger.Logger)

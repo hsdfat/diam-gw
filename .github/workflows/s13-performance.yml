@@ -1,0 +1,135 @@
+name: S13 Performance Test
+
+on:
+  push:
+    branches: [ main, dev ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  performance-test:
+    name: S13 Interface Performance
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.23'
+          cache: true
+
+      - name: Run S13 performance test
+        id: perf-test
+        run: |
+          echo "Running S13 performance test..."
+          go test -v -timeout 15m -run TestS13Performance ./gateway_test -count=1 2>&1 | tee test-output.log
+
+          # Extract results
+          MAX_TPS=$(grep "Maximum stable TPS:" test-output.log | awk '{print $NF}')
+          echo "max_tps=$MAX_TPS" >> $GITHUB_OUTPUT
+
+          # Check if test passed
+          if grep -q "PASS" test-output.log; then
+            echo "status=✅ PASSED" >> $GITHUB_OUTPUT
+          else
+            echo "status=❌ FAILED" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Parse test results
+        id: parse-results
+        if: always()
+        run: |
+          # Extract TPS progression table
+          awk '/TPS Progression:/,/========/' test-output.log > tps-results.txt
+
+          # Count errors
+          ERROR_COUNT=$(grep -c "Cannot send to EIR" test-output.log || echo "0")
+          echo "error_count=$ERROR_COUNT" >> $GITHUB_OUTPUT
+
+          # Extract component stats for final TPS level
+          FINAL_TPS=$(grep "Testing TPS:" test-output.log | tail -1 | awk '{print $NF}')
+          echo "final_tps=$FINAL_TPS" >> $GITHUB_OUTPUT
+
+          # Get Gateway InClient stats
+          GW_REQUESTS=$(grep "Gateway InClient" test-output.log | tail -1 | grep -oP 'Requests: \K\d+' || echo "0")
+          GW_RESPONSES=$(grep "Gateway InClient" test-output.log | tail -1 | grep -oP 'Responses: \K\d+' || echo "0")
+          GW_ERRORS=$(grep "Gateway InClient" test-output.log | tail -1 | grep -oP 'Errors: \K\d+' || echo "0")
+          GW_TIMEOUTS=$(grep "Gateway InClient" test-output.log | tail -1 | grep -oP 'Timeouts: \K\d+' || echo "0")
+
+          echo "gw_requests=$GW_REQUESTS" >> $GITHUB_OUTPUT
+          echo "gw_responses=$GW_RESPONSES" >> $GITHUB_OUTPUT
+          echo "gw_errors=$GW_ERRORS" >> $GITHUB_OUTPUT
+          echo "gw_timeouts=$GW_TIMEOUTS" >> $GITHUB_OUTPUT
+
+      - name: Generate test report
+        if: always()
+        run: |
+          cat << 'EOF' > performance-report.md
+          # S13 Performance Test Report
+
+          **Status:** ${{ steps.perf-test.outputs.status }}
+          **Maximum Stable TPS:** ${{ steps.perf-test.outputs.max_tps }}
+          **Final TPS Tested:** ${{ steps.parse-results.outputs.final_tps }}
+
+          ## Gateway Statistics (Cumulative)
+
+          | Metric | Value |
+          |--------|-------|
+          | Total Requests Sent to EIR | ${{ steps.parse-results.outputs.gw_requests }} |
+          | Total Responses from EIR | ${{ steps.parse-results.outputs.gw_responses }} |
+          | Gateway Errors | ${{ steps.parse-results.outputs.gw_errors }} |
+          | Gateway Timeouts | ${{ steps.parse-results.outputs.gw_timeouts }} |
+          | Error Logs (Gateway→EIR) | ${{ steps.parse-results.outputs.error_count }} |
+
+          ## TPS Progression Results
+
+          ```
+          $(cat tps-results.txt)
+          ```
+
+          ## Test Details
+
+          - **Workflow:** ${{ github.workflow }}
+          - **Run ID:** ${{ github.run_id }}
+          - **Commit:** ${{ github.sha }}
+          - **Branch:** ${{ github.ref_name }}
+          - **Triggered by:** ${{ github.event_name }}
+
+          EOF
+
+          cat performance-report.md
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: s13-performance-results
+          path: |
+            test-output.log
+            performance-report.md
+            tps-results.txt
+          retention-days: 30
+
+      - name: Comment PR with results
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const report = fs.readFileSync('performance-report.md', 'utf8');
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: report
+            });
+
+      - name: Fail if test failed
+        if: steps.perf-test.outputs.status != '✅ PASSED'
+        run: exit 1
