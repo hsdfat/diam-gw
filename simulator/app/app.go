@@ -196,12 +196,14 @@ func handleClientMessages(ctx context.Context, wg *sync.WaitGroup, pool *client.
 		select {
 		case <-ctx.Done():
 			return
-		case msg, ok := <-pool.Receive():
+		case connInfo, ok := <-pool.Receive():
 			if !ok {
 				return
 			}
 
-			if err := processClientMessage(pool, msg, log, originHost, originRealm); err != nil {
+			// Extract message bytes from DiamConnectionInfo
+			msgBytes := append(connInfo.Message.Header, connInfo.Message.Body...)
+			if err := processClientMessage(pool, msgBytes, log, originHost, originRealm); err != nil {
 				log.Error("Failed to process client message: %v", err)
 			}
 		}

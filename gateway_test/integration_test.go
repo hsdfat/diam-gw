@@ -106,6 +106,39 @@ func TestGatewayConnectivity(t *testing.T) {
 	}
 	defer dra.Stop()
 
+	// Register ULR handler on DRA
+	dra.server.HandleFunc(server.Command{
+		Code:      316,
+		Interface: 16777251,
+		Request:   true,
+	}, func(msg *server.Message, conn server.Conn) {
+		ulr := &s6a.UpdateLocationRequest{}
+		err := ulr.Unmarshal(append(msg.Header, msg.Body...))
+		if err != nil {
+			draLog.Errorw("cannot unmarshal ULR", "error", err)
+			return
+		}
+
+		ula := s6a.NewUpdateLocationAnswer()
+		ula.SessionId = models_base.UTF8String("test-session-123")
+		ula.AuthSessionState = models_base.Enumerated(1)
+		ula.OriginHost = models_base.DiameterIdentity("dra-simulator.example.com")
+		ula.OriginRealm = models_base.DiameterIdentity("example.com")
+		resultCode := models_base.Unsigned32(2001)
+		ula.ResultCode = &resultCode
+
+		// Set header identifiers for matching
+		ula.Header.HopByHopID = ulr.Header.HopByHopID
+		ula.Header.EndToEndID = ulr.Header.EndToEndID
+
+		b, err := ula.Marshal()
+		if err != nil {
+			draLog.Errorw("cannot marshal ULA", "error", err)
+			return
+		}
+		conn.Write(b)
+	})
+
 	// Wait for DRA to be ready
 	time.Sleep(200 * time.Millisecond)
 
@@ -129,6 +162,22 @@ func TestGatewayConnectivity(t *testing.T) {
 				HandleWatchdog:   true,
 			},
 			RecvChannelSize: 100,
+		},
+		InClientConfig: &client.PoolConfig{
+			OriginHost:        "test-gw.example.com",
+			OriginRealm:       "example.com",
+			ProductName:       "Test-Gateway",
+			VendorID:          10415,
+			DialTimeout:       5 * time.Second,
+			SendTimeout:       5 * time.Second,
+			CERTimeout:        5 * time.Second,
+			DWRInterval:       30 * time.Second,
+			DWRTimeout:        10 * time.Second,
+			MaxDWRFailures:    3,
+			ReconnectEnabled:  true,
+			ReconnectInterval: 2 * time.Second,
+			MaxReconnectDelay: 30 * time.Second,
+			ReconnectBackoff:  1.5,
 		},
 		DRAPoolConfig: &client.DRAPoolConfig{
 			DRAs: []*client.DRAServerConfig{
@@ -172,18 +221,66 @@ func TestGatewayConnectivity(t *testing.T) {
 	}
 	registerBaseProtocolHandlers(gw, t)
 
+	// Register handler for ULR (Update Location Request) to forward to DRA
+	gw.RegisterInServer(connection.Command{
+		Code:      316,
+		Interface: 16777251,
+		Request:   true,
+	}, func(msg *connection.Message, conn connection.Conn) {
+		msgInfo, err := connection.ParseMessageHeader(msg.Header)
+		if err != nil {
+			gwLog.Errorw("cannot parse header", "error", err)
+			return
+		}
+		rsp := make(chan *connection.Message, 1)
+		gw.StoreSession(msgInfo.HopByHopID, &gateway.Session{
+			Conn:         conn,
+			CreatedAt:    time.Now(),
+			ResponseChan: rsp,
+		})
+		gw.GetDRAPool().Send(append(msg.Header, msg.Body...))
+		select {
+		case rMsg := <-rsp:
+			conn.Write(append(rMsg.Header, rMsg.Body...))
+		case <-time.After(5 * time.Second):
+			gwLog.Errorw("timeout to receive rsp", "msg", msgInfo.String())
+		}
+	})
+
+	// Register handler for ULA (Update Location Answer) from DRA
+	gw.RegisterDraPoolServer(connection.Command{
+		Code:      316,
+		Interface: 16777251,
+		Request:   false,
+	}, func(msg *connection.Message, conn connection.Conn) {
+		msgInfo, err := connection.ParseMessageHeader(msg.Header)
+		if err != nil {
+			gwLog.Errorw("cannot parse header", "error", err)
+			return
+		}
+		session, err := gw.FindSession(msgInfo.HopByHopID)
+		if err != nil {
+			gwLog.Debugw("cannot found session", "msg", msgInfo.String())
+			return
+		}
+		session.ResponseChan <- msg
+	})
+
 	if err := gw.Start(); err != nil {
 		t.Fatalf("Failed to start gateway: %v", err)
 	}
 	defer gw.Stop()
 
 	// Wait for gateway to establish DRA connection
-	time.Sleep(500 * time.Millisecond)
+	time.Sleep(2 * time.Second)
 
 	// Verify DRA connection
 	draStats := gw.GetDRAPool().GetStats()
+	t.Logf("DRA Stats: total=%d, active=%d, healthy=%d",
+		draStats.TotalConnections, draStats.ActiveConnections, draStats.ActiveDRAs)
 	if draStats.ActiveConnections == 0 {
-		t.Fatal("Gateway did not connect to DRA")
+		t.Fatalf("Gateway did not connect to DRA - total=%d, active=%d, healthy=%d",
+			draStats.TotalConnections, draStats.ActiveConnections, draStats.ActiveDRAs)
 	}
 	t.Logf("Gateway connected to DRA: %d active connections", draStats.ActiveConnections)
 
@@ -308,6 +405,22 @@ func TestGatewayPerformance(t *testing.T) {
 				HandleWatchdog:   true,
 			},
 			RecvChannelSize: 1000,
+		},
+		InClientConfig: &client.PoolConfig{
+			OriginHost:        "perf-gw.example.com",
+			OriginRealm:       "example.com",
+			ProductName:       "Perf-Gateway",
+			VendorID:          10415,
+			DialTimeout:       5 * time.Second,
+			SendTimeout:       5 * time.Second,
+			CERTimeout:        5 * time.Second,
+			DWRInterval:       30 * time.Second,
+			DWRTimeout:        10 * time.Second,
+			MaxDWRFailures:    3,
+			ReconnectEnabled:  true,
+			ReconnectInterval: 2 * time.Second,
+			MaxReconnectDelay: 30 * time.Second,
+			ReconnectBackoff:  1.5,
 		},
 		DRAPoolConfig: &client.DRAPoolConfig{
 			DRAs: []*client.DRAServerConfig{
@@ -486,19 +599,57 @@ func TestGatewayFailover(t *testing.T) {
 	defer cancel()
 
 	log := logger.New("failover-test", "debug")
+	draPrimaryLog := log.With("mod", "dra-primary").(logger.Logger)
+	draSecondLog := log.With("mod", "dra-second").(logger.Logger)
+	appSimulator := log.With("mod", "app").(logger.Logger)
+	gwLog := log.With("mod", "gw").(logger.Logger)
 
 	// Start two DRA simulators (primary and secondary)
-	draPrimary := NewDRASimulator(ctx, "127.0.0.1:13871", log)
+	draPrimary := NewDRASimulator(ctx, "127.0.0.1:13871", draPrimaryLog)
 	if err := draPrimary.Start(); err != nil {
 		t.Fatalf("Failed to start primary DRA: %v", err)
 	}
-	defer draPrimary.Stop()
+	// Note: draPrimary is manually stopped in the test to simulate failover, so no defer
 
-	draSecondary := NewDRASimulator(ctx, "127.0.0.1:13872", log)
+	draSecondary := NewDRASimulator(ctx, "127.0.0.1:13872", draSecondLog)
 	if err := draSecondary.Start(); err != nil {
 		t.Fatalf("Failed to start secondary DRA: %v", err)
 	}
 	defer draSecondary.Stop()
+
+	// Register ULR handlers on both DRAs
+	for _, dra := range []*DRASimulator{draPrimary, draSecondary} {
+		dra.server.HandleFunc(server.Command{
+			Code:      316,
+			Interface: 16777251,
+			Request:   true,
+		}, func(msg *server.Message, conn server.Conn) {
+			ulr := &s6a.UpdateLocationRequest{}
+			err := ulr.Unmarshal(append(msg.Header, msg.Body...))
+			if err != nil {
+				log.Errorw("cannot unmarshal ULR", "error", err)
+				return
+			}
+
+			ula := s6a.NewUpdateLocationAnswer()
+			ula.SessionId = models_base.UTF8String("failover-test-session")
+			ula.AuthSessionState = models_base.Enumerated(1)
+			ula.OriginHost = models_base.DiameterIdentity("dra-simulator.example.com")
+			ula.OriginRealm = models_base.DiameterIdentity("example.com")
+			resultCode := models_base.Unsigned32(2001)
+			ula.ResultCode = &resultCode
+
+			ula.Header.HopByHopID = ulr.Header.HopByHopID
+			ula.Header.EndToEndID = ulr.Header.EndToEndID
+
+			b, err := ula.Marshal()
+			if err != nil {
+				log.Errorw("cannot marshal ULA", "error", err)
+				return
+			}
+			conn.Write(b)
+		})
+	}
 
 	time.Sleep(200 * time.Millisecond)
 
@@ -522,6 +673,22 @@ func TestGatewayFailover(t *testing.T) {
 				HandleWatchdog:   true,
 			},
 			RecvChannelSize: 100,
+		},
+		InClientConfig: &client.PoolConfig{
+			OriginHost:        "failover-gw.example.com",
+			OriginRealm:       "example.com",
+			ProductName:       "Failover-Gateway",
+			VendorID:          10415,
+			DialTimeout:       5 * time.Second,
+			SendTimeout:       5 * time.Second,
+			CERTimeout:        5 * time.Second,
+			DWRInterval:       5 * time.Second,
+			DWRTimeout:        2 * time.Second,
+			MaxDWRFailures:    2,
+			ReconnectEnabled:  true,
+			ReconnectInterval: 2 * time.Second,
+			MaxReconnectDelay: 10 * time.Second,
+			ReconnectBackoff:  1.5,
 		},
 		DRAPoolConfig: &client.DRAPoolConfig{
 			DRAs: []*client.DRAServerConfig{
@@ -557,6 +724,7 @@ func TestGatewayFailover(t *testing.T) {
 			SendBufferSize:      100,
 			RecvBufferSize:      100,
 		},
+		DRASupported:   true,
 		OriginHost:     "failover-gw.example.com",
 		OriginRealm:    "example.com",
 		ProductName:    "Failover-Gateway",
@@ -564,10 +732,54 @@ func TestGatewayFailover(t *testing.T) {
 		SessionTimeout: 10 * time.Second,
 	}
 
-	gw, err := gateway.NewGateway(gwConfig, log)
+	gw, err := gateway.NewGateway(gwConfig, gwLog)
 	if err != nil {
 		t.Fatalf("Failed to create gateway: %v", err)
 	}
+
+	// Register ULR handlers on gateway
+	gw.RegisterInServer(connection.Command{
+		Code:      316,
+		Interface: 16777251,
+		Request:   true,
+	}, func(msg *connection.Message, conn connection.Conn) {
+		msgInfo, err := connection.ParseMessageHeader(msg.Header)
+		if err != nil {
+			log.Errorw("cannot parse header", "error", err)
+			return
+		}
+		rsp := make(chan *connection.Message, 1)
+		gw.StoreSession(msgInfo.HopByHopID, &gateway.Session{
+			Conn:         conn,
+			CreatedAt:    time.Now(),
+			ResponseChan: rsp,
+		})
+		gw.GetDRAPool().Send(append(msg.Header, msg.Body...))
+		select {
+		case rMsg := <-rsp:
+			conn.Write(append(rMsg.Header, rMsg.Body...))
+		case <-time.After(5 * time.Second):
+			log.Errorw("timeout to receive rsp", "msg", msgInfo.String())
+		}
+	})
+
+	gw.RegisterDraPoolServer(connection.Command{
+		Code:      316,
+		Interface: 16777251,
+		Request:   false,
+	}, func(msg *connection.Message, conn connection.Conn) {
+		msgInfo, err := connection.ParseMessageHeader(msg.Header)
+		if err != nil {
+			log.Errorw("cannot parse header", "error", err)
+			return
+		}
+		session, err := gw.FindSession(msgInfo.HopByHopID)
+		if err != nil {
+			log.Debugw("cannot found session", "msg", msgInfo.String())
+			return
+		}
+		session.ResponseChan <- msg
+	})
 
 	if err := gw.Start(); err != nil {
 		t.Fatalf("Failed to start gateway: %v", err)
@@ -584,7 +796,7 @@ func TestGatewayFailover(t *testing.T) {
 	t.Logf("Initial active priority: %d", activePriority)
 
 	// Create Logic App client
-	logicApp := NewLogicAppSimulator(ctx, 0, "127.0.0.1:13873", log)
+	logicApp := NewLogicAppSimulator(ctx, 0, "127.0.0.1:13873", appSimulator)
 	if err := logicApp.Connect(); err != nil {
 		t.Fatalf("Failed to connect Logic App: %v", err)
 	}
@@ -606,13 +818,31 @@ func TestGatewayFailover(t *testing.T) {
 	t.Log("Stopping primary DRA to trigger failover...")
 	draPrimary.Stop()
 
-	// Wait for failover to occur
-	time.Sleep(15 * time.Second)
+	// Send multiple requests to force connection failure detection
+	// The server has stopped but connections may still be lingering
+	// Sending requests will trigger failures that the health check will detect
+	t.Log("Sending requests to trigger connection failure detection...")
+	for i := 0; i < 5; i++ {
+		logicApp.SendRequest(316, 16777251) // Ignore errors, we expect failures
+		time.Sleep(500 * time.Millisecond)
+	}
+
+	// Wait for failover to occur with polling
+	// Poll for up to 15 seconds for priority to change from 1 to 2
+	failoverDetected := false
+	for i := 0; i < 30; i++ { // 30 * 500ms = 15 seconds max
+		time.Sleep(500 * time.Millisecond)
+		activePriority = gw.GetDRAPool().GetActivePriority()
+		if activePriority == 2 {
+			failoverDetected = true
+			t.Logf("Failover detected after %d ms", (i+1)*500)
+			break
+		}
+	}
 
 	// Verify failover to priority 2
-	activePriority = gw.GetDRAPool().GetActivePriority()
-	if activePriority != 2 {
-		t.Errorf("Expected failover to priority 2, got %d", activePriority)
+	if !failoverDetected {
+		t.Errorf("Expected failover to priority 2, got %d after 15s", activePriority)
 	}
 	t.Logf("Failover successful: active priority = %d", activePriority)
 
@@ -669,6 +899,22 @@ func BenchmarkGatewayThroughput(b *testing.B) {
 			},
 			RecvChannelSize: 10000,
 		},
+		InClientConfig: &client.PoolConfig{
+			OriginHost:        "bench-gw.example.com",
+			OriginRealm:       "example.com",
+			ProductName:       "Bench-Gateway",
+			VendorID:          10415,
+			DialTimeout:       5 * time.Second,
+			SendTimeout:       10 * time.Second,
+			CERTimeout:        5 * time.Second,
+			DWRInterval:       30 * time.Second,
+			DWRTimeout:        10 * time.Second,
+			MaxDWRFailures:    3,
+			ReconnectEnabled:  true,
+			ReconnectInterval: 2 * time.Second,
+			MaxReconnectDelay: 30 * time.Second,
+			ReconnectBackoff:  1.5,
+		},
 		DRAPoolConfig: &client.DRAPoolConfig{
 			DRAs: []*client.DRAServerConfig{
 				{Name: "DRA-BENCH", Host: "127.0.0.1", Port: 13874, Priority: 1, Weight: 100},
@@ -690,6 +936,7 @@ func BenchmarkGatewayThroughput(b *testing.B) {
 			SendBufferSize:      10000,
 			RecvBufferSize:      10000,
 		},
+		DRASupported:   true,
 		OriginHost:     "bench-gw.example.com",
 		OriginRealm:    "example.com",
 		ProductName:    "Bench-Gateway",

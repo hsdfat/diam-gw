@@ -106,9 +106,10 @@ func (d *DRASimulator) handleCER(msg *server.Message, conn server.Conn) {
 		"remote", conn.RemoteAddr().String(),
 		"length", msg.Length)
 
-	// Unmarshal CER
+	// Unmarshal CER (need full message: header + body)
 	cer := &base.CapabilitiesExchangeRequest{}
-	if err := cer.Unmarshal(msg.Header); err != nil {
+	fullMsg := append(msg.Header, msg.Body...)
+	if err := cer.Unmarshal(fullMsg); err != nil {
 		d.logger.Errorw("Failed to unmarshal CER", "error", err)
 		return
 	}
@@ -165,9 +166,10 @@ func (d *DRASimulator) handleCER(msg *server.Message, conn server.Conn) {
 func (d *DRASimulator) handleDWR(msg *server.Message, conn server.Conn) {
 	d.logger.Debugw("DWR received", "remote", conn.RemoteAddr().String())
 
-	// Unmarshal DWR
+	// Unmarshal DWR (need full message: header + body)
 	dwr := &base.DeviceWatchdogRequest{}
-	if err := dwr.Unmarshal(msg.Header); err != nil {
+	fullMsg := append(msg.Header, msg.Body...)
+	if err := dwr.Unmarshal(fullMsg); err != nil {
 		d.logger.Errorw("Failed to unmarshal DWR", "error", err)
 		return
 	}
@@ -202,9 +204,10 @@ func (d *DRASimulator) handleDWR(msg *server.Message, conn server.Conn) {
 func (d *DRASimulator) handleDPR(msg *server.Message, conn server.Conn) {
 	d.logger.Infow("DPR received", "remote", conn.RemoteAddr().String())
 
-	// Unmarshal DPR
+	// Unmarshal DPR (need full message: header + body)
 	dpr := &base.DisconnectPeerRequest{}
-	if err := dpr.Unmarshal(msg.Header); err != nil {
+	fullMsg := append(msg.Header, msg.Body...)
+	if err := dpr.Unmarshal(fullMsg); err != nil {
 		d.logger.Errorw("Failed to unmarshal DPR", "error", err)
 		return
 	}

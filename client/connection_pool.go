@@ -341,7 +341,17 @@ func (p *ConnectionPool) GetConnectionStates() map[string]ConnectionState {
 
 // IsHealthy returns true if at least one connection is active
 func (p *ConnectionPool) IsHealthy() bool {
-	return p.getActiveCount() > 0
+	// Check actual connection states instead of relying on activeCount
+	// which is not updated when connections fail during runtime
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+
+	for _, conn := range p.connections {
+		if conn.IsActive() {
+			return true
+		}
+	}
+	return false
 }
 
 // WaitForConnection waits until at least one connection is active

@@ -63,6 +63,10 @@ type Connection struct {
 
 	reconnectDisabled bool
 
+	// Failure callback
+	onFailure   func(error)
+	onFailureMu sync.RWMutex
+
 	// Statistics
 	stats  ConnectionStats
 	logger logger.Logger
@@ -81,6 +85,27 @@ type ConnectionStats struct {
 
 func (c *Connection) DisableReconnect() {
 	c.reconnectDisabled = true
+}
+
+// SetOnFailure sets the failure callback
+// The callback will be invoked when the connection fails (e.g., disconnect, DWR timeout)
+// This allows the pool or other managers to react immediately to failures
+func (c *Connection) SetOnFailure(callback func(error)) {
+	c.onFailureMu.Lock()
+	defer c.onFailureMu.Unlock()
+	c.onFailure = callback
+}
+
+// callOnFailure safely calls the failure callback if set
+func (c *Connection) callOnFailure(err error) {
+	c.onFailureMu.RLock()
+	callback := c.onFailure
+	c.onFailureMu.RUnlock()
+
+	if callback != nil {
+		// Call in goroutine to avoid blocking connection cleanup
+		go callback(err)
+	}
 }
 
 // GetLastError returns the last error
@@ -693,6 +718,9 @@ func (c *Connection) handleFailure(err error) {
 	c.stats.SetLastError(err)
 	c.setState(StateFailed)
 	c.close()
+
+	// Notify pool or other managers immediately
+	c.callOnFailure(err)
 
 	// Attempt reconnection
 	if !c.reconnectDisabled {

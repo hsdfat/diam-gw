@@ -28,7 +28,7 @@ func TestServerPerformanceMultipleInterfacesConcurrent(t *testing.T) {
 	registerBaseProtocolHandlers(server, t)
 
 	// Register S13 ECR handler
-	server.HandleFunc(Command{Interface: 16777252, Code: 324}, func(msg *Message, conn Conn) {
+	server.HandleFunc(Command{Interface: 16777252, Code: 324, Request: true}, func(msg *Message, conn Conn) {
 		ecr := &s13.MEIdentityCheckRequest{}
 		fullMsg := append(msg.Header, msg.Body...)
 		ecr.Unmarshal(fullMsg)
@@ -50,7 +50,7 @@ func TestServerPerformanceMultipleInterfacesConcurrent(t *testing.T) {
 	})
 
 	// Register S6a AIR handler
-	server.HandleFunc(Command{Interface: 16777251, Code: 318}, func(msg *Message, conn Conn) {
+	server.HandleFunc(Command{Interface: 16777251, Code: 318, Request: true}, func(msg *Message, conn Conn) {
 		air := &s6a.AuthenticationInformationRequest{}
 		fullMsg := append(msg.Header, msg.Body...)
 		air.Unmarshal(fullMsg)

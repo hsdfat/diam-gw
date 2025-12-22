@@ -107,6 +107,19 @@ type ManagedConnection struct {
 	handleFn func(DiamConnectionInfo)
 }
 
+// onConnectionFailure is called when the underlying connection fails
+// This allows immediate cleanup instead of waiting for health check
+func (mc *ManagedConnection) onConnectionFailure(err error) {
+	mc.pool.logger.Warnw("Connection failure detected",
+		"remote_addr", mc.address,
+		"error", err,
+		"action", "immediate_cleanup")
+
+	// Cancel the managed connection context to trigger cleanup
+	// The lifecycle manager will handle removing from pool
+	mc.cancel()
+}
+
 // PoolMetricsSnapshot is a point-in-time snapshot of pool metrics
 type PoolMetricsSnapshot struct {
 	ActiveConnections      int64
@@ -403,16 +416,7 @@ func (p *AddressConnectionPool) establishConnection(ctx context.Context, remoteA
 	// Create the connection
 	conn := NewConnection(connCtx, connID, draConfig, p.logger)
 
-	// Start the connection (this performs CER/CEA)
-	if err := conn.Start(); err != nil {
-		connCancel()
-		return nil, fmt.Errorf("failed to start connection: %w", err)
-	}
-	if !p.config.ReconnectEnabled {
-		conn.DisableReconnect()
-	}
-
-	// Create managed connection
+	// Create managed connection (before starting, so we can set callback)
 	mc := &ManagedConnection{
 		conn:      conn,
 		address:   remoteAddr,
@@ -421,6 +425,18 @@ func (p *AddressConnectionPool) establishConnection(ctx context.Context, remoteA
 		ctx:       connCtx,
 		cancel:    connCancel,
 		handleFn:  p.handleFn,
+	}
+
+	// Set failure callback for immediate cleanup
+	conn.SetOnFailure(mc.onConnectionFailure)
+
+	// Start the connection (this performs CER/CEA)
+	if err := conn.Start(); err != nil {
+		connCancel()
+		return nil, fmt.Errorf("failed to start connection: %w", err)
+	}
+	if !p.config.ReconnectEnabled {
+		conn.DisableReconnect()
 	}
 
 	// Start lifecycle management

@@ -247,7 +247,7 @@ func TestServerS13ECRExchange(t *testing.T) {
 	var handlerMu sync.Mutex
 
 	// Register S13 ECR handler
-	server.HandleFunc(Command{Interface: 16777252, Code: 324}, func(msg *Message, conn Conn) {
+	server.HandleFunc(Command{Interface: 16777252, Code: 324, Request: true}, func(msg *Message, conn Conn) {
 		handlerMu.Lock()
 		handlerCalled = true
 		handlerMu.Unlock()
@@ -641,7 +641,7 @@ func ptrUTF8String(s string) *models_base.UTF8String {
 // registerBaseProtocolHandlers registers handlers for base Diameter protocol messages
 func registerBaseProtocolHandlers(server *Server, t *testing.T) {
 	// CER/CEA handler
-	server.HandleFunc(Command{Interface: 0, Code: 257}, func(msg *Message, conn Conn) {
+	server.HandleFunc(Command{Interface: 0, Code: 257, Request: true}, func(msg *Message, conn Conn) {
 		cer := &base.CapabilitiesExchangeRequest{}
 		fullMsg := append(msg.Header, msg.Body...)
 		if err := cer.Unmarshal(fullMsg); err != nil {
@@ -664,7 +664,7 @@ func registerBaseProtocolHandlers(server *Server, t *testing.T) {
 	})
 
 	// DWR/DWA handler
-	server.HandleFunc(Command{Interface: 0, Code: 280}, func(msg *Message, conn Conn) {
+	server.HandleFunc(Command{Interface: 0, Code: 280, Request: true}, func(msg *Message, conn Conn) {
 		dwr := &base.DeviceWatchdogRequest{}
 		fullMsg := append(msg.Header, msg.Body...)
 		if err := dwr.Unmarshal(fullMsg); err != nil {
@@ -684,7 +684,7 @@ func registerBaseProtocolHandlers(server *Server, t *testing.T) {
 	})
 
 	// DPR/DPA handler
-	server.HandleFunc(Command{Interface: 0, Code: 282}, func(msg *Message, conn Conn) {
+	server.HandleFunc(Command{Interface: 0, Code: 282, Request: true}, func(msg *Message, conn Conn) {
 		dpr := &base.DisconnectPeerRequest{}
 		fullMsg := append(msg.Header, msg.Body...)
 		if err := dpr.Unmarshal(fullMsg); err != nil {
@@ -938,7 +938,7 @@ func TestServerPerformanceThroughput(t *testing.T) {
 	registerBaseProtocolHandlers(server, t)
 
 	// Register S13 handler
-	server.HandleFunc(Command{Interface: 16777252, Code: 324}, func(msg *Message, conn Conn) {
+	server.HandleFunc(Command{Interface: 16777252, Code: 324, Request: true}, func(msg *Message, conn Conn) {
 		ecr := &s13.MEIdentityCheckRequest{}
 		fullMsg := append(msg.Header, msg.Body...)
 		ecr.Unmarshal(fullMsg)
@@ -1354,7 +1354,7 @@ func TestServerInterfaceStatsS13(t *testing.T) {
 	registerBaseProtocolHandlers(server, t)
 
 	// Register S13 ECR handler
-	server.HandleFunc(Command{Interface: 16777252, Code: 324}, func(msg *Message, conn Conn) {
+	server.HandleFunc(Command{Interface: 16777252, Code: 324, Request: true}, func(msg *Message, conn Conn) {
 		ecr := &s13.MEIdentityCheckRequest{}
 		fullMsg := append(msg.Header, msg.Body...)
 		ecr.Unmarshal(fullMsg)
@@ -1460,7 +1460,7 @@ func TestServerInterfaceStatsS6a(t *testing.T) {
 
 	// Register S6a AIR handler (Authentication-Information-Request)
 	var airHandlerCalled bool
-	server.HandleFunc(Command{Interface: 16777251, Code: 318}, func(msg *Message, conn Conn) {
+	server.HandleFunc(Command{Interface: 16777251, Code: 318, Request: true}, func(msg *Message, conn Conn) {
 		airHandlerCalled = true
 		t.Logf("AIR handler called, message length=%d", msg.Length)
 		air := &s6a.AuthenticationInformationRequest{}
@@ -1492,7 +1492,7 @@ func TestServerInterfaceStatsS6a(t *testing.T) {
 	})
 
 	// Register S6a ULR handler (Update-Location-Request)
-	server.HandleFunc(Command{Interface: 16777251, Code: 316}, func(msg *Message, conn Conn) {
+	server.HandleFunc(Command{Interface: 16777251, Code: 316, Request: true}, func(msg *Message, conn Conn) {
 		ulr := &s6a.UpdateLocationRequest{}
 		fullMsg := append(msg.Header, msg.Body...)
 		if err := ulr.Unmarshal(fullMsg); err != nil {
@@ -1678,7 +1678,7 @@ func TestServerMultipleInterfacesStats(t *testing.T) {
 	registerBaseProtocolHandlers(server, t)
 
 	// Register S13 handler
-	server.HandleFunc(Command{Interface: 16777252, Code: 324}, func(msg *Message, conn Conn) {
+	server.HandleFunc(Command{Interface: 16777252, Code: 324, Request: true}, func(msg *Message, conn Conn) {
 		ecr := &s13.MEIdentityCheckRequest{}
 		fullMsg := append(msg.Header, msg.Body...)
 		ecr.Unmarshal(fullMsg)
@@ -1700,7 +1700,7 @@ func TestServerMultipleInterfacesStats(t *testing.T) {
 	})
 
 	// Register S6a handler
-	server.HandleFunc(Command{Interface: 16777251, Code: 318}, func(msg *Message, conn Conn) {
+	server.HandleFunc(Command{Interface: 16777251, Code: 318, Request: true}, func(msg *Message, conn Conn) {
 		air := &s6a.AuthenticationInformationRequest{}
 		fullMsg := append(msg.Header, msg.Body...)
 		air.Unmarshal(fullMsg)

@@ -23,12 +23,14 @@ var (
 	originHost  = flag.String("origin-host", "diameter-gw.example.com", "Gateway Origin-Host")
 	originRealm = flag.String("origin-realm", "example.com", "Gateway Origin-Realm")
 	productName = flag.String("product", "Diameter-Gateway", "Product name")
+	vendorID    = flag.Int("vendor-id", 10415, "Vendor ID (default: 3GPP)")
 
 	// DRA configuration
 	dra1Host     = flag.String("dra1-host", "127.0.0.1", "Primary DRA host")
 	dra1Port     = flag.Int("dra1-port", 3869, "Primary DRA port")
 	dra2Host     = flag.String("dra2-host", "127.0.0.1", "Secondary DRA host")
 	dra2Port     = flag.Int("dra2-port", 3870, "Secondary DRA port")
+	draSupported = flag.Bool("dra-supported", true, "Enable DRA support")
 
 	// Advanced settings
 	maxConnections  = flag.Int("max-connections", 1000, "Maximum inbound connections")
@@ -37,6 +39,17 @@ var (
 	enableReqLog    = flag.Bool("log-requests", false, "Enable request logging")
 	enableRespLog   = flag.Bool("log-responses", false, "Enable response logging")
 	statsInterval   = flag.Duration("stats-interval", 60*time.Second, "Statistics logging interval")
+
+	// Timeout settings
+	readTimeout      = flag.Duration("read-timeout", 30*time.Second, "Connection read timeout")
+	writeTimeout     = flag.Duration("write-timeout", 10*time.Second, "Connection write timeout")
+	watchdogInterval = flag.Duration("watchdog-interval", 30*time.Second, "Watchdog interval")
+	watchdogTimeout  = flag.Duration("watchdog-timeout", 10*time.Second, "Watchdog timeout")
+	connectTimeout   = flag.Duration("connect-timeout", 10*time.Second, "DRA connect timeout")
+	cerTimeout       = flag.Duration("cer-timeout", 5*time.Second, "CER timeout")
+	dwrInterval      = flag.Duration("dwr-interval", 30*time.Second, "DWR interval")
+	dwrTimeout       = flag.Duration("dwr-timeout", 10*time.Second, "DWR timeout")
+	maxDWRFailures   = flag.Int("max-dwr-failures", 3, "Maximum DWR failures before reconnect")
 )
 
 func main() {
@@ -91,14 +104,18 @@ func main() {
 
 func createGatewayConfig() *gateway.GatewayConfig {
 	// Server configuration (inbound from Logic Apps)
-	serverConfig := &server.ServerConfig{
+	inServerConfig := &server.ServerConfig{
 		ListenAddress:  *listenAddr,
 		MaxConnections: *maxConnections,
 		ConnectionConfig: &server.ConnectionConfig{
-			ReadTimeout:      30 * time.Second,
-			WriteTimeout:     10 * time.Second,
-			WatchdogInterval: 30 * time.Second,
-			WatchdogTimeout:  10 * time.Second,
+			OriginHost:       *originHost,
+			OriginRealm:      *originRealm,
+			ProductName:      *productName,
+			VendorID:         uint32(*vendorID),
+			ReadTimeout:      *readTimeout,
+			WriteTimeout:     *writeTimeout,
+			WatchdogInterval: *watchdogInterval,
+			WatchdogTimeout:  *watchdogTimeout,
 			MaxMessageSize:   65535,
 			SendChannelSize:  100,
 			RecvChannelSize:  100,
@@ -125,12 +142,16 @@ func createGatewayConfig() *gateway.GatewayConfig {
 				Weight:   100,
 			},
 		},
+		OriginHost:          *originHost,
+		OriginRealm:         *originRealm,
+		ProductName:         *productName,
+		VendorID:            uint32(*vendorID),
 		ConnectionsPerDRA:   *connsPerDRA,
-		ConnectTimeout:      10 * time.Second,
-		CERTimeout:          5 * time.Second,
-		DWRInterval:         30 * time.Second,
-		DWRTimeout:          10 * time.Second,
-		MaxDWRFailures:      3,
+		ConnectTimeout:      *connectTimeout,
+		CERTimeout:          *cerTimeout,
+		DWRInterval:         *dwrInterval,
+		DWRTimeout:          *dwrTimeout,
+		MaxDWRFailures:      *maxDWRFailures,
 		HealthCheckInterval: 10 * time.Second,
 		ReconnectInterval:   5 * time.Second,
 		MaxReconnectDelay:   5 * time.Minute,
@@ -139,13 +160,37 @@ func createGatewayConfig() *gateway.GatewayConfig {
 		RecvBufferSize:      100,
 	}
 
+	// Internal client pool configuration (for forwarding to Logic Apps)
+	inClientConfig := &client.PoolConfig{
+		OriginHost:          *originHost,
+		OriginRealm:         *originRealm,
+		ProductName:         *productName,
+		VendorID:            uint32(*vendorID),
+		DialTimeout:         5 * time.Second,
+		SendTimeout:         10 * time.Second,
+		CERTimeout:          *cerTimeout,
+		DWRInterval:         *dwrInterval,
+		DWRTimeout:          *dwrTimeout,
+		MaxDWRFailures:      *maxDWRFailures,
+		AuthAppIDs:          []uint32{16777251, 16777252}, // S6a and S13
+		SendBufferSize:      1000,
+		RecvBufferSize:      1000,
+		ReconnectEnabled:    false,
+		ReconnectInterval:   2 * time.Second,
+		MaxReconnectDelay:   30 * time.Second,
+		ReconnectBackoff:    1.5,
+		HealthCheckInterval: 10 * time.Second,
+	}
+
 	return &gateway.GatewayConfig{
-		ServerConfig:          serverConfig,
+		InServerConfig:        inServerConfig,
 		DRAPoolConfig:         draPoolConfig,
+		InClientConfig:        inClientConfig,
+		DRASupported:          *draSupported,
 		OriginHost:            *originHost,
 		OriginRealm:           *originRealm,
 		ProductName:           *productName,
-		VendorID:              10415, // 3GPP
+		VendorID:              uint32(*vendorID),
 		SessionTimeout:        *sessionTimeout,
 		EnableRequestLogging:  *enableReqLog,
 		EnableResponseLogging: *enableRespLog,

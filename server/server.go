@@ -108,7 +108,7 @@ type Handler = connection.Handler
 type Server struct {
 	config      *ServerConfig
 	listener    net.Listener
-	connections map[string]*Connection
+	connections map[string]connection.Conn
 	connMu      sync.RWMutex
 	ctx         context.Context
 	cancel      context.CancelFunc
@@ -232,7 +232,7 @@ func NewServer(config *ServerConfig, log logger.Logger) *Server {
 
 	s := &Server{
 		config:      config,
-		connections: make(map[string]*Connection),
+		connections: make(map[string]connection.Conn),
 		ctx:         ctx,
 		cancel:      cancel,
 		logger:      log,
@@ -374,6 +374,9 @@ func (s *Server) Start() error {
 			s.stats.ActiveConnections.Add(^uint64(0)) // Decrement
 			continue
 		} else {
+			s.connMu.Lock()
+			s.connections[rw.RemoteAddr().String()] = c.writer
+			s.connMu.Unlock()
 			go c.serve()
 		}
 	}
@@ -415,7 +418,7 @@ func (s *Server) Receive() <-chan *MessageContext {
 }
 
 // GetConnection returns a connection by remote address
-func (s *Server) GetConnection(addr string) (*Connection, bool) {
+func (s *Server) GetConnection(addr string) (connection.Conn, bool) {
 	s.connMu.RLock()
 	defer s.connMu.RUnlock()
 	conn, exists := s.connections[addr]
@@ -423,11 +426,11 @@ func (s *Server) GetConnection(addr string) (*Connection, bool) {
 }
 
 // GetAllConnections returns all active connections
-func (s *Server) GetAllConnections() []*Connection {
+func (s *Server) GetAllConnections() []connection.Conn {
 	s.connMu.RLock()
 	defer s.connMu.RUnlock()
 
-	conns := make([]*Connection, 0, len(s.connections))
+	conns := make([]connection.Conn, 0, len(s.connections))
 	for _, conn := range s.connections {
 		conns = append(conns, conn)
 	}
@@ -608,7 +611,7 @@ func (s *Server) Broadcast(msg []byte) error {
 
 	var lastErr error
 	for addr, conn := range s.connections {
-		if err := conn.Send(msg); err != nil {
+		if _, err := conn.Write(msg); err != nil {
 			s.logger.Errorw("Failed to send message", "address", addr, "error", err)
 			lastErr = err
 			s.stats.Errors.Add(1)
