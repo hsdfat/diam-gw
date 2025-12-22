@@ -55,11 +55,19 @@ jobs:
           FINAL_TPS=$(grep "Testing TPS:" test-output.log | tail -1 | awk '{print $NF}' 2>/dev/null || echo "N/A")
           echo "final_tps=$FINAL_TPS" >> $GITHUB_OUTPUT
 
-          # Get Gateway InClient stats
-          GW_REQUESTS=$(grep "Gateway InClient" test-output.log | tail -1 | grep -oP 'Requests: \K\d+' 2>/dev/null || echo "0")
-          GW_RESPONSES=$(grep "Gateway InClient" test-output.log | tail -1 | grep -oP 'Responses: \K\d+' 2>/dev/null || echo "0")
-          GW_ERRORS=$(grep "Gateway InClient" test-output.log | tail -1 | grep -oP 'Errors: \K\d+' 2>/dev/null || echo "0")
-          GW_TIMEOUTS=$(grep "Gateway InClient" test-output.log | tail -1 | grep -oP 'Timeouts: \K\d+' 2>/dev/null || echo "0")
+          # Get Gateway InClient stats (using sed for portability)
+          GW_LINE=$(grep "Gateway InClient" test-output.log | tail -1 || echo "")
+          if [ -n "$GW_LINE" ]; then
+            GW_REQUESTS=$(echo "$GW_LINE" | sed -n 's/.*Requests: \([0-9]*\).*/\1/p')
+            GW_RESPONSES=$(echo "$GW_LINE" | sed -n 's/.*Responses: \([0-9]*\).*/\1/p')
+            GW_ERRORS=$(echo "$GW_LINE" | sed -n 's/.*Errors: \([0-9]*\).*/\1/p')
+            GW_TIMEOUTS=$(echo "$GW_LINE" | sed -n 's/.*Timeouts: \([0-9]*\).*/\1/p')
+          else
+            GW_REQUESTS="0"
+            GW_RESPONSES="0"
+            GW_ERRORS="0"
+            GW_TIMEOUTS="0"
+          fi
 
           echo "gw_requests=$GW_REQUESTS" >> $GITHUB_OUTPUT
           echo "gw_responses=$GW_RESPONSES" >> $GITHUB_OUTPUT
