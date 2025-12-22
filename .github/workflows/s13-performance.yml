@@ -45,21 +45,21 @@ jobs:
         if: always()
         run: |
           # Extract TPS progression table
-          awk '/TPS Progression:/,/========/' test-output.log > tps-results.txt
+          awk '/TPS Progression:/,/========/' test-output.log > tps-results.txt || echo "No TPS progression data found" > tps-results.txt
 
-          # Count errors
-          ERROR_COUNT=$(grep -c "Cannot send to EIR" test-output.log || echo "0")
+          # Count errors (grep -c returns 0 if no matches, use || true to handle exit code)
+          ERROR_COUNT=$(grep -c "Cannot send to EIR" test-output.log 2>/dev/null || echo "0")
           echo "error_count=$ERROR_COUNT" >> $GITHUB_OUTPUT
 
           # Extract component stats for final TPS level
-          FINAL_TPS=$(grep "Testing TPS:" test-output.log | tail -1 | awk '{print $NF}')
+          FINAL_TPS=$(grep "Testing TPS:" test-output.log | tail -1 | awk '{print $NF}' 2>/dev/null || echo "N/A")
           echo "final_tps=$FINAL_TPS" >> $GITHUB_OUTPUT
 
           # Get Gateway InClient stats
-          GW_REQUESTS=$(grep "Gateway InClient" test-output.log | tail -1 | grep -oP 'Requests: \K\d+' || echo "0")
-          GW_RESPONSES=$(grep "Gateway InClient" test-output.log | tail -1 | grep -oP 'Responses: \K\d+' || echo "0")
-          GW_ERRORS=$(grep "Gateway InClient" test-output.log | tail -1 | grep -oP 'Errors: \K\d+' || echo "0")
-          GW_TIMEOUTS=$(grep "Gateway InClient" test-output.log | tail -1 | grep -oP 'Timeouts: \K\d+' || echo "0")
+          GW_REQUESTS=$(grep "Gateway InClient" test-output.log | tail -1 | grep -oP 'Requests: \K\d+' 2>/dev/null || echo "0")
+          GW_RESPONSES=$(grep "Gateway InClient" test-output.log | tail -1 | grep -oP 'Responses: \K\d+' 2>/dev/null || echo "0")
+          GW_ERRORS=$(grep "Gateway InClient" test-output.log | tail -1 | grep -oP 'Errors: \K\d+' 2>/dev/null || echo "0")
+          GW_TIMEOUTS=$(grep "Gateway InClient" test-output.log | tail -1 | grep -oP 'Timeouts: \K\d+' 2>/dev/null || echo "0")
 
           echo "gw_requests=$GW_REQUESTS" >> $GITHUB_OUTPUT
           echo "gw_responses=$GW_RESPONSES" >> $GITHUB_OUTPUT

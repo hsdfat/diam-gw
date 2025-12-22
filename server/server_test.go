@@ -1285,8 +1285,9 @@ func TestServerPerformanceUnderLoad(t *testing.T) {
 				dwr := base.NewDeviceWatchdogRequest()
 				dwr.OriginHost = models_base.DiameterIdentity("test-client.example.com")
 				dwr.OriginRealm = models_base.DiameterIdentity("example.com")
-				dwr.Header.HopByHopID = uint32(workerID*10000 + int(totalSent))
-				dwr.Header.EndToEndID = uint32(workerID*10000 + int(totalSent) + 50000)
+				currentCount := atomic.LoadUint64(&totalSent)
+				dwr.Header.HopByHopID = uint32(workerID*10000 + int(currentCount))
+				dwr.Header.EndToEndID = uint32(workerID*10000 + int(currentCount) + 50000)
 
 				dwrBytes, err := dwr.Marshal()
 				if err != nil {
