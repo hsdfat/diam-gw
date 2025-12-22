@@ -840,7 +840,19 @@ func (c *Connection) unregisterPending(hopByHopID uint32) {
 
 // GetStats returns connection statistics
 func (c *Connection) GetStats() ConnectionStats {
-	return c.stats
+	// Create a snapshot of stats using atomic loads to avoid data races
+	stats := ConnectionStats{}
+	stats.MessagesSent.Store(c.stats.MessagesSent.Load())
+	stats.MessagesReceived.Store(c.stats.MessagesReceived.Load())
+	stats.BytesSent.Store(c.stats.BytesSent.Load())
+	stats.BytesReceived.Store(c.stats.BytesReceived.Load())
+	stats.Reconnects.Store(c.stats.Reconnects.Load())
+
+	c.stats.lastErrorMu.RLock()
+	stats.lastError = c.stats.lastError
+	c.stats.lastErrorMu.RUnlock()
+
+	return stats
 }
 
 // SendWithContext sends a Diameter message with context support

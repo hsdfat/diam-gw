@@ -108,6 +108,7 @@ type Handler = connection.Handler
 type Server struct {
 	config      *ServerConfig
 	listener    net.Listener
+	listenerMu  sync.RWMutex // Protects listener
 	connections map[string]connection.Conn
 	connMu      sync.RWMutex
 	ctx         context.Context
@@ -318,7 +319,9 @@ func (s *Server) Start() error {
 		return fmt.Errorf("failed to listen on %s: %w", s.config.ListenAddress, err)
 	}
 
+	s.listenerMu.Lock()
 	s.listener = listener
+	s.listenerMu.Unlock()
 	s.logger.Infow("Server listening", "address", s.config.ListenAddress)
 
 	var tempDelay time.Duration // how long to sleep on accept failure
@@ -387,11 +390,13 @@ func (s *Server) Stop() error {
 	s.logger.Infow("Stopping server")
 	s.cancel()
 
+	s.listenerMu.Lock()
 	if s.listener != nil {
 		if err := s.listener.Close(); err != nil {
 			s.logger.Errorw("Failed to close listener", "error", err)
 		}
 	}
+	s.listenerMu.Unlock()
 
 	// Close all connections
 	s.connMu.Lock()
@@ -579,6 +584,8 @@ func (s *Server) GetCommandStats(appID int, cmdCode int) (CommandStatsSnapshot, 
 
 // GetListener returns the server listener (for testing)
 func (s *Server) GetListener() net.Listener {
+	s.listenerMu.RLock()
+	defer s.listenerMu.RUnlock()
 	return s.listener
 }
 

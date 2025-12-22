@@ -232,14 +232,14 @@ func TestDRAPoolRouting(t *testing.T) {
 	if err := pool.Start(); err != nil {
 		t.Fatalf("Failed to start DRA pool: %v", err)
 	}
-	var totalResp = 0
+	var totalResp atomic.Int32
 	pool.HandleFunc(
 		connection.Command{
 			Interface: 16777252,
 			Request:   false,
 			Code:      324,
 		}, func(msg *connection.Message, conn connection.Conn) {
-			totalResp++
+			totalResp.Add(1)
 		},
 	)
 	// Wait for connections
@@ -277,8 +277,9 @@ func TestDRAPoolRouting(t *testing.T) {
 	if count1 == 0 && count2 == 0 {
 		t.Error("No messages were routed to any DRA")
 	}
-	if count1+count2 != int32(totalResp) {
-		t.Errorf("No receive right expected number, send %d, receive %d", count1+count2, totalResp)
+	totalRespCount := totalResp.Load()
+	if count1+count2 != totalRespCount {
+		t.Errorf("No receive right expected number, send %d, receive %d", count1+count2, totalRespCount)
 	}
 }
 
