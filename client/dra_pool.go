@@ -249,10 +249,16 @@ func (p *DRAPool) Start() error {
 	// Update initial stats
 	p.updateStats()
 
+	// Read stats with lock
+	p.statsMu.RLock()
+	totalDRAs := p.stats.TotalDRAs
+	activeDRAs := p.stats.ActiveDRAs
+	p.statsMu.RUnlock()
+
 	p.logger.Infow("DRA pool started successfully",
 		"active_priority", p.activePriority.Load(),
-		"total_dras", p.stats.TotalDRAs,
-		"active_dras", p.stats.ActiveDRAs)
+		"total_dras", totalDRAs,
+		"active_dras", activeDRAs)
 
 	return nil
 }
