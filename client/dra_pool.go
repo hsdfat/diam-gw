@@ -83,8 +83,9 @@ type DRAPool struct {
 	wg     sync.WaitGroup
 
 	// Statistics
-	stats  DRAPoolStats
-	logger logger.Logger
+	stats   DRAPoolStats
+	statsMu sync.RWMutex // Protects stats
+	logger  logger.Logger
 }
 
 // DRAPoolStats holds statistics for the entire DRA pool
@@ -474,6 +475,9 @@ func (p *DRAPool) countHealthyDRAsAtPriority(priority int) int {
 
 // updateStats updates pool statistics
 func (p *DRAPool) updateStats() {
+	p.statsMu.Lock()
+	defer p.statsMu.Unlock()
+
 	p.stats.TotalDRAs = len(p.draConfigs)
 	p.stats.CurrentPriority = int(p.activePriority.Load())
 	p.stats.ActiveDRAs = 0
@@ -500,12 +504,21 @@ func (p *DRAPool) updateStats() {
 // logHealthStatus logs health status of all DRAs
 func (p *DRAPool) logHealthStatus() {
 	p.logger.Infow("=== DRA Pool Health Status ===")
+
+	p.statsMu.RLock()
+	currentPriority := p.stats.CurrentPriority
+	totalDRAs := p.stats.TotalDRAs
+	activeDRAs := p.stats.ActiveDRAs
+	totalConnections := p.stats.TotalConnections
+	activeConnections := p.stats.ActiveConnections
+	p.statsMu.RUnlock()
+
 	p.logger.Infow("Overall",
-		"active_priority", p.stats.CurrentPriority,
-		"total_dras", p.stats.TotalDRAs,
-		"active_dras", p.stats.ActiveDRAs,
-		"total_connections", p.stats.TotalConnections,
-		"active_connections", p.stats.ActiveConnections,
+		"active_priority", currentPriority,
+		"total_dras", totalDRAs,
+		"active_dras", activeDRAs,
+		"total_connections", totalConnections,
+		"active_connections", activeConnections,
 		"failover_count", p.stats.FailoverCount.Load())
 
 	for _, dra := range p.draConfigs {
@@ -532,6 +545,9 @@ func (p *DRAPool) logHealthStatus() {
 // GetStats returns aggregated statistics
 func (p *DRAPool) GetStats() DRAPoolStats {
 	p.updateStats()
+
+	p.statsMu.RLock()
+	defer p.statsMu.RUnlock()
 	return p.stats
 }
 
