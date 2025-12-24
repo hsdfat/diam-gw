@@ -104,6 +104,35 @@ type Command = connection.Command
 //	server.Start()
 type Handler = connection.Handler
 
+// Middleware is a function that wraps a Handler and returns a new Handler.
+// It can perform actions before and/or after the wrapped handler is called.
+//
+// Example usage:
+//
+//	// Logging middleware
+//	loggingMiddleware := func(next Handler) Handler {
+//	    return func(msg *Message, conn Conn) {
+//	        logger.Info("Before handler: received message")
+//	        next(msg, conn)
+//	        logger.Info("After handler: message processed")
+//	    }
+//	}
+//
+//	// Authentication middleware
+//	authMiddleware := func(next Handler) Handler {
+//	    return func(msg *Message, conn Conn) {
+//	        if !isAuthorized(msg, conn) {
+//	            logger.Warn("Unauthorized request")
+//	            return
+//	        }
+//	        next(msg, conn)
+//	    }
+//	}
+//
+//	server.Use(loggingMiddleware)
+//	server.Use(authMiddleware)
+type Middleware func(Handler) Handler
+
 // Server represents a Diameter server
 type Server struct {
 	config      *ServerConfig
@@ -126,6 +155,8 @@ type Server struct {
 	LocalAddr    net.Addr            // optional Local Address to bind dailer's (Dail...) socket to
 	HandlerMux   map[Command]Handler // Map of command to handler functions
 	handlerMu    sync.RWMutex        // Protects HandlerMux
+	middlewares  []Middleware        // Global middleware chain
+	middlewareMu sync.RWMutex        // Protects middlewares
 }
 
 // ServerConfig holds server configuration
@@ -597,12 +628,51 @@ func (s *Server) HandleFunc(cmd Command, handler Handler) {
 	s.logger.Infow("Registered handler for command", "interface", cmd.Interface, "code", cmd.Code, "request", cmd.Request)
 }
 
-// getHandler retrieves a handler for a given command
+// Use adds a middleware to the global middleware chain.
+// Middlewares are executed in the order they are added (FIFO).
+// The first middleware added will be the outermost wrapper.
+//
+// Example:
+//
+//	server.Use(loggingMiddleware)
+//	server.Use(authMiddleware)
+//	server.Use(metricsMiddleware)
+//
+// Execution order: logging -> auth -> metrics -> handler
+func (s *Server) Use(middleware Middleware) {
+	s.middlewareMu.Lock()
+	defer s.middlewareMu.Unlock()
+	s.middlewares = append(s.middlewares, middleware)
+	s.logger.Infow("Registered global middleware", "total_middlewares", len(s.middlewares))
+}
+
+// wrapHandler wraps a handler with all registered middlewares.
+// Middlewares are applied in reverse order so that the first registered
+// middleware becomes the outermost wrapper.
+func (s *Server) wrapHandler(handler Handler) Handler {
+	s.middlewareMu.RLock()
+	defer s.middlewareMu.RUnlock()
+
+	// Apply middlewares in reverse order
+	wrapped := handler
+	for i := len(s.middlewares) - 1; i >= 0; i-- {
+		wrapped = s.middlewares[i](wrapped)
+	}
+	return wrapped
+}
+
+// getHandler retrieves a handler for a given command and wraps it with middlewares
 func (s *Server) getHandler(cmd Command) (Handler, bool) {
 	s.handlerMu.RLock()
-	defer s.handlerMu.RUnlock()
 	handler, exists := s.HandlerMux[cmd]
-	return handler, exists
+	s.handlerMu.RUnlock()
+
+	if !exists {
+		return nil, false
+	}
+
+	// Wrap handler with middlewares
+	return s.wrapHandler(handler), true
 }
 
 // parseCommand extracts the command information from a message header.
