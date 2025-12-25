@@ -1,11 +1,12 @@
 module github.com/hsdfat/diam-gw
 
-go 1.23
+go 1.25.5
 
 require (
+	github.com/chronnie/governance v0.0.0-00010101000000-000000000000
 	github.com/google/gopacket v1.1.19
 	github.com/hsdfat/go-zlog v0.0.3
-	go.uber.org/zap v1.27.0
+	go.uber.org/zap v1.27.1
 )
 
 require (
@@ -13,3 +14,5 @@ require (
 	golang.org/x/net v0.0.0-20190620200207-3b0461eec859 // indirect
 	golang.org/x/sys v0.0.0-20190412213103-97732733099d // indirect
 )
+
+replace github.com/chronnie/governance => ../governance

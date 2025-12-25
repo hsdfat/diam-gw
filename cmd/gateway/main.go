@@ -6,9 +6,12 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
+	govclient "github.com/chronnie/governance/client"
+	"github.com/chronnie/governance/models"
 	"github.com/hsdfat/diam-gw/client"
 	"github.com/hsdfat/diam-gw/gateway"
 	"github.com/hsdfat/diam-gw/pkg/logger"
@@ -86,6 +89,51 @@ func main() {
 		"primary_dra", fmt.Sprintf("%s:%d", *dra1Host, *dra1Port),
 		"secondary_dra", fmt.Sprintf("%s:%d", *dra2Host, *dra2Port))
 
+	// Register with governance manager
+	governanceURL := os.Getenv("GOVERNANCE_URL")
+	if governanceURL == "" {
+		governanceURL = "http://telco-governance:8080"
+	}
+
+	podName := os.Getenv("POD_NAME")
+	if podName == "" {
+		podName, _ = os.Hostname()
+	}
+
+	govClient := govclient.NewClient(&govclient.ClientConfig{
+		ManagerURL:  governanceURL,
+		ServiceName: "diam-gw",
+		PodName:     podName,
+	})
+
+	// Extract IP from listen address
+	listenIP := strings.Split(*listenAddr, ":")[0]
+	listenPort := 3868 // Default diameter port
+
+	// Register diam-gw service and subscribe to eir-diameter group for IP/port discovery
+	registration := &models.ServiceRegistration{
+		ServiceName: "diam-gw",
+		PodName:     podName,
+		Providers: []models.ProviderInfo{
+			{
+				Protocol: models.ProtocolTCP,
+				IP:       listenIP,
+				Port:     listenPort,
+			},
+		},
+		HealthCheckURL:  fmt.Sprintf("http://%s:8081/health", listenIP),               // Assume health endpoint
+		NotificationURL: fmt.Sprintf("http://%s:8081/governance/notify", listenIP),   // Assume notification endpoint
+		Subscriptions:   []string{"eir-diameter"}, // Subscribe to eir-diameter group to get Diameter IP/port
+	}
+
+	if err := govClient.Register(registration); err != nil {
+		log.Warnw("Failed to register with governance manager", "error", err)
+	} else {
+		log.Infow("✓ Registered with governance manager",
+			"url", governanceURL,
+			"subscriptions", registration.Subscriptions)
+	}
+
 	// Wait for interrupt signal
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
@@ -93,6 +141,13 @@ func main() {
 
 	log.Infow("Shutting down gracefully...")
 	cancel()
+
+	// Unregister from governance
+	if err := govClient.Unregister(); err != nil {
+		log.Warnw("Failed to unregister from governance", "error", err)
+	} else {
+		log.Infow("✓ Unregistered from governance manager")
+	}
 
 	// Stop gateway
 	if err := gw.Stop(); err != nil {
