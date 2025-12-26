@@ -8,7 +8,7 @@ import (
 	"os/signal"
 	"syscall"
 
-	gwconfig "github.com/hsdfat/telco/diam-gw/pkg/config"
+	gwconfig "github.com/hsdfat/diam-gw/pkg/config"
 )
 
 func main() {

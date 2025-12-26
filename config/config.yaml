@@ -1,0 +1,82 @@
+gateway:
+  originHost: diameter-gw.example.com
+  originRealm: example.com
+  productName: Diameter-Gateway
+  vendorID: 10415
+  sessionTimeout: 30s
+  enableReqLog: false
+  enableRespLog: false
+  statsInterval: 60s
+
+server:
+  listenAddr: 0.0.0.0:3868
+  maxConnections: 1000
+  readTimeout: 30s
+  writeTimeout: 10s
+  watchdogInterval: 30s
+  watchdogTimeout: 10s
+  maxMessageSize: 65535
+  sendChannelSize: 100
+  recvChannelSize: 1000
+  handleWatchdog: true
+
+draPool:
+  supported: true
+  connectionsPerDRA: 1
+  connectTimeout: 10s
+  cerTimeout: 5s
+  dwrInterval: 30s
+  dwrTimeout: 10s
+  maxDWRFailures: 3
+  healthCheckInterval: 10s
+  reconnectInterval: 5s
+  maxReconnectDelay: 5m
+  reconnectBackoff: 1.5
+  sendBufferSize: 100
+  recvBufferSize: 100
+  dras:
+    - name: DRA-1
+      host: 127.0.0.1
+      port: 3869
+      priority: 1
+      weight: 100
+    - name: DRA-2
+      host: 127.0.0.1
+      port: 3870
+      priority: 2
+      weight: 100
+
+client:
+  dialTimeout: 5s
+  sendTimeout: 10s
+  cerTimeout: 5s
+  dwrInterval: 30s
+  dwrTimeout: 10s
+  maxDWRFailures: 3
+  authAppIDs:
+    - 16777251  # S6a
+    - 16777252  # S13
+  sendBufferSize: 1000
+  recvBufferSize: 1000
+  reconnectEnabled: false
+  reconnectInterval: 2s
+  maxReconnectDelay: 30s
+  reconnectBackoff: 1.5
+  healthCheckInterval: 10s
+
+logging:
+  level: info
+  format: json
+
+metrics:
+  enabled: true
+  port: 9091
+  path: /metrics
+
+governance:
+  enabled: true
+  url: http://localhost:8080
+  serviceName: diam-gw
+  subscriptions:
+    - eir-diameter
+  failOnError: true

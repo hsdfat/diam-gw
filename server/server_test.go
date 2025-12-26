@@ -14,6 +14,7 @@ import (
 	"github.com/hsdfat/diam-gw/commands/s6a"
 	"github.com/hsdfat/diam-gw/models_base"
 	"github.com/hsdfat/diam-gw/pkg/logger"
+	// Import EIR packages
 )
 
 // TestServerBasicSetup tests basic server creation and startup
@@ -1527,14 +1528,14 @@ func TestServerInterfaceStatsS6a(t *testing.T) {
 	defer server.Stop()
 
 	addr := server.GetListener().Addr().String()
-	
+
 	// Create client connection directly like TestServerCERCEAExchange does
 	clientConn, err := net.Dial("tcp", addr)
 	if err != nil {
 		t.Fatalf("Failed to connect to server: %v", err)
 	}
 	defer clientConn.Close()
-	
+
 	// client := &testClient{conn: clientConn, t: t}
 
 	// Send CER with S6a support
@@ -1556,13 +1557,13 @@ func TestServerInterfaceStatsS6a(t *testing.T) {
 	if _, err := clientConn.Write(cerBytes); err != nil {
 		t.Fatalf("Failed to send CER: %v", err)
 	}
-	
+
 	// Use readDiameterMessage directly like TestServerCERCEAExchange does
 	ceaBytes := readDiameterMessage(t, clientConn)
 	if _, err := clientConn.Write(cerBytes); err != nil {
 		t.Fatalf("Failed to send CER: %v", err)
 	}
-	
+
 	// Use readDiameterMessage directly like TestServerCERCEAExchange does
 	ceaBytes = readDiameterMessage(t, clientConn)
 	cea := &base.CapabilitiesExchangeAnswer{}

@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"flag"
 	"fmt"
 	"os"
 	"os/signal"
@@ -14,62 +13,31 @@ import (
 	"github.com/chronnie/governance/models"
 	"github.com/hsdfat/diam-gw/client"
 	"github.com/hsdfat/diam-gw/gateway"
+	"github.com/hsdfat/diam-gw/internal/config"
 	"github.com/hsdfat/diam-gw/pkg/logger"
 	"github.com/hsdfat/diam-gw/server"
 )
 
-var (
-	listenAddr = flag.String("listen", "0.0.0.0:3868", "Gateway listen address")
-	logLevel   = flag.String("log", "info", "Log level (debug, info, warn, error)")
-
-	// Gateway identity
-	originHost  = flag.String("origin-host", "diameter-gw.example.com", "Gateway Origin-Host")
-	originRealm = flag.String("origin-realm", "example.com", "Gateway Origin-Realm")
-	productName = flag.String("product", "Diameter-Gateway", "Product name")
-	vendorID    = flag.Int("vendor-id", 10415, "Vendor ID (default: 3GPP)")
-
-	// DRA configuration
-	dra1Host     = flag.String("dra1-host", "127.0.0.1", "Primary DRA host")
-	dra1Port     = flag.Int("dra1-port", 3869, "Primary DRA port")
-	dra2Host     = flag.String("dra2-host", "127.0.0.1", "Secondary DRA host")
-	dra2Port     = flag.Int("dra2-port", 3870, "Secondary DRA port")
-	draSupported = flag.Bool("dra-supported", true, "Enable DRA support")
-
-	// Advanced settings
-	maxConnections  = flag.Int("max-connections", 1000, "Maximum inbound connections")
-	connsPerDRA     = flag.Int("conns-per-dra", 1, "Connections per DRA")
-	sessionTimeout  = flag.Duration("session-timeout", 30*time.Second, "Session timeout")
-	enableReqLog    = flag.Bool("log-requests", false, "Enable request logging")
-	enableRespLog   = flag.Bool("log-responses", false, "Enable response logging")
-	statsInterval   = flag.Duration("stats-interval", 60*time.Second, "Statistics logging interval")
-
-	// Timeout settings
-	readTimeout      = flag.Duration("read-timeout", 30*time.Second, "Connection read timeout")
-	writeTimeout     = flag.Duration("write-timeout", 10*time.Second, "Connection write timeout")
-	watchdogInterval = flag.Duration("watchdog-interval", 30*time.Second, "Watchdog interval")
-	watchdogTimeout  = flag.Duration("watchdog-timeout", 10*time.Second, "Watchdog timeout")
-	connectTimeout   = flag.Duration("connect-timeout", 10*time.Second, "DRA connect timeout")
-	cerTimeout       = flag.Duration("cer-timeout", 5*time.Second, "CER timeout")
-	dwrInterval      = flag.Duration("dwr-interval", 30*time.Second, "DWR interval")
-	dwrTimeout       = flag.Duration("dwr-timeout", 10*time.Second, "DWR timeout")
-	maxDWRFailures   = flag.Int("max-dwr-failures", 3, "Maximum DWR failures before reconnect")
-)
-
 func main() {
-	flag.Parse()
+	// Load configuration
+	cfg, err := config.Load("")
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Failed to load configuration: %v\n", err)
+		os.Exit(1)
+	}
 
 	// Initialize logger
-	log := logger.New("gateway-main", *logLevel)
+	log := logger.New("gateway-main", cfg.Logging.Level)
 	log.Infow("Starting Diameter Gateway",
 		"version", "1.0.0",
-		"listen", *listenAddr,
-		"origin_host", *originHost)
+		"listen", cfg.Server.ListenAddr,
+		"origin_host", cfg.Gateway.OriginHost)
 
 	// Create gateway configuration
-	config := createGatewayConfig()
+	gatewayConfig := createGatewayConfig(cfg)
 
 	// Create gateway
-	gw, err := gateway.NewGateway(config, log)
+	gw, err := gateway.NewGateway(gatewayConfig, log)
 	if err != nil {
 		log.Fatalw("Failed to create gateway", "error", err)
 	}
@@ -82,56 +50,16 @@ func main() {
 	// Start statistics reporter
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	go statsReporter(ctx, gw, log)
+	go statsReporter(ctx, gw, log, cfg.Gateway.StatsInterval)
 
 	log.Infow("Gateway is running",
-		"listen_address", *listenAddr,
-		"primary_dra", fmt.Sprintf("%s:%d", *dra1Host, *dra1Port),
-		"secondary_dra", fmt.Sprintf("%s:%d", *dra2Host, *dra2Port))
+		"listen_address", cfg.Server.ListenAddr,
+		"dra_count", len(cfg.DRAPool.DRAs))
 
-	// Register with governance manager
-	governanceURL := os.Getenv("GOVERNANCE_URL")
-	if governanceURL == "" {
-		governanceURL = "http://telco-governance:8080"
-	}
-
-	podName := os.Getenv("POD_NAME")
-	if podName == "" {
-		podName, _ = os.Hostname()
-	}
-
-	govClient := govclient.NewClient(&govclient.ClientConfig{
-		ManagerURL:  governanceURL,
-		ServiceName: "diam-gw",
-		PodName:     podName,
-	})
-
-	// Extract IP from listen address
-	listenIP := strings.Split(*listenAddr, ":")[0]
-	listenPort := 3868 // Default diameter port
-
-	// Register diam-gw service and subscribe to eir-diameter group for IP/port discovery
-	registration := &models.ServiceRegistration{
-		ServiceName: "diam-gw",
-		PodName:     podName,
-		Providers: []models.ProviderInfo{
-			{
-				Protocol: models.ProtocolTCP,
-				IP:       listenIP,
-				Port:     listenPort,
-			},
-		},
-		HealthCheckURL:  fmt.Sprintf("http://%s:8081/health", listenIP),               // Assume health endpoint
-		NotificationURL: fmt.Sprintf("http://%s:8081/governance/notify", listenIP),   // Assume notification endpoint
-		Subscriptions:   []string{"eir-diameter"}, // Subscribe to eir-diameter group to get Diameter IP/port
-	}
-
-	if err := govClient.Register(registration); err != nil {
-		log.Warnw("Failed to register with governance manager", "error", err)
-	} else {
-		log.Infow("✓ Registered with governance manager",
-			"url", governanceURL,
-			"subscriptions", registration.Subscriptions)
+	// Register with governance manager if enabled
+	var govClient *govclient.Client
+	if cfg.Governance.Enabled {
+		govClient = registerWithGovernance(cfg, log)
 	}
 
 	// Wait for interrupt signal
@@ -143,10 +71,13 @@ func main() {
 	cancel()
 
 	// Unregister from governance
-	if err := govClient.Unregister(); err != nil {
-		log.Warnw("Failed to unregister from governance", "error", err)
-	} else {
-		log.Infow("✓ Unregistered from governance manager")
+	if govClient != nil {
+		if err := govClient.Unregister(); err != nil {
+			log.Error("Failed to unregister from governance", "error", err)
+			panic(err)
+		} else {
+			log.Infow("✓ Unregistered from governance manager")
+		}
 	}
 
 	// Stop gateway
@@ -157,103 +88,153 @@ func main() {
 	log.Infow("Gateway stopped successfully")
 }
 
-func createGatewayConfig() *gateway.GatewayConfig {
+func createGatewayConfig(cfg *config.Config) *gateway.GatewayConfig {
 	// Server configuration (inbound from Logic Apps)
 	inServerConfig := &server.ServerConfig{
-		ListenAddress:  *listenAddr,
-		MaxConnections: *maxConnections,
+		ListenAddress:  cfg.Server.ListenAddr,
+		MaxConnections: cfg.Server.MaxConnections,
 		ConnectionConfig: &server.ConnectionConfig{
-			OriginHost:       *originHost,
-			OriginRealm:      *originRealm,
-			ProductName:      *productName,
-			VendorID:         uint32(*vendorID),
-			ReadTimeout:      *readTimeout,
-			WriteTimeout:     *writeTimeout,
-			WatchdogInterval: *watchdogInterval,
-			WatchdogTimeout:  *watchdogTimeout,
-			MaxMessageSize:   65535,
-			SendChannelSize:  100,
-			RecvChannelSize:  100,
-			HandleWatchdog:   true,
+			OriginHost:       cfg.Gateway.OriginHost,
+			OriginRealm:      cfg.Gateway.OriginRealm,
+			ProductName:      cfg.Gateway.ProductName,
+			VendorID:         cfg.Gateway.VendorID,
+			ReadTimeout:      cfg.Server.ReadTimeout,
+			WriteTimeout:     cfg.Server.WriteTimeout,
+			WatchdogInterval: cfg.Server.WatchdogInterval,
+			WatchdogTimeout:  cfg.Server.WatchdogTimeout,
+			MaxMessageSize:   cfg.Server.MaxMessageSize,
+			SendChannelSize:  cfg.Server.SendChannelSize,
+			RecvChannelSize:  cfg.Server.RecvChannelSize,
+			HandleWatchdog:   cfg.Server.HandleWatchdog,
 		},
-		RecvChannelSize: 1000,
+		RecvChannelSize: cfg.Server.RecvChannelSize,
 	}
 
 	// DRA pool configuration (outbound to DRA servers)
+	draConfigs := make([]*client.DRAServerConfig, len(cfg.DRAPool.DRAs))
+	for i, dra := range cfg.DRAPool.DRAs {
+		draConfigs[i] = &client.DRAServerConfig{
+			Name:     dra.Name,
+			Host:     dra.Host,
+			Port:     dra.Port,
+			Priority: dra.Priority,
+			Weight:   dra.Weight,
+		}
+	}
+
 	draPoolConfig := &client.DRAPoolConfig{
-		DRAs: []*client.DRAServerConfig{
-			{
-				Name:     "DRA-1",
-				Host:     *dra1Host,
-				Port:     *dra1Port,
-				Priority: 1, // Higher priority (primary)
-				Weight:   100,
-			},
-			{
-				Name:     "DRA-2",
-				Host:     *dra2Host,
-				Port:     *dra2Port,
-				Priority: 2, // Lower priority (secondary)
-				Weight:   100,
-			},
-		},
-		OriginHost:          *originHost,
-		OriginRealm:         *originRealm,
-		ProductName:         *productName,
-		VendorID:            uint32(*vendorID),
-		ConnectionsPerDRA:   *connsPerDRA,
-		ConnectTimeout:      *connectTimeout,
-		CERTimeout:          *cerTimeout,
-		DWRInterval:         *dwrInterval,
-		DWRTimeout:          *dwrTimeout,
-		MaxDWRFailures:      *maxDWRFailures,
-		HealthCheckInterval: 10 * time.Second,
-		ReconnectInterval:   5 * time.Second,
-		MaxReconnectDelay:   5 * time.Minute,
-		ReconnectBackoff:    1.5,
-		SendBufferSize:      100,
-		RecvBufferSize:      100,
+		DRAs:                draConfigs,
+		OriginHost:          cfg.Gateway.OriginHost,
+		OriginRealm:         cfg.Gateway.OriginRealm,
+		ProductName:         cfg.Gateway.ProductName,
+		VendorID:            cfg.Gateway.VendorID,
+		ConnectionsPerDRA:   cfg.DRAPool.ConnectionsPerDRA,
+		ConnectTimeout:      cfg.DRAPool.ConnectTimeout,
+		CERTimeout:          cfg.DRAPool.CERTimeout,
+		DWRInterval:         cfg.DRAPool.DWRInterval,
+		DWRTimeout:          cfg.DRAPool.DWRTimeout,
+		MaxDWRFailures:      cfg.DRAPool.MaxDWRFailures,
+		HealthCheckInterval: cfg.DRAPool.HealthCheckInterval,
+		ReconnectInterval:   cfg.DRAPool.ReconnectInterval,
+		MaxReconnectDelay:   cfg.DRAPool.MaxReconnectDelay,
+		ReconnectBackoff:    cfg.DRAPool.ReconnectBackoff,
+		SendBufferSize:      cfg.DRAPool.SendBufferSize,
+		RecvBufferSize:      cfg.DRAPool.RecvBufferSize,
 	}
 
 	// Internal client pool configuration (for forwarding to Logic Apps)
 	inClientConfig := &client.PoolConfig{
-		OriginHost:          *originHost,
-		OriginRealm:         *originRealm,
-		ProductName:         *productName,
-		VendorID:            uint32(*vendorID),
-		DialTimeout:         5 * time.Second,
-		SendTimeout:         10 * time.Second,
-		CERTimeout:          *cerTimeout,
-		DWRInterval:         *dwrInterval,
-		DWRTimeout:          *dwrTimeout,
-		MaxDWRFailures:      *maxDWRFailures,
-		AuthAppIDs:          []uint32{16777251, 16777252}, // S6a and S13
-		SendBufferSize:      1000,
-		RecvBufferSize:      1000,
-		ReconnectEnabled:    false,
-		ReconnectInterval:   2 * time.Second,
-		MaxReconnectDelay:   30 * time.Second,
-		ReconnectBackoff:    1.5,
-		HealthCheckInterval: 10 * time.Second,
+		OriginHost:          cfg.Gateway.OriginHost,
+		OriginRealm:         cfg.Gateway.OriginRealm,
+		ProductName:         cfg.Gateway.ProductName,
+		VendorID:            cfg.Gateway.VendorID,
+		DialTimeout:         cfg.Client.DialTimeout,
+		SendTimeout:         cfg.Client.SendTimeout,
+		CERTimeout:          cfg.Client.CERTimeout,
+		DWRInterval:         cfg.Client.DWRInterval,
+		DWRTimeout:          cfg.Client.DWRTimeout,
+		MaxDWRFailures:      cfg.Client.MaxDWRFailures,
+		AuthAppIDs:          cfg.Client.AuthAppIDs,
+		SendBufferSize:      cfg.Client.SendBufferSize,
+		RecvBufferSize:      cfg.Client.RecvBufferSize,
+		ReconnectEnabled:    cfg.Client.ReconnectEnabled,
+		ReconnectInterval:   cfg.Client.ReconnectInterval,
+		MaxReconnectDelay:   cfg.Client.MaxReconnectDelay,
+		ReconnectBackoff:    cfg.Client.ReconnectBackoff,
+		HealthCheckInterval: cfg.Client.HealthCheckInterval,
 	}
 
 	return &gateway.GatewayConfig{
 		InServerConfig:        inServerConfig,
 		DRAPoolConfig:         draPoolConfig,
 		InClientConfig:        inClientConfig,
-		DRASupported:          *draSupported,
-		OriginHost:            *originHost,
-		OriginRealm:           *originRealm,
-		ProductName:           *productName,
-		VendorID:              uint32(*vendorID),
-		SessionTimeout:        *sessionTimeout,
-		EnableRequestLogging:  *enableReqLog,
-		EnableResponseLogging: *enableRespLog,
+		DRASupported:          cfg.DRAPool.Supported,
+		OriginHost:            cfg.Gateway.OriginHost,
+		OriginRealm:           cfg.Gateway.OriginRealm,
+		ProductName:           cfg.Gateway.ProductName,
+		VendorID:              cfg.Gateway.VendorID,
+		SessionTimeout:        cfg.Gateway.SessionTimeout,
+		EnableRequestLogging:  cfg.Gateway.EnableReqLog,
+		EnableResponseLogging: cfg.Gateway.EnableRespLog,
 	}
 }
 
-func statsReporter(ctx context.Context, gw *gateway.Gateway, log logger.Logger) {
-	ticker := time.NewTicker(*statsInterval)
+func registerWithGovernance(cfg *config.Config, log logger.Logger) *govclient.Client {
+	governanceURL := cfg.Governance.URL
+	if envURL := os.Getenv("GOVERNANCE_URL"); envURL != "" {
+		governanceURL = envURL
+	}
+
+	podName := cfg.Governance.PodName
+	if podName == "" {
+		podName = os.Getenv("POD_NAME")
+	}
+	if podName == "" {
+		podName, _ = os.Hostname()
+	}
+
+	govClient := govclient.NewClient(&govclient.ClientConfig{
+		ManagerURL:  governanceURL,
+		ServiceName: cfg.Governance.ServiceName,
+		PodName:     podName,
+	})
+
+	// Extract IP from listen address
+	listenIP := strings.Split(cfg.Server.ListenAddr, ":")[0]
+	listenPort := 3868 // Default diameter port
+
+	// Register diam-gw service and subscribe to eir-diameter group for IP/port discovery
+	registration := &models.ServiceRegistration{
+		ServiceName: cfg.Governance.ServiceName,
+		PodName:     podName,
+		Providers: []models.ProviderInfo{
+			{
+				Protocol: models.ProtocolTCP,
+				IP:       listenIP,
+				Port:     listenPort,
+			},
+		},
+		HealthCheckURL:  fmt.Sprintf("http://%s:8081/health", listenIP),
+		NotificationURL: fmt.Sprintf("http://%s:8081/governance/notify", listenIP),
+		Subscriptions:   cfg.Governance.Subscriptions,
+	}
+
+	if _, err := govClient.Register(registration); err != nil {
+		log.Warnw("Failed to register with governance manager", "error", err)
+		if cfg.Governance.FailOnError {
+			panic(err)
+		}
+	} else {
+		log.Infow("✓ Registered with governance manager",
+			"url", governanceURL,
+			"subscriptions", registration.Subscriptions)
+	}
+
+	return govClient
+}
+
+func statsReporter(ctx context.Context, gw *gateway.Gateway, log logger.Logger, interval time.Duration) {
+	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 
 	for {
