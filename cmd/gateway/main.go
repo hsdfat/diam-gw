@@ -209,6 +209,7 @@ func registerWithGovernance(cfg *config.Config, log logger.Logger) *govclient.Cl
 		PodName:     podName,
 		Providers: []models.ProviderInfo{
 			{
+				ProviderID: "diameter",
 				Protocol: models.ProtocolTCP,
 				IP:       listenIP,
 				Port:     listenPort,
@@ -216,7 +217,12 @@ func registerWithGovernance(cfg *config.Config, log logger.Logger) *govclient.Cl
 		},
 		HealthCheckURL:  fmt.Sprintf("http://%s:8081/health", listenIP),
 		NotificationURL: fmt.Sprintf("http://%s:8081/governance/notify", listenIP),
-		Subscriptions:   cfg.Governance.Subscriptions,
+		Subscriptions: []models.Subscription{
+			{
+				ServiceName: "eir-diameter",
+				ProviderIDs: []string{string(models.ProviderEIRDiameter)},
+			},
+		},
 	}
 
 	if _, err := govClient.Register(registration); err != nil {
