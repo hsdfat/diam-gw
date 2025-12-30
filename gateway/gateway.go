@@ -197,10 +197,10 @@ func NewGateway(config *GatewayConfig, log logger.Logger) (*Gateway, error) {
 		logger:   log,
 	}
 
-	inServerLog := log.With("components", "inbound-server").(logger.Logger)
-	inClientLog := log.With("components", "inbound-client").(logger.Logger)
-	outServerLog := log.With("components", "outbound-server").(logger.Logger)
-	draPool := log.With("components", "dra-pool").(logger.Logger)
+	inServerLog := log.With("component", "inbound-server").(logger.Logger)
+	inClientLog := log.With("component", "inbound-client").(logger.Logger)
+	outServerLog := log.With("component", "outbound-server").(logger.Logger)
+	draPool := log.With("component", "dra-pool").(logger.Logger)
 	// Create servers
 	gw.inServer = gw.newServer(config, config.InServerConfig, inServerLog)
 	gw.inClient, err = client.NewAddressClient(ctx, config.InClientConfig, inClientLog)

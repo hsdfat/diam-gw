@@ -27,7 +27,7 @@ func main() {
 	}
 
 	// Initialize logger
-	log := logger.New("gateway-main", cfg.Logging.Level)
+	log := logger.New("diam-gw", cfg.Logging.Level)
 	log.Infow("Starting Diameter Gateway",
 		"version", "1.0.0",
 		"listen", cfg.Server.ListenAddr,
@@ -72,9 +72,9 @@ func main() {
 
 	// Unregister from governance
 	if govClient != nil {
+		govClient.StopHeartbeat()
 		if err := govClient.Unregister(); err != nil {
 			log.Error("Failed to unregister from governance", "error", err)
-			panic(err)
 		} else {
 			log.Infow("✓ Unregistered from governance manager")
 		}
@@ -180,10 +180,8 @@ func createGatewayConfig(cfg *config.Config) *gateway.GatewayConfig {
 }
 
 func registerWithGovernance(cfg *config.Config, log logger.Logger) *govclient.Client {
+	// Governance URL is now loaded from environment variables via pkg/config/env
 	governanceURL := cfg.Governance.URL
-	if envURL := os.Getenv("GOVERNANCE_URL"); envURL != "" {
-		governanceURL = envURL
-	}
 
 	podName := cfg.Governance.PodName
 	if podName == "" {
@@ -193,39 +191,63 @@ func registerWithGovernance(cfg *config.Config, log logger.Logger) *govclient.Cl
 		podName, _ = os.Hostname()
 	}
 
+	// Create governance client
 	govClient := govclient.NewClient(&govclient.ClientConfig{
 		ManagerURL:  governanceURL,
 		ServiceName: cfg.Governance.ServiceName,
 		PodName:     podName,
 	})
 
+	go govClient.StartHTTPServerWithClient(govclient.HTTPServerConfig{
+		Port: 9092,
+	})
+
+	// Wait a bit for server to start
+	time.Sleep(200 * time.Millisecond)
+
 	// Extract IP from listen address
 	listenIP := strings.Split(cfg.Server.ListenAddr, ":")[0]
+	if listenIP == "" || listenIP == "0.0.0.0" {
+		// Try to get pod IP from environment or use hostname
+		if podIP := os.Getenv("POD_IP"); podIP != "" {
+			listenIP = podIP
+		} else {
+			listenIP = "localhost"
+		}
+	}
 	listenPort := 3868 // Default diameter port
 
-	// Register diam-gw service and subscribe to eir-diameter group for IP/port discovery
+	// Build subscriptions
+	subscriptions := make([]models.Subscription, 0)
+	for _, subName := range cfg.Governance.Subscriptions {
+		subscriptions = append(subscriptions, models.Subscription{
+			ServiceName: subName,
+			ProviderIDs: []string{}, // Subscribe to all providers
+		})
+	}
+
+	// Register diam-gw service and subscribe to configured services
 	registration := &models.ServiceRegistration{
 		ServiceName: cfg.Governance.ServiceName,
 		PodName:     podName,
 		Providers: []models.ProviderInfo{
 			{
 				ProviderID: "diameter",
-				Protocol: models.ProtocolTCP,
-				IP:       listenIP,
-				Port:     listenPort,
+				Protocol:   models.ProtocolTCP,
+				IP:         listenIP,
+				Port:       listenPort,
 			},
 		},
-		HealthCheckURL:  fmt.Sprintf("http://%s:8081/health", listenIP),
-		NotificationURL: fmt.Sprintf("http://%s:8081/governance/notify", listenIP),
-		Subscriptions: []models.Subscription{
-			{
-				ServiceName: "eir-diameter",
-				ProviderIDs: []string{string(models.ProviderEIRDiameter)},
-			},
-		},
+		HealthCheckURL:  fmt.Sprintf("http://%s:9092/health", listenIP),
+		NotificationURL: fmt.Sprintf("http://%s:9092/notify", listenIP),
+		Subscriptions:   []models.Subscription{{
+			ServiceName: "eir-diameter",
+			ProviderIDs: []string{"eir-diameter"},
+		}},
 	}
 
-	if _, err := govClient.Register(registration); err != nil {
+	resp, err := govClient.Register(registration)
+	if err != nil {
 		log.Warnw("Failed to register with governance manager", "error", err)
 		if cfg.Governance.FailOnError {
 			panic(err)
@@ -233,8 +255,20 @@ func registerWithGovernance(cfg *config.Config, log logger.Logger) *govclient.Cl
 	} else {
 		log.Infow("✓ Registered with governance manager",
 			"url", governanceURL,
-			"subscriptions", registration.Subscriptions)
+			"service", cfg.Governance.ServiceName,
+			"pod", podName,
+			"own_pods", len(resp.Pods),
+			"subscribed_services", len(resp.SubscribedServices))
+
+		// Log subscription details
+		for svcName, pods := range resp.SubscribedServices {
+			log.Infow("  Subscription", "service", svcName, "pods", len(pods))
+		}
 	}
+
+	// Start heartbeat
+	govClient.StartHeartbeat()
+	log.Infow("✓ Started governance heartbeat")
 
 	return govClient
 }

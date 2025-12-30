@@ -2,8 +2,10 @@ package config
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
+	envpkg "github.com/hsdfat/diam-gw/pkg/config/env"
 	"github.com/spf13/viper"
 )
 
@@ -175,6 +177,29 @@ func Load(configPath string) (*Config, error) {
 		return nil, fmt.Errorf("failed to unmarshal config: %w", err)
 	}
 
+	// Load governance configuration from environment variables
+	envConfig := &envpkg.EnvConfigs{}
+	envConfig.DefaultValues()
+	// envconfig.ReadConfigFrom reads from environment variables
+	if err := envConfig.Load(); err != nil {
+		// Don't fail if env vars are not set, just use defaults
+		fmt.Printf("Warning: Could not load governance env config: %v\n", err)
+	}
+
+	// Override governance config with values from environment
+	config.Governance.Enabled = envConfig.Governance
+	config.Governance.FailOnError = envConfig.GovFail
+
+	// Convert TargetGov (host:port) to full URL format
+	if envConfig.TargetGov != "" {
+		targetGov := envConfig.TargetGov
+		// Add http:// prefix if not present
+		if !strings.HasPrefix(targetGov, "http://") && !strings.HasPrefix(targetGov, "https://") {
+			targetGov = "http://" + targetGov
+		}
+		config.Governance.URL = targetGov
+	}
+
 	// Validate config
 	if err := config.Validate(); err != nil {
 		return nil, fmt.Errorf("invalid configuration: %w", err)
@@ -265,12 +290,10 @@ func setDefaults(v *viper.Viper) {
 	v.SetDefault("metrics.port", 9091)
 	v.SetDefault("metrics.path", "/metrics")
 
-	// Governance defaults
-	v.SetDefault("governance.enabled", true)
-	v.SetDefault("governance.url", "http://telco-governance:8080")
+	// Note: Governance configuration is loaded from environment variables in pkg/config/env
+	// But keep serviceName and subscriptions in YAML as they're service-specific
 	v.SetDefault("governance.serviceName", "diam-gw")
 	v.SetDefault("governance.subscriptions", []string{"eir-diameter"})
-	v.SetDefault("governance.failOnError", false)
 }
 
 // Validate validates the configuration

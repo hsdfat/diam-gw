@@ -225,3 +225,6 @@ help:
 	@echo "    DWR_INTERVAL       - Interval between DWR messages (default: 10s)"
 	@echo "    DWR_TIMEOUT        - Timeout waiting for DWA (default: 5s)"
 	@echo "    MAX_DWR_FAILURES   - Max failures before reconnect (default: 3)"
+
+run:
+	go run cmd/gateway/main.go

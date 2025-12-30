@@ -6,7 +6,7 @@ require (
 	github.com/chronnie/governance v0.0.0-00010101000000-000000000000
 	github.com/google/gopacket v1.1.19
 	github.com/hsdfat/go-zlog v0.0.3
-	github.com/hsdfat/telco v0.0.3
+	github.com/hsdfat/telco v0.0.4
 	github.com/spf13/viper v1.21.0
 	go.uber.org/zap v1.27.1
 )
@@ -39,8 +39,8 @@ require (
 	go.uber.org/multierr v1.10.0 // indirect
 	go.yaml.in/yaml/v3 v3.0.4 // indirect
 	golang.org/x/exp v0.0.0-20230817173708-d852ddb80c63 // indirect
-	golang.org/x/net v0.17.0 // indirect
-	golang.org/x/sys v0.29.0 // indirect
+	golang.org/x/net v0.42.0 // indirect
+	golang.org/x/sys v0.35.0 // indirect
 	golang.org/x/text v0.28.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )

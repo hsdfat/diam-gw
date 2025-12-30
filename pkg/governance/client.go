@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"net/http"
 	"os"
 	"strconv"
 	"strings"
@@ -13,6 +14,7 @@ import (
 	govclient "github.com/chronnie/governance/client"
 	"github.com/chronnie/governance/models"
 	diamgwconfig "github.com/hsdfat/diam-gw/pkg/config"
+	"github.com/hsdfat/diam-gw/pkg/logger"
 )
 
 var (
@@ -25,7 +27,6 @@ var (
 // Client wraps the governance client with service-specific configuration
 type Client struct {
 	govClient      *govclient.Client
-	notifServer    *govclient.NotificationServer
 	serviceName    string
 	podName        string
 	subscriptions  []string
@@ -121,12 +122,13 @@ func Initialize(cfg *Config) error {
 			subscriptions: cfg.Subscriptions,
 		}
 
-		// Create governance client
+		// Create governance client with logger
 		client.govClient = govclient.NewClient(&govclient.ClientConfig{
 			ManagerURL:  cfg.ManagerURL,
 			ServiceName: cfg.ServiceName,
 			PodName:     cfg.PodName,
 			Timeout:     cfg.Timeout,
+			Logger:      logger.WithFields("component", "governance"),
 		})
 
 		// Create default notification handler
@@ -140,23 +142,9 @@ func Initialize(cfg *Config) error {
 			}
 		}
 
-		// Wrap handler to auto-update pod info
-		wrappedHandler := client.govClient.WrapNotificationHandler(client.notifHandler)
-
-		// Create notification server
-		client.notifServer = govclient.NewNotificationServer(cfg.NotificationPort, wrappedHandler)
-
-		// Start notification server in background
-		go func() {
-			if err := client.notifServer.Start(); err != nil {
-				log.Printf("[Governance] Notification server error: %v", err)
-			}
-		}()
-
-		// Wait for server to start
-		time.Sleep(500 * time.Millisecond)
-
 		// Register with governance manager
+		// Note: Health check and notification URLs should be set up separately
+		// using the HTTP server methods
 		registration := &models.ServiceRegistration{
 			ServiceName: cfg.ServiceName,
 			PodName:     cfg.PodName,
@@ -167,8 +155,8 @@ func Initialize(cfg *Config) error {
 					Port:     cfg.ServicePort,
 				},
 			},
-			HealthCheckURL:  client.notifServer.GetHealthCheckURL(cfg.PodIP),
-			NotificationURL: client.notifServer.GetNotificationURL(cfg.PodIP),
+			HealthCheckURL:  fmt.Sprintf("http://%s:%d/health", cfg.PodIP, cfg.NotificationPort),
+			NotificationURL: fmt.Sprintf("http://%s:%d/notify", cfg.PodIP, cfg.NotificationPort),
 			Subscriptions:   nil,
 		}
 
@@ -276,12 +264,6 @@ func (c *Client) Shutdown(ctx context.Context) error {
 		log.Printf("[Governance] Error during unregister: %v", err)
 	}
 
-	// Stop notification server
-	if err := c.notifServer.Stop(ctx); err != nil {
-		log.Printf("[Governance] Error stopping notification server: %v", err)
-		return err
-	}
-
 	log.Println("[Governance] Shutdown complete")
 	return nil
 }
@@ -306,6 +288,18 @@ func (c *Client) GetPodName() string {
 // GetSubscriptions returns the list of subscribed services
 func (c *Client) GetSubscriptions() []string {
 	return c.subscriptions
+}
+
+// StartHTTPServer starts an HTTP server with all governance endpoints including subscribed services
+// This is a convenience method that includes notification, heartbeat, health check, and subscribed services endpoints
+func (c *Client) StartHTTPServer(config govclient.HTTPServerConfig) error {
+	return c.govClient.StartHTTPServerWithClient(config)
+}
+
+// CreateSubscribedServicesHandler creates an HTTP handler for the subscribed services endpoint
+// This can be integrated into existing HTTP servers (gin, chi, stdlib, etc.)
+func (c *Client) CreateSubscribedServicesHandler() http.HandlerFunc {
+	return c.govClient.CreateSubscribedServicesHandler()
 }
 
 // Shutdown shuts down the global governance client

@@ -65,7 +65,7 @@ client:
   healthCheckInterval: 10s
 
 logging:
-  level: info
+  level: debug
   format: json
 
 metrics:
@@ -74,9 +74,6 @@ metrics:
   path: /metrics
 
 governance:
-  enabled: true
-  url: http://localhost:8080
   serviceName: diam-gw
   subscriptions:
     - eir-diameter
-  failOnError: true

@@ -32,5 +32,5 @@ func New(name, level string) Logger {
 		// Set level if provided
 		logger.SetLevel(level)
 	}
-	return Log.With("component", name).(logger.LoggerI)
+	return Log.With("mod", name).(logger.LoggerI)
 }
