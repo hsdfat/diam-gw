@@ -1,12 +1,12 @@
 module github.com/hsdfat/diam-gw
 
-go 1.25.5
+go 1.25.2
 
 require (
 	github.com/chronnie/governance v0.0.0-00010101000000-000000000000
 	github.com/google/gopacket v1.1.19
 	github.com/hsdfat/go-zlog v0.0.3
-	github.com/hsdfat/telco v0.0.4
+	github.com/hsdfat/telco v0.0.5-0.20260110064706-87be845ac618
 	github.com/spf13/viper v1.21.0
 	go.uber.org/zap v1.27.1
 )
@@ -45,4 +45,4 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
 
-replace github.com/chronnie/governance => ../governance
+replace github.com/chronnie/governance => github.com/hsdfat/governance v0.0.0-20260110065044-9e088598e01a

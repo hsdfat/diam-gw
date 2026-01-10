@@ -1,0 +1,67 @@
+# GitLab CI/CD Pipeline for Diam-GW Service
+# Builds and pushes Docker image to GitHub Container Registry (ghcr.io)
+
+stages:
+  - build
+  - push
+
+variables:
+  DOCKER_DRIVER: overlay2
+  DOCKER_TLS_CERTDIR: "/certs"
+  # GitHub Container Registry settings
+  REGISTRY: ghcr.io
+  # Set these in GitLab CI/CD Variables (Settings > CI/CD > Variables):
+  # GHCR_USERNAME - Your GitHub username
+  # GHCR_PASSWORD - Your GitHub Personal Access Token (with write:packages scope)
+  IMAGE_NAME: $REGISTRY/$GHCR_USERNAME/diam-gw
+  IMAGE_TAG: $CI_COMMIT_REF_SLUG
+
+# Build and push diam-gw image
+build-and-push:
+  stage: build
+  image: docker:24-dind
+  services:
+    - docker:24-dind
+  before_script:
+    - echo "Logging into GitHub Container Registry..."
+    - echo "$GHCR_PASSWORD" | docker login ghcr.io -u "$GHCR_USERNAME" --password-stdin
+  script:
+    - echo "Building diam-gw image..."
+    - docker build -f Dockerfile.app -t $IMAGE_NAME:$IMAGE_TAG .
+    - docker build -f Dockerfile.app -t $IMAGE_NAME:latest .
+    - echo "Pushing diam-gw image..."
+    - docker push $IMAGE_NAME:$IMAGE_TAG
+    - docker push $IMAGE_NAME:latest
+    - echo "Successfully pushed diam-gw:$IMAGE_TAG and diam-gw:latest"
+  after_script:
+    - docker logout ghcr.io
+  only:
+    - main
+    - master
+    - develop
+    - tags
+  tags:
+    - docker
+
+# Optional: Build on feature branches (without pushing to latest)
+build-feature:
+  stage: build
+  image: docker:24-dind
+  services:
+    - docker:24-dind
+  before_script:
+    - echo "$GHCR_PASSWORD" | docker login ghcr.io -u "$GHCR_USERNAME" --password-stdin
+  script:
+    - echo "Building diam-gw image for feature branch..."
+    - docker build -f Dockerfile.app -t $IMAGE_NAME:$IMAGE_TAG .
+    - docker push $IMAGE_NAME:$IMAGE_TAG
+  after_script:
+    - docker logout ghcr.io
+  except:
+    - main
+    - master
+    - develop
+    - tags
+  tags:
+    - docker
+  when: manual

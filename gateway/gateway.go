@@ -200,7 +200,7 @@ func NewGateway(config *GatewayConfig, log logger.Logger) (*Gateway, error) {
 	inServerLog := log.With("component", "inbound-server").(logger.Logger)
 	inClientLog := log.With("component", "inbound-client").(logger.Logger)
 	outServerLog := log.With("component", "outbound-server").(logger.Logger)
-	draPool := log.With("component", "dra-pool").(logger.Logger)
+	draPoolLog := log.With("component", "dra-pool").(logger.Logger)
 	// Create servers
 	gw.inServer = gw.newServer(config, config.InServerConfig, inServerLog)
 	gw.inClient, err = client.NewAddressClient(ctx, config.InClientConfig, inClientLog)
@@ -222,7 +222,7 @@ func NewGateway(config *GatewayConfig, log logger.Logger) (*Gateway, error) {
 		draPoolConfig.ProductName = config.ProductName
 		draPoolConfig.VendorID = config.VendorID
 
-		draPool, err := client.NewDRAPool(ctx, draPoolConfig, draPool)
+		draPool, err := client.NewDRAPool(ctx, draPoolConfig, draPoolLog)
 		draPool.SetHandler(make(map[connection.Command]client.Handler))
 		if err != nil {
 			cancel()
@@ -415,6 +415,36 @@ func (gw *Gateway) GetStats() GatewayStatsSnapshot {
 // GetDRAPool returns the DRA pool
 func (gw *Gateway) GetDRAPool() *client.DRAPool {
 	return gw.draPool
+}
+
+// IncrementTotalRequests increments the total requests counter
+func (gw *Gateway) IncrementTotalRequests() {
+	gw.stats.TotalRequests.Add(1)
+}
+
+// IncrementTotalResponses increments the total responses counter
+func (gw *Gateway) IncrementTotalResponses() {
+	gw.stats.TotalResponses.Add(1)
+}
+
+// IncrementTotalErrors increments the total errors counter
+func (gw *Gateway) IncrementTotalErrors() {
+	gw.stats.TotalErrors.Add(1)
+}
+
+// IncrementTotalForwarded increments the total forwarded counter (to EIR)
+func (gw *Gateway) IncrementTotalForwarded() {
+	gw.stats.TotalForwarded.Add(1)
+}
+
+// IncrementTotalFromDRA increments the total from DRA counter (responses from EIR back to DRA)
+func (gw *Gateway) IncrementTotalFromDRA() {
+	gw.stats.TotalFromDRA.Add(1)
+}
+
+// IncrementRoutingErrors increments the routing errors counter
+func (gw *Gateway) IncrementRoutingErrors() {
+	gw.stats.RoutingErrors.Add(1)
 }
 
 // ValidateGatewayConfig validates gateway configuration

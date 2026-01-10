@@ -106,12 +106,15 @@ type MetricsConfig struct {
 
 // GovernanceConfig holds governance/service discovery configuration
 type GovernanceConfig struct {
-	Enabled      bool
-	URL          string
-	ServiceName  string
-	PodName      string
-	Subscriptions []string
-	FailOnError  bool
+	Enabled        bool
+	URL            string
+	ServiceName    string
+	PodName        string
+	Subscriptions  []string
+	FailOnError    bool
+	ServiceIP      string // Service IP for health check URL
+	ServicePort    int    // Service port for governance registration
+	GovBackendPort int    // Port for governance health check and notification endpoints (default 2345)
 }
 
 // Load loads configuration from file and environment variables
@@ -189,6 +192,9 @@ func Load(configPath string) (*Config, error) {
 	// Override governance config with values from environment
 	config.Governance.Enabled = envConfig.Governance
 	config.Governance.FailOnError = envConfig.GovFail
+	config.Governance.ServiceIP = envConfig.ServiceIP
+	config.Governance.ServicePort = envConfig.ServicePort
+	config.Governance.GovBackendPort = envConfig.GovBackendPort
 
 	// Convert TargetGov (host:port) to full URL format
 	if envConfig.TargetGov != "" {
@@ -242,7 +248,7 @@ func setDefaults(v *viper.Viper) {
 	v.SetDefault("draPool.maxDWRFailures", 3)
 	v.SetDefault("draPool.healthCheckInterval", "10s")
 	v.SetDefault("draPool.reconnectInterval", "5s")
-	v.SetDefault("draPool.maxReconnectDelay", "5m")
+	v.SetDefault("draPool.maxReconnectDelay", "30s") // Cap exponential backoff at 30s (changed from 5m)
 	v.SetDefault("draPool.reconnectBackoff", 1.5)
 	v.SetDefault("draPool.sendBufferSize", 100)
 	v.SetDefault("draPool.recvBufferSize", 100)

@@ -2,7 +2,9 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"net/http"
 	"os"
 	"os/signal"
 	"strings"
@@ -12,10 +14,15 @@ import (
 	govclient "github.com/chronnie/governance/client"
 	"github.com/chronnie/governance/models"
 	"github.com/hsdfat/diam-gw/client"
+	"github.com/hsdfat/diam-gw/commands/s13"
 	"github.com/hsdfat/diam-gw/gateway"
 	"github.com/hsdfat/diam-gw/internal/config"
+	diamStats "github.com/hsdfat/diam-gw/internal/stats"
+	"github.com/hsdfat/diam-gw/models_base"
+	"github.com/hsdfat/diam-gw/pkg/connection"
 	"github.com/hsdfat/diam-gw/pkg/logger"
 	"github.com/hsdfat/diam-gw/server"
+	unifiedStats "github.com/hsdfat/telco/stats"
 )
 
 func main() {
@@ -52,15 +59,88 @@ func main() {
 	defer cancel()
 	go statsReporter(ctx, gw, log, cfg.Gateway.StatsInterval)
 
+	// Start HTTP stats API server
+	startTime := time.Now()
+	if cfg.Metrics.Enabled {
+		go startStatsServer(cfg.Metrics.Port, gw, startTime, log)
+	}
+
 	log.Infow("Gateway is running",
 		"listen_address", cfg.Server.ListenAddr,
-		"dra_count", len(cfg.DRAPool.DRAs))
+		"dra_count", len(cfg.DRAPool.DRAs),
+		"stats_api_port", cfg.Metrics.Port)
 
 	// Register with governance manager if enabled
 	var govClient *govclient.Client
 	if cfg.Governance.Enabled {
 		govClient = registerWithGovernance(cfg, log)
 	}
+
+	gw.RegisterDraPoolServer(connection.Command{
+		Code:      324,
+		Interface: s13.S13_APPLICATION_ID,
+		Request:   true,
+	}, func(msg *connection.Message, conn connection.Conn) {
+		log.Infow("process micr message")
+
+		// Increment total requests counter (message received from DRA)
+		gw.IncrementTotalRequests()
+
+		_, err := connection.ParseMessageHeader(msg.Header)
+		if err != nil {
+			log.Errorw("cannot parse header", "error", err)
+			gw.IncrementTotalErrors()
+			return
+		}
+		eirApps := govClient.GetPodInfos(models.ServiceNameEir, string(models.ProviderEIRDiameter))
+		if len(eirApps) == 0 {
+			log.Errorw("no EIR Logic App instances available")
+			mica := s13.NewMEIdentityCheckAnswer()
+			code := models_base.Unsigned32(5001) // DIAMETER_UNABLE_TO_COMPLY
+			mica.ResultCode = &code
+			msgInfo, err := client.ParseMessageHeader(msg.Header)
+			if err != nil {
+				log.Errorw("cannot parse header", "error", err)
+				gw.IncrementTotalErrors()
+				return
+			}
+			mica.Header.HopByHopID = msgInfo.HopByHopID
+			mica.Header.EndToEndID = msgInfo.EndToEndID
+			rspBytes, err := mica.Marshal()
+			if err != nil {
+				log.Errorw("cannot marshal MICA", "error", err)
+				gw.IncrementTotalErrors()
+				return
+			}
+			conn.Write(rspBytes)
+			gw.IncrementTotalResponses()
+			gw.IncrementRoutingErrors()
+			return
+		}
+		// get first EIR Logic App instance from map
+		var selectedEIRApp govclient.Pod
+		for _, eirApp := range eirApps {
+			selectedEIRApp = eirApp
+			break
+		}
+		log.Infow("forwarding to EIR Logic App", "pod", selectedEIRApp.Name, "ip", selectedEIRApp.Ip, "port", selectedEIRApp.Port)
+
+		// Increment forwarded counter (forwarding to EIR)
+		gw.IncrementTotalForwarded()
+
+		rsp, err := gw.SendInternal(fmt.Sprintf("%s:%d", selectedEIRApp.Ip, selectedEIRApp.Port), append(msg.Header, msg.Body...))
+		if err != nil {
+			log.Errorw("cannot send to eir", "err", err)
+			gw.IncrementTotalErrors()
+			return
+		}
+
+		// Increment from_dra counter (response received from EIR, sending back to DRA)
+		gw.IncrementTotalFromDRA()
+		gw.IncrementTotalResponses()
+
+		conn.Write(rsp)
+	})
 
 	// Wait for interrupt signal
 	sigChan := make(chan os.Signal, 1)
@@ -198,24 +278,40 @@ func registerWithGovernance(cfg *config.Config, log logger.Logger) *govclient.Cl
 		PodName:     podName,
 	})
 
+	// Use GovBackendPort for governance health check and notification endpoints
+	// This ensures consistency across all services (default 2345)
+	govBackendPort := cfg.Governance.GovBackendPort
+	if govBackendPort == 0 {
+		govBackendPort = 2345 // Default governance backend port
+	}
+
 	go govClient.StartHTTPServerWithClient(govclient.HTTPServerConfig{
-		Port: 9092,
+		Port: govBackendPort,
 	})
 
 	// Wait a bit for server to start
 	time.Sleep(200 * time.Millisecond)
 
-	// Extract IP from listen address
-	listenIP := strings.Split(cfg.Server.ListenAddr, ":")[0]
-	if listenIP == "" || listenIP == "0.0.0.0" {
-		// Try to get pod IP from environment or use hostname
-		if podIP := os.Getenv("POD_IP"); podIP != "" {
-			listenIP = podIP
-		} else {
-			listenIP = "localhost"
+	// Use ServiceIP from environment config for health check URL
+	// This defaults to local IP address and can be overridden via SERVICE_IP env var
+	serviceIP := cfg.Governance.ServiceIP
+	if serviceIP == "" || serviceIP == "0.0.0.0" {
+		// Fallback: use actual hostname for Docker/K8s environments
+		serviceIP, _ = os.Hostname()
+	}
+
+	// Use ServicePort from environment config for governance registration
+	servicePort := cfg.Governance.ServicePort
+	if servicePort == 0 {
+		// Fallback: extract from server listen address
+		listenParts := strings.Split(cfg.Server.ListenAddr, ":")
+		if len(listenParts) > 1 {
+			fmt.Sscanf(listenParts[1], "%d", &servicePort)
+		}
+		if servicePort == 0 {
+			servicePort = 3868 // Default diameter port
 		}
 	}
-	listenPort := 3868 // Default diameter port
 
 	// Build subscriptions
 	subscriptions := make([]models.Subscription, 0)
@@ -234,15 +330,15 @@ func registerWithGovernance(cfg *config.Config, log logger.Logger) *govclient.Cl
 			{
 				ProviderID: "diameter",
 				Protocol:   models.ProtocolTCP,
-				IP:         listenIP,
-				Port:       listenPort,
+				IP:         serviceIP,
+				Port:       servicePort,
 			},
 		},
-		HealthCheckURL:  fmt.Sprintf("http://%s:9092/health", listenIP),
-		NotificationURL: fmt.Sprintf("http://%s:9092/notify", listenIP),
-		Subscriptions:   []models.Subscription{{
-			ServiceName: "eir-diameter",
-			ProviderIDs: []string{"eir-diameter"},
+		HealthCheckURL:  fmt.Sprintf("http://%s:%d/health", serviceIP, govBackendPort),
+		NotificationURL: fmt.Sprintf("http://%s:%d/notify", serviceIP, govBackendPort),
+		Subscriptions: []models.Subscription{{
+			ServiceName: models.ServiceNameEir,
+			ProviderIDs: []string{string(models.ProviderEIRDiameter)},
 		}},
 	}
 
@@ -319,4 +415,82 @@ func statsReporter(ctx context.Context, gw *gateway.Gateway, log logger.Logger, 
 			log.Infow("==========================")
 		}
 	}
+}
+
+func startStatsServer(port int, gw *gateway.Gateway, startTime time.Time, log logger.Logger) {
+	mux := http.NewServeMux()
+
+	// Unified stats endpoint
+	mux.HandleFunc("/api/stats", func(w http.ResponseWriter, r *http.Request) {
+		handleUnifiedStats(w, r, gw, startTime)
+	})
+
+	// Health check endpoint
+	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+		handleHealth(w, r, gw)
+	})
+
+	addr := fmt.Sprintf(":%d", port)
+	log.Infow("Starting stats API server", "address", addr)
+
+	server := &http.Server{
+		Addr:    addr,
+		Handler: mux,
+	}
+
+	if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		log.Errorw("Stats server error", "error", err)
+	}
+}
+
+func handleUnifiedStats(w http.ResponseWriter, r *http.Request, gw *gateway.Gateway, startTime time.Time) {
+	// Get Diam-GW stats
+	gwStats := gw.GetStats()
+
+	// Convert to unified format
+	serviceStats := diamStats.ConvertToUnifiedStats(&gwStats, startTime)
+
+	// Create response
+	response := unifiedStats.StatsResponse{
+		Status: "success",
+		Data:   *serviceStats,
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+}
+
+func handleHealth(w http.ResponseWriter, r *http.Request, gw *gateway.Gateway) {
+	gwStats := gw.GetStats()
+	draStats := gw.GetDRAPool().GetStats()
+
+	health := unifiedStats.HealthStatus{
+		Status:    "healthy",
+		Timestamp: time.Now(),
+		Checks: map[string]unifiedStats.Check{
+			"gateway": {
+				Status:  "pass",
+				Message: fmt.Sprintf("Active sessions: %d, Total requests: %d", gwStats.ActiveSessions, gwStats.TotalRequests),
+			},
+			"dra_pool": {
+				Status:  "pass",
+				Message: fmt.Sprintf("Active DRAs: %d/%d, Active connections: %d", draStats.ActiveDRAs, draStats.TotalDRAs, draStats.ActiveConnections),
+			},
+		},
+	}
+
+	// Check if DRA pool has issues
+	if draStats.ActiveDRAs == 0 {
+		health.Status = "degraded"
+		health.Checks["dra_pool"] = unifiedStats.Check{
+			Status:  "warn",
+			Message: "No active DRA connections",
+		}
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(health)
 }

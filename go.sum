@@ -96,8 +96,10 @@ github.com/hashicorp/serf v0.10.1 h1:Z1H2J60yRKvfDYAOZLd2MU0ND4AH/WDz7xYHDWQsIPY
 github.com/hashicorp/serf v0.10.1/go.mod h1:yL2t6BqATOLGc5HF7qbFkTfXoPIY0WZdWHfEvMqbG+4=
 github.com/hsdfat/go-zlog v0.0.3 h1:lNZDSu5DbHMGt4QB7AwTUgSDnxAMs5tWyGVs6F7n9no=
 github.com/hsdfat/go-zlog v0.0.3/go.mod h1:fT0IzEu0cTAG/kC7YeM8BN0I+HqJOXME3nMRW2lRQKI=
-github.com/hsdfat/telco v0.0.4 h1:0b0RlC9VeMSjzpZU5N6GcG6oy2fXOriEVXaYdOQOAv4=
-github.com/hsdfat/telco v0.0.4/go.mod h1:NyM9tj8SbLik9P/68F0mJ86b2fKgWuhXC8UEb2X3K7E=
+github.com/hsdfat/governance v0.0.0-20260110065044-9e088598e01a h1:BPgcCdT5IgrAb1O3qSViGuAFAifMD4QRCrdDbJThKLE=
+github.com/hsdfat/governance v0.0.0-20260110065044-9e088598e01a/go.mod h1:K6uqNVCW8pQmaKZm9mq5Mgnxhv69bfSpQxnO0qYNf74=
+github.com/hsdfat/telco v0.0.5-0.20260110064706-87be845ac618 h1:+a1i8vJYbO5QBM77BArclspengN0ao93fxsFrWXDDBo=
+github.com/hsdfat/telco v0.0.5-0.20260110064706-87be845ac618/go.mod h1:NyM9tj8SbLik9P/68F0mJ86b2fKgWuhXC8UEb2X3K7E=
 github.com/json-iterator/go v1.1.6/go.mod h1:+SdeFBvtyEkXs7REEP0seUULqWtbJapLOCVDaaPEHmU=
 github.com/json-iterator/go v1.1.9/go.mod h1:KdQUCv79m/52Kvf8AW2vK1V8akMuk1QjK/uOdHXbAo4=
 github.com/julienschmidt/httprouter v1.2.0/go.mod h1:SYymIcj16QtmaHHD7aYtjjsJG7VTCxuUUipMqKk8s4w=

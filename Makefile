@@ -227,4 +227,4 @@ help:
 	@echo "    MAX_DWR_FAILURES   - Max failures before reconnect (default: 3)"
 
 run:
-	go run cmd/gateway/main.go
+	go run ./cmd/gateway/

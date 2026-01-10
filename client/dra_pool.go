@@ -186,6 +186,9 @@ func NewDRAPool(ctx context.Context, config *DRAPoolConfig, log logger.Logger) (
 		}
 
 		pool.draPools[draConfig.Name] = connPool
+		pool.logger.Infow("Created DRA connection pool", "dra", draConfig.Name,
+			"priority", draConfig.Priority,
+			"address", draConfig.Host+fmt.Sprintf(":%d", draConfig.Port))
 	}
 
 	return pool, nil

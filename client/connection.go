@@ -175,6 +175,9 @@ func (c *Connection) Start() error {
 	c.logger.Infow("Starting connection", "conn_id", c.id, "host", c.config.Host, "port", c.config.Port)
 
 	if err := c.connect(); err != nil {
+		// Trigger reconnection mechanism for initial connection failures
+		// This ensures connections retry even when they fail during startup
+		c.handleFailure(err)
 		return err
 	}
 
@@ -722,9 +725,9 @@ func (c *Connection) handleFailure(err error) {
 	// Notify pool or other managers immediately
 	c.callOnFailure(err)
 
-	// Attempt reconnection
+	// Attempt reconnection in a separate goroutine to avoid blocking
 	if !c.reconnectDisabled {
-		c.reconnect()
+		go c.reconnect()
 	}
 }
 

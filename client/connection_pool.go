@@ -65,7 +65,14 @@ func NewConnectionPool(ctx context.Context, config *DRAConfig, log logger.Logger
 	// Create connections
 	for i := 0; i < config.ConnectionCount; i++ {
 		connID := fmt.Sprintf("%s:%d-conn%d", config.Host, config.Port, i)
-		pool.connections[i] = NewConnection(ctx, connID, config, log)
+		conn := NewConnection(ctx, connID, config, log)
+
+		// Set failure callback to track connection failures
+		conn.SetOnFailure(func(err error) {
+			pool.handleConnectionFailure(connID, err)
+		})
+
+		pool.connections[i] = conn
 	}
 
 	return pool, nil
@@ -96,7 +103,10 @@ func (p *ConnectionPool) Start() error {
 			time.Sleep(time.Duration(idx) * 100 * time.Millisecond)
 
 			if err := c.Start(); err != nil {
-				logger.Log.Errorw("Failed to start connection", "conn_id", c.ID(), "error", err)
+				// Log as warning instead of error since reconnection is automatic
+				logger.Log.Warnw("Initial connection failed, will retry automatically",
+					"conn_id", c.ID(), "error", err)
+				// Still report error for initial pool health check
 				errCh <- err
 			} else {
 				p.incrementActive()
@@ -121,11 +131,18 @@ func (p *ConnectionPool) Start() error {
 	p.startHealthReporter()
 
 	// Check if we have at least one active connection
-	if p.getActiveCount() == 0 {
-		return fmt.Errorf("failed to establish any connections: %w", startErr)
+	activeCount := p.getActiveCount()
+	if activeCount == 0 {
+		// Don't fail completely - connections will retry automatically
+		logger.Log.Warnw("No connections active yet, automatic reconnection in progress",
+			"total", p.config.ConnectionCount,
+			"initial_error", startErr)
+	} else {
+		logger.Log.Infow("Connection pool started", "active", activeCount, "total", p.config.ConnectionCount)
 	}
 
-	logger.Log.Infow("Connection pool started", "active", p.getActiveCount(), "total", p.config.ConnectionCount)
+	// Always return nil to allow the pool to operate
+	// Connections will automatically retry in the background
 
 	return nil
 }
@@ -409,6 +426,16 @@ func (p *ConnectionPool) Close() error {
 }
 
 // Helper methods
+
+// handleConnectionFailure is called when a connection fails
+// This callback is invoked by individual connections when they encounter failures
+func (p *ConnectionPool) handleConnectionFailure(connID string, err error) {
+	logger.Log.Warnw("Connection failure detected, automatic reconnection in progress",
+		"conn_id", connID,
+		"error", err)
+	// Note: Connection will automatically attempt reconnection via its reconnect() method
+	// We don't need to decrement activeCount here as IsHealthy() checks actual connection states
+}
 
 func (p *ConnectionPool) incrementActive() {
 	p.mu.Lock()
