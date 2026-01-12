@@ -35,6 +35,34 @@ func main() {
 
 	// Initialize logger
 	log := logger.New("diam-gw", cfg.Logging.Level)
+
+	// Initialize centralized logging if enabled
+	if cfg.Logging.Centralized.Enabled {
+		centralizedCfg := &logger.CentralizedConfig{
+			Enabled:       cfg.Logging.Centralized.Enabled,
+			Backend:       cfg.Logging.Centralized.Backend,
+			LokiURL:       cfg.Logging.Centralized.LokiURL,
+			HTTPURL:       cfg.Logging.Centralized.HTTPURL,
+			TenantID:      cfg.Logging.Centralized.TenantID,
+			BearerToken:   cfg.Logging.Centralized.BearerToken,
+			BufferSize:    cfg.Logging.Centralized.BufferSize,
+			FlushInterval: cfg.Logging.Centralized.FlushInterval,
+			MaxBatchSize:  cfg.Logging.Centralized.MaxBatchSize,
+			Labels:        cfg.Logging.Centralized.Labels,
+		}
+
+		if err := logger.InitializeWithCentralizedLogging(centralizedCfg, cfg.Logging.Level); err != nil {
+			log.Warnw("Failed to initialize centralized logging, using console only", "error", err)
+		} else {
+			log.Infow("Centralized logging initialized",
+				"backend", cfg.Logging.Centralized.Backend,
+				"url", cfg.Logging.Centralized.LokiURL)
+		}
+
+		// Recreate logger after initialization
+		log = logger.New("diam-gw", cfg.Logging.Level)
+	}
+
 	log.Infow("Starting Diameter Gateway",
 		"version", "1.0.0",
 		"listen", cfg.Server.ListenAddr,

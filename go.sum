@@ -94,8 +94,8 @@ github.com/hashicorp/memberlist v0.5.0 h1:EtYPN8DpAURiapus508I4n9CzHs2W+8NZGbmmR
 github.com/hashicorp/memberlist v0.5.0/go.mod h1:yvyXLpo0QaGE59Y7hDTsTzDD25JYBZ4mHgHUZ8lrOI0=
 github.com/hashicorp/serf v0.10.1 h1:Z1H2J60yRKvfDYAOZLd2MU0ND4AH/WDz7xYHDWQsIPY=
 github.com/hashicorp/serf v0.10.1/go.mod h1:yL2t6BqATOLGc5HF7qbFkTfXoPIY0WZdWHfEvMqbG+4=
-github.com/hsdfat/go-zlog v0.0.3 h1:lNZDSu5DbHMGt4QB7AwTUgSDnxAMs5tWyGVs6F7n9no=
-github.com/hsdfat/go-zlog v0.0.3/go.mod h1:fT0IzEu0cTAG/kC7YeM8BN0I+HqJOXME3nMRW2lRQKI=
+github.com/hsdfat/go-zlog v0.0.4-0.20260111162739-8e2e63137338 h1:IJUxM973vlxsPM/c9CgHlRd8K7TKvuHUjrC1G11zlBM=
+github.com/hsdfat/go-zlog v0.0.4-0.20260111162739-8e2e63137338/go.mod h1:fT0IzEu0cTAG/kC7YeM8BN0I+HqJOXME3nMRW2lRQKI=
 github.com/hsdfat/governance v0.0.0-20260110065044-9e088598e01a h1:BPgcCdT5IgrAb1O3qSViGuAFAifMD4QRCrdDbJThKLE=
 github.com/hsdfat/governance v0.0.0-20260110065044-9e088598e01a/go.mod h1:K6uqNVCW8pQmaKZm9mq5Mgnxhv69bfSpQxnO0qYNf74=
 github.com/hsdfat/telco v0.0.5-0.20260110064706-87be845ac618 h1:+a1i8vJYbO5QBM77BArclspengN0ao93fxsFrWXDDBo=
