@@ -1952,23 +1952,57 @@ func (g *Generator) generateTestFieldAssignmentWithVar(buf *bytes.Buffer, field 
 			for i, nestedField := range field.AVP.GroupedFields {
 				// Use the FieldName which is already properly converted from snake_case to CamelCase
 				nestedFieldName := nestedField.FieldName
+				nestedRequired := nestedField.Required
+				nestedRepeated := nestedField.Repeated
 				switch nestedField.AVP.TypeName {
 				case "UTF8String":
+					var val string
 					if nestedField.AVP.Name == "IMEI" {
-						buf.WriteString(fmt.Sprintf("%s\t\t%s: ptrUTF8String(\"123456789012345\"),\n", indent, nestedFieldName))
+						val = "\"123456789012345\""
 					} else if nestedField.AVP.Name == "Software-Version" {
-						buf.WriteString(fmt.Sprintf("%s\t\t%s: ptrUTF8String(\"01\"),\n", indent, nestedFieldName))
+						val = "\"01\""
 					} else {
-						buf.WriteString(fmt.Sprintf("%s\t\t%s: ptrUTF8String(\"test\"),\n", indent, nestedFieldName))
+						val = "\"test\""
+					}
+					if nestedRepeated {
+						buf.WriteString(fmt.Sprintf("%s\t\t%s: []models_base.UTF8String{models_base.UTF8String(%s)},\n", indent, nestedFieldName, val))
+					} else if nestedRequired {
+						buf.WriteString(fmt.Sprintf("%s\t\t%s: models_base.UTF8String(%s),\n", indent, nestedFieldName, val))
+					} else {
+						buf.WriteString(fmt.Sprintf("%s\t\t%s: ptrUTF8String(%s),\n", indent, nestedFieldName, val))
 					}
 				case "OctetString":
-					buf.WriteString(fmt.Sprintf("%s\t\t%s: ptrOctetString([]byte{0x01, 0x02, 0x03}),\n", indent, nestedFieldName))
+					if nestedRepeated {
+						buf.WriteString(fmt.Sprintf("%s\t\t%s: []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})},\n", indent, nestedFieldName))
+					} else if nestedRequired {
+						buf.WriteString(fmt.Sprintf("%s\t\t%s: models_base.OctetString([]byte{0x01, 0x02, 0x03}),\n", indent, nestedFieldName))
+					} else {
+						buf.WriteString(fmt.Sprintf("%s\t\t%s: ptrOctetString([]byte{0x01, 0x02, 0x03}),\n", indent, nestedFieldName))
+					}
 				case "Unsigned32":
-					buf.WriteString(fmt.Sprintf("%s\t\t%s: ptrUnsigned32(1),\n", indent, nestedFieldName))
+					if nestedRepeated {
+						buf.WriteString(fmt.Sprintf("%s\t\t%s: []models_base.Unsigned32{models_base.Unsigned32(1)},\n", indent, nestedFieldName))
+					} else if nestedRequired {
+						buf.WriteString(fmt.Sprintf("%s\t\t%s: models_base.Unsigned32(1),\n", indent, nestedFieldName))
+					} else {
+						buf.WriteString(fmt.Sprintf("%s\t\t%s: ptrUnsigned32(1),\n", indent, nestedFieldName))
+					}
 				case "Unsigned64":
-					buf.WriteString(fmt.Sprintf("%s\t\t%s: ptrUnsigned64(1),\n", indent, nestedFieldName))
+					if nestedRepeated {
+						buf.WriteString(fmt.Sprintf("%s\t\t%s: []models_base.Unsigned64{models_base.Unsigned64(1)},\n", indent, nestedFieldName))
+					} else if nestedRequired {
+						buf.WriteString(fmt.Sprintf("%s\t\t%s: models_base.Unsigned64(1),\n", indent, nestedFieldName))
+					} else {
+						buf.WriteString(fmt.Sprintf("%s\t\t%s: ptrUnsigned64(1),\n", indent, nestedFieldName))
+					}
 				case "Enumerated":
-					buf.WriteString(fmt.Sprintf("%s\t\t%s: ptrEnumerated(1),\n", indent, nestedFieldName))
+					if nestedRepeated {
+						buf.WriteString(fmt.Sprintf("%s\t\t%s: []models_base.Enumerated{models_base.Enumerated(1)},\n", indent, nestedFieldName))
+					} else if nestedRequired {
+						buf.WriteString(fmt.Sprintf("%s\t\t%s: models_base.Enumerated(1),\n", indent, nestedFieldName))
+					} else {
+						buf.WriteString(fmt.Sprintf("%s\t\t%s: ptrEnumerated(1),\n", indent, nestedFieldName))
+					}
 				default:
 					// For unknown types, add a comment
 					buf.WriteString(fmt.Sprintf("%s\t\t// %s (type: %s) needs to be set\n", indent, nestedFieldName, nestedField.AVP.TypeName))
@@ -2539,7 +2573,8 @@ func (g *Generator) generateCommandBenchmarkTest(buf *bytes.Buffer, cmd *Command
 func (g *Generator) hasAddressFields() bool {
 	for _, cmd := range g.Parser.Commands {
 		for _, field := range cmd.Fields {
-			if field.AVP != nil && field.AVP.TypeName == "Address" {
+			// Only required fields are set in unit/benchmark tests, so only count those
+			if field.AVP != nil && field.AVP.TypeName == "Address" && field.Required {
 				return true
 			}
 		}

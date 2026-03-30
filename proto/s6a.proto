@@ -1109,6 +1109,2015 @@ avp Error-Diagnostic {
 }
 
 // ================================================================================
+//                         MISSING SUB-AVP DEFINITIONS
+// ================================================================================
+// These AVPs are referenced as sub-fields of grouped AVPs above.
+// All use Vendor-ID = 10415 (3GPP), based on 3GPP TS 29.272 v16.x
+
+// ---- QoS / Bandwidth ----
+
+// Max-Requested-Bandwidth-UL (AVP Code 516)
+// Maximum uplink bitrate for the APN
+// Flags: M, V
+avp Max-Requested-Bandwidth-UL {
+  code = 516;
+  vendor_id = 10415;
+  type = Unsigned32;
+  must = true;
+  may_encrypt = false;
+  description = "Maximum requested uplink bandwidth in bps (AMBR/GBR)";
+}
+
+// Max-Requested-Bandwidth-DL (AVP Code 515)
+// Maximum downlink bitrate for the APN
+// Flags: M, V
+avp Max-Requested-Bandwidth-DL {
+  code = 515;
+  vendor_id = 10415;
+  type = Unsigned32;
+  must = true;
+  may_encrypt = false;
+  description = "Maximum requested downlink bandwidth in bps (AMBR/GBR)";
+}
+
+// Extended-Max-Requested-BW-UL (AVP Code 554)
+// Extended uplink bitrate exceeding 4 Gbps
+// Flags: V
+avp Extended-Max-Requested-BW-UL {
+  code = 554;
+  vendor_id = 10415;
+  type = Unsigned32;
+  must = false;
+  may_encrypt = false;
+  description = "Extended maximum uplink bandwidth in Kbps (values > 4294967295 bps)";
+}
+
+// Extended-Max-Requested-BW-DL (AVP Code 553)
+// Extended downlink bitrate exceeding 4 Gbps
+// Flags: V
+avp Extended-Max-Requested-BW-DL {
+  code = 553;
+  vendor_id = 10415;
+  type = Unsigned32;
+  must = false;
+  may_encrypt = false;
+  description = "Extended maximum downlink bandwidth in Kbps (values > 4294967295 bps)";
+}
+
+// QoS-Class-Identifier (AVP Code 1028) - from 3GPP TS 29.212
+// Identifies standardized QoS characteristics
+// Flags: M, V
+avp QoS-Class-Identifier {
+  code = 1028;
+  vendor_id = 10415;
+  type = Enumerated;
+  must = true;
+  may_encrypt = false;
+  description = "Identifies a standardized QoS class (QCI 1-9 for GBR/non-GBR)";
+  // Values: 1=QCI1(conversational), 2=QCI2, 3=QCI3, 4=QCI4 (GBR)
+  //         5=QCI5(IMS signaling), 6=QCI6, 7=QCI7, 8=QCI8, 9=QCI9 (non-GBR)
+  //         65-70=Mission critical, 75,79,80+ = operator-specific
+}
+
+// Allocation-Retention-Priority (AVP Code 1034) - Grouped, from 3GPP TS 29.212
+// Defines the priority of an EPS bearer
+// Flags: M, V
+avp Allocation-Retention-Priority {
+  code = 1034;
+  vendor_id = 10415;
+  type = Grouped;
+  must = true;
+  may_encrypt = false;
+  description = "Contains the allocation and retention priority parameters for an EPS bearer";
+
+  grouped {
+    required Priority-Level priority_level = 1;             // Code 1046
+    optional Pre-emption-Capability pre_emption_capability = 2;   // Code 1047
+    optional Pre-emption-Vulnerability pre_emption_vulnerability = 3;  // Code 1048
+  }
+}
+
+// Priority-Level (AVP Code 1046) - from 3GPP TS 29.212
+// Priority level 1 (highest) to 15 (lowest)
+// Flags: M, V
+avp Priority-Level {
+  code = 1046;
+  vendor_id = 10415;
+  type = Unsigned32;
+  must = true;
+  may_encrypt = false;
+  description = "Priority level for bearer allocation and retention (1=highest, 15=lowest)";
+}
+
+// Pre-emption-Capability (AVP Code 1047) - from 3GPP TS 29.212
+// Flags: M, V
+avp Pre-emption-Capability {
+  code = 1047;
+  vendor_id = 10415;
+  type = Enumerated;
+  must = true;
+  may_encrypt = false;
+  description = "Indicates if bearer can pre-empt lower priority bearers";
+  // Values: 0=PRE-EMPTION_CAPABILITY_ENABLED, 1=PRE-EMPTION_CAPABILITY_DISABLED
+}
+
+// Pre-emption-Vulnerability (AVP Code 1048) - from 3GPP TS 29.212
+// Flags: M, V
+avp Pre-emption-Vulnerability {
+  code = 1048;
+  vendor_id = 10415;
+  type = Enumerated;
+  must = true;
+  may_encrypt = false;
+  description = "Indicates if bearer can be pre-empted by higher priority bearers";
+  // Values: 0=PRE-EMPTION_VULNERABILITY_ENABLED, 1=PRE-EMPTION_VULNERABILITY_DISABLED
+}
+
+// ---- PDN / APN ----
+
+// PDN-Type (AVP Code 1456)
+// Type of PDN connection
+// Flags: M, V
+avp PDN-Type {
+  code = 1456;
+  vendor_id = 10415;
+  type = Enumerated;
+  must = true;
+  may_encrypt = false;
+  description = "Type of PDN (IPv4, IPv6, IPv4v6, or non-IP)";
+  // Values: 0=IPv4, 1=IPv6, 2=IPv4v6, 3=IPv4_OR_IPv6, 4=Non-IP
+}
+
+// Served-Party-IP-Address (AVP Code 848) - from 3GPP TS 32.299
+// IP address assigned to the served party
+// Flags: V
+avp Served-Party-IP-Address {
+  code = 848;
+  vendor_id = 10415;
+  type = Address;
+  must = false;
+  may_encrypt = false;
+  description = "IP address (IPv4 or IPv6) assigned to the subscriber for this PDN";
+}
+
+// MIP6-Agent-Info (AVP Code 486) - from RFC 5447
+// Contains home agent information for MIPv6
+// Flags: M
+avp MIP6-Agent-Info {
+  code = 486;
+  type = Grouped;
+  must = true;
+  may_encrypt = false;
+  description = "Contains Mobile IPv6 home agent address information";
+
+  grouped {
+    optional MIP-Home-Agent-Address mip_home_agent_address = 1;  // Code 334
+    optional MIP-Home-Agent-Host mip_home_agent_host = 2;        // Code 348
+    optional MIP6-Home-Link-Prefix mip6_home_link_prefix = 3;    // Code 125
+  }
+}
+
+// MIP-Home-Agent-Address (AVP Code 334) - RFC 4004
+avp MIP-Home-Agent-Address {
+  code = 334;
+  type = Address;
+  must = true;
+  may_encrypt = false;
+  description = "Home agent IP address for MIPv6";
+}
+
+// MIP-Home-Agent-Host (AVP Code 348) - RFC 4004
+avp MIP-Home-Agent-Host {
+  code = 348;
+  type = Grouped;
+  must = true;
+  may_encrypt = false;
+  description = "Home agent hostname for MIPv6";
+
+  grouped {
+    required Destination-Realm destination_realm = 1;
+    required Destination-Host destination_host = 2;
+  }
+}
+
+// MIP6-Home-Link-Prefix (AVP Code 125) - RFC 5447
+avp MIP6-Home-Link-Prefix {
+  code = 125;
+  type = OctetString;
+  must = true;
+  may_encrypt = false;
+  description = "IPv6 home link prefix for MIPv6";
+}
+
+// VPLMN-Dynamic-Address-Allowed (AVP Code 1432)
+// Indicates if VPLMN can dynamically assign addresses
+// Flags: M, V
+avp VPLMN-Dynamic-Address-Allowed {
+  code = 1432;
+  vendor_id = 10415;
+  type = Enumerated;
+  must = true;
+  may_encrypt = false;
+  description = "Indicates whether the VPLMN is allowed to assign dynamic IP addresses";
+  // Values: 0=NOTALLOWED, 1=ALLOWED
+}
+
+// PDN-GW-Allocation-Type (AVP Code 1438)
+// How the PDN-GW was allocated
+// Flags: M, V
+avp PDN-GW-Allocation-Type {
+  code = 1438;
+  vendor_id = 10415;
+  type = Enumerated;
+  must = true;
+  may_encrypt = false;
+  description = "Indicates how the PDN-GW was allocated (static or dynamic)";
+  // Values: 0=STATIC, 1=DYNAMIC
+}
+
+// 3GPP-Charging-Characteristics (AVP Code 13)
+// Charging characteristics per TS 29.061
+// Flags: V
+avp 3GPP-Charging-Characteristics {
+  code = 13;
+  vendor_id = 10415;
+  type = UTF8String;
+  must = false;
+  may_encrypt = false;
+  description = "3GPP charging characteristics (4-hex digit string per TS 32.215)";
+}
+
+// Specific-APN-Info (AVP Code 1472) - Grouped
+// Contains specific APN access information
+// Flags: V
+avp Specific-APN-Info {
+  code = 1472;
+  vendor_id = 10415;
+  type = Grouped;
+  must = false;
+  may_encrypt = false;
+  description = "Contains APN information for a specific access network type";
+
+  grouped {
+    required Service-Selection service_selection = 1;    // APN name
+    required MIP6-Agent-Info mip6_agent_info = 2;        // PDN-GW
+    optional Visited-Network-Identifier visited_network_identifier = 3;
+  }
+}
+
+// SIPTO-Permission (AVP Code 1613)
+// Permission for Selective IP Traffic Offload
+// Flags: M, V
+avp SIPTO-Permission {
+  code = 1613;
+  vendor_id = 10415;
+  type = Enumerated;
+  must = true;
+  may_encrypt = false;
+  description = "Indicates whether selective IP traffic offload is permitted";
+  // Values: 0=SIPTO_above_RAN_ALLOWED, 1=SIPTO_above_RAN_NOTALLOWED
+}
+
+// LIPA-Permission (AVP Code 1618)
+// Permission for Local IP Access
+// Flags: M, V
+avp LIPA-Permission {
+  code = 1618;
+  vendor_id = 10415;
+  type = Enumerated;
+  must = true;
+  may_encrypt = false;
+  description = "Indicates whether Local IP Access (LIPA) is permitted";
+  // Values: 0=LIPA_PROHIBITED, 1=LIPA_ONLY, 2=LIPA_CONDITIONAL
+}
+
+// Restoration-Priority (AVP Code 1663)
+// Priority for bearer restoration
+// Flags: V
+avp Restoration-Priority {
+  code = 1663;
+  vendor_id = 10415;
+  type = Unsigned32;
+  must = false;
+  may_encrypt = false;
+  description = "Priority level for APN bearer restoration after S-GW/P-GW failure";
+}
+
+// SIPTO-Local-Network-Permission (AVP Code 1665)
+// Permission for local network traffic offload
+// Flags: V
+avp SIPTO-Local-Network-Permission {
+  code = 1665;
+  vendor_id = 10415;
+  type = Unsigned32;
+  must = false;
+  may_encrypt = false;
+  description = "Bitmask indicating SIPTO at local network permission";
+}
+
+// WLAN-offloadability (AVP Code 1667) - Grouped
+// Indicates WLAN offload capability
+// Flags: V
+avp WLAN-offloadability {
+  code = 1667;
+  vendor_id = 10415;
+  type = Grouped;
+  must = false;
+  may_encrypt = false;
+  description = "Indicates the offloadability to WLAN for EUTRAN and UTRAN";
+
+  grouped {
+    optional WLAN-offloadability-EUTRAN wlan_offloadability_eutran = 1;  // Code 1668
+    optional WLAN-offloadability-UTRAN wlan_offloadability_utran = 2;    // Code 1669
+  }
+}
+
+// WLAN-offloadability-EUTRAN (AVP Code 1668)
+avp WLAN-offloadability-EUTRAN {
+  code = 1668;
+  vendor_id = 10415;
+  type = Unsigned32;
+  must = false;
+  may_encrypt = false;
+  description = "Bitmask for WLAN offloadability in E-UTRAN";
+}
+
+// WLAN-offloadability-UTRAN (AVP Code 1669)
+avp WLAN-offloadability-UTRAN {
+  code = 1669;
+  vendor_id = 10415;
+  type = Unsigned32;
+  must = false;
+  may_encrypt = false;
+  description = "Bitmask for WLAN offloadability in UTRAN";
+}
+
+// Non-IP-PDN-Type-Indicator (AVP Code 1681)
+// Indicates non-IP PDN type
+// Flags: V
+avp Non-IP-PDN-Type-Indicator {
+  code = 1681;
+  vendor_id = 10415;
+  type = Enumerated;
+  must = false;
+  may_encrypt = false;
+  description = "Indicates whether non-IP PDN type is supported";
+  // Values: 0=False, 1=True
+}
+
+// Non-IP-Data-Delivery-Mechanism (AVP Code 1682)
+// Mechanism for non-IP data delivery
+// Flags: V
+avp Non-IP-Data-Delivery-Mechanism {
+  code = 1682;
+  vendor_id = 10415;
+  type = Unsigned32;
+  must = false;
+  may_encrypt = false;
+  description = "Indicates mechanism for non-IP data delivery (SCEF or SGi)";
+  // Values: 0=UNSTRUCTURED_CSP_POINT_TO_POINT, 1=WHOLE_PDU_TRANSMISSION_VIA_SGi, 2=SCEF
+}
+
+// SCEF-ID (AVP Code 3125)
+// Service Capability Exposure Function identifier
+// Flags: V
+avp SCEF-ID {
+  code = 3125;
+  vendor_id = 10415;
+  type = DiameterIdentity;
+  must = false;
+  may_encrypt = false;
+  description = "Identity of the SCEF (Service Capability Exposure Function)";
+}
+
+// SCEF-Realm (AVP Code 1684)
+// Realm of the SCEF
+// Flags: V
+avp SCEF-Realm {
+  code = 1684;
+  vendor_id = 10415;
+  type = DiameterIdentity;
+  must = false;
+  may_encrypt = false;
+  description = "Diameter realm of the SCEF";
+}
+
+// Preferred-Data-Mode (AVP Code 1686)
+// Preferred data transmission mode
+// Flags: V
+avp Preferred-Data-Mode {
+  code = 1686;
+  vendor_id = 10415;
+  type = Unsigned32;
+  must = false;
+  may_encrypt = false;
+  description = "Bitmask indicating preferred data transmission mode (UP/CP)";
+}
+
+// PDN-Connection-Continuity (AVP Code 1690)
+// PDN connection continuity indication
+// Flags: V
+avp PDN-Connection-Continuity {
+  code = 1690;
+  vendor_id = 10415;
+  type = Unsigned32;
+  must = false;
+  may_encrypt = false;
+  description = "Indicates whether PDN connection continuity across RATs is required";
+}
+
+// ---- Subscription Data sub-AVPs ----
+
+// Network-Access-Mode (AVP Code 1417)
+// Indicates the type of network access
+// Flags: M, V
+avp Network-Access-Mode {
+  code = 1417;
+  vendor_id = 10415;
+  type = Enumerated;
+  must = true;
+  may_encrypt = false;
+  description = "Indicates the type of network the subscriber is allowed to access";
+  // Values: 0=PACKET_AND_CIRCUIT, 1=Reserved, 2=ONLY_PACKET
+}
+
+// HPLMN-ODB (AVP Code 1418)
+// Operator Determined Barring for HPLMN
+// Flags: M, V
+avp HPLMN-ODB {
+  code = 1418;
+  vendor_id = 10415;
+  type = Unsigned32;
+  must = true;
+  may_encrypt = false;
+  description = "Bitmask of HPLMN-specific operator determined barring categories";
+}
+
+// STN-SR (AVP Code 1433)
+// Session Transfer Number for Single Registration
+// Flags: M, V
+avp STN-SR {
+  code = 1433;
+  vendor_id = 10415;
+  type = OctetString;
+  must = true;
+  may_encrypt = false;
+  description = "Session Transfer Number for Single Registration (ISDN-AddressString format)";
+}
+
+// RAT-Frequency-Selection-Priority-ID (AVP Code 1440)
+// Priority ID for RAT/frequency selection
+// Flags: V
+avp RAT-Frequency-Selection-Priority-ID {
+  code = 1440;
+  vendor_id = 10415;
+  type = Unsigned32;
+  must = false;
+  may_encrypt = false;
+  description = "RAT/Frequency Selection Priority identifier for inter-RAT reselection";
+}
+
+// Regional-Subscription-Zone-Code (AVP Code 1446)
+// Zone codes for regional subscription
+// Flags: M, V
+avp Regional-Subscription-Zone-Code {
+  code = 1446;
+  vendor_id = 10415;
+  type = OctetString;
+  must = true;
+  may_encrypt = false;
+  description = "Zone code defining areas where the subscriber is allowed to roam";
+}
+
+// Roaming-Restricted-Due-To-Unsupported-Feature (AVP Code 1457)
+// Indicates roaming restriction due to unsupported feature
+// Flags: M, V
+avp Roaming-Restricted-Due-To-Unsupported-Feature {
+  code = 1457;
+  vendor_id = 10415;
+  type = Enumerated;
+  must = true;
+  may_encrypt = false;
+  description = "Roaming is restricted because visited network lacks required features";
+  // Values: 0=Roaming-Restricted-Due-To-Unsupported-Feature
+}
+
+// Trace-Data (AVP Code 1458) - Grouped
+// Contains trace activation parameters
+// Flags: M, V
+avp Trace-Data {
+  code = 1458;
+  vendor_id = 10415;
+  type = Grouped;
+  must = true;
+  may_encrypt = false;
+  description = "Contains parameters for trace data collection";
+
+  grouped {
+    required Trace-Reference trace_reference = 1;   // Code 1459
+    required Trace-Depth trace_depth = 2;           // Code 1462
+    required Trace-NE-Type-List trace_ne_type_list = 3;  // Code 1463
+    optional Trace-Interface-List trace_interface_list = 4;  // Code 1464
+    required Trace-Event-List trace_event_list = 5;   // Code 1465
+    optional OMC-Id omc_id = 6;                     // Code 1466
+    required Trace-Collection-Entity trace_collection_entity = 7;  // Code 1468
+    optional MDT-Configuration mdt_configuration = 8;  // Code 1622
+  }
+}
+
+// Trace-Reference (AVP Code 1459)
+avp Trace-Reference {
+  code = 1459;
+  vendor_id = 10415;
+  type = OctetString;
+  must = true;
+  may_encrypt = false;
+  description = "Trace reference (PLMN-ID + Trace-ID, 6 bytes)";
+}
+
+// Trace-Depth (AVP Code 1462)
+avp Trace-Depth {
+  code = 1462;
+  vendor_id = 10415;
+  type = Enumerated;
+  must = true;
+  may_encrypt = false;
+  description = "Depth of trace (minimum/medium/maximum/vendorMinimum/vendorMedium/vendorMaximum)";
+}
+
+// Trace-NE-Type-List (AVP Code 1463)
+avp Trace-NE-Type-List {
+  code = 1463;
+  vendor_id = 10415;
+  type = OctetString;
+  must = true;
+  may_encrypt = false;
+  description = "Bitmask of network element types to be traced";
+}
+
+// Trace-Interface-List (AVP Code 1464)
+avp Trace-Interface-List {
+  code = 1464;
+  vendor_id = 10415;
+  type = OctetString;
+  must = false;
+  may_encrypt = false;
+  description = "Bitmask of interfaces to be traced";
+}
+
+// Trace-Event-List (AVP Code 1465)
+avp Trace-Event-List {
+  code = 1465;
+  vendor_id = 10415;
+  type = OctetString;
+  must = true;
+  may_encrypt = false;
+  description = "Bitmask of events to be traced";
+}
+
+// OMC-Id (AVP Code 1466)
+avp OMC-Id {
+  code = 1466;
+  vendor_id = 10415;
+  type = OctetString;
+  must = false;
+  may_encrypt = false;
+  description = "Operations and Maintenance Center identity";
+}
+
+// Trace-Collection-Entity (AVP Code 1468)
+avp Trace-Collection-Entity {
+  code = 1468;
+  vendor_id = 10415;
+  type = Address;
+  must = true;
+  may_encrypt = false;
+  description = "IP address of the trace collection entity";
+}
+
+// MDT-Configuration (AVP Code 1622) - Grouped (simplified)
+avp MDT-Configuration {
+  code = 1622;
+  vendor_id = 10415;
+  type = Grouped;
+  must = false;
+  may_encrypt = false;
+  description = "Minimization of Drive Tests configuration parameters";
+
+  grouped {
+    required Job-Type job_type = 1;                          // Code 1623
+    optional Area-Scope area_scope = 2;                      // Code 1624
+    optional List-Of-Measurements list_of_measurements = 3;  // Code 1625
+    optional Reporting-Trigger reporting_trigger = 4;         // Code 1626
+    optional Report-Interval report_interval = 5;             // Code 1627
+    optional Report-Amount report_amount = 6;                 // Code 1628
+    optional Event-Threshold-RSRP event_threshold_rsrp = 7;  // Code 1629
+    optional Event-Threshold-RSRQ event_threshold_rsrq = 8;  // Code 1630
+    optional Logging-Interval logging_interval = 9;           // Code 1631
+    optional Logging-Duration logging_duration = 10;          // Code 1632
+    optional Measurement-Period-UMTS measurement_period_umts = 11;  // Code 1655
+    optional Measurement-Period-LTE measurement_period_lte = 12;    // Code 1656
+    optional Collection-Period-RRM-LTE collection_period_rrm_lte = 13;  // Code 1657
+    optional Collection-Period-RRM-UMTS collection_period_rrm_umts = 14;  // Code 1658
+    optional Positioning-Method positioning_method = 15;     // Code 1659
+    optional Measurement-Quantity measurement_quantity = 16;  // Code 1660
+    optional Event-Threshold-Event-1F event_threshold_1f = 17;  // Code 1661
+    optional Event-Threshold-Event-1I event_threshold_1i = 18;  // Code 1662
+  }
+}
+
+// MDT-Configuration sub-AVPs (simplified leaf nodes)
+avp Job-Type { code = 1623; vendor_id = 10415; type = Enumerated; must = true; may_encrypt = false; description = "MDT job type"; }
+avp Area-Scope { code = 1624; vendor_id = 10415; type = Grouped; must = false; may_encrypt = false; description = "Area scope for MDT"; grouped { } }
+avp List-Of-Measurements { code = 1625; vendor_id = 10415; type = Unsigned32; must = true; may_encrypt = false; description = "Bitmask of MDT measurements"; }
+avp Reporting-Trigger { code = 1626; vendor_id = 10415; type = Unsigned32; must = false; may_encrypt = false; description = "MDT reporting trigger bitmask"; }
+avp Report-Interval { code = 1627; vendor_id = 10415; type = Enumerated; must = false; may_encrypt = false; description = "MDT report interval"; }
+avp Report-Amount { code = 1628; vendor_id = 10415; type = Enumerated; must = false; may_encrypt = false; description = "Number of MDT reports"; }
+avp Event-Threshold-RSRP { code = 1629; vendor_id = 10415; type = Unsigned32; must = false; may_encrypt = false; description = "MDT event threshold RSRP"; }
+avp Event-Threshold-RSRQ { code = 1630; vendor_id = 10415; type = Unsigned32; must = false; may_encrypt = false; description = "MDT event threshold RSRQ"; }
+avp Logging-Interval { code = 1631; vendor_id = 10415; type = Enumerated; must = false; may_encrypt = false; description = "MDT logging interval"; }
+avp Logging-Duration { code = 1632; vendor_id = 10415; type = Enumerated; must = false; may_encrypt = false; description = "MDT logging duration"; }
+avp Measurement-Period-UMTS { code = 1655; vendor_id = 10415; type = Enumerated; must = false; may_encrypt = false; description = "MDT measurement period for UMTS"; }
+avp Measurement-Period-LTE { code = 1656; vendor_id = 10415; type = Enumerated; must = false; may_encrypt = false; description = "MDT measurement period for LTE"; }
+avp Collection-Period-RRM-LTE { code = 1657; vendor_id = 10415; type = Enumerated; must = false; may_encrypt = false; description = "MDT RRM collection period for LTE"; }
+avp Collection-Period-RRM-UMTS { code = 1658; vendor_id = 10415; type = Enumerated; must = false; may_encrypt = false; description = "MDT RRM collection period for UMTS"; }
+avp Positioning-Method { code = 1659; vendor_id = 10415; type = OctetString; must = false; may_encrypt = false; description = "MDT positioning method bitmask"; }
+avp Measurement-Quantity { code = 1660; vendor_id = 10415; type = OctetString; must = false; may_encrypt = false; description = "MDT measurement quantity"; }
+avp Event-Threshold-Event-1F { code = 1661; vendor_id = 10415; type = Integer32; must = false; may_encrypt = false; description = "MDT event threshold 1F"; }
+avp Event-Threshold-Event-1I { code = 1662; vendor_id = 10415; type = Integer32; must = false; may_encrypt = false; description = "MDT event threshold 1I"; }
+
+// GPRS-Subscription-Data (AVP Code 1467) - Grouped
+// Contains GPRS/2G/3G subscription data
+// Flags: M, V
+avp GPRS-Subscription-Data {
+  code = 1467;
+  vendor_id = 10415;
+  type = Grouped;
+  must = true;
+  may_encrypt = false;
+  description = "Contains GPRS subscription data (2G/3G PDP context configurations)";
+
+  grouped {
+    required Complete-Data-List-Included-Indicator complete_data_list_included_indicator = 1;  // Code 1468 (reuse placeholder)
+    repeated PDP-Context pdp_context = 2;           // Code 1469
+  }
+}
+
+// Complete-Data-List-Included-Indicator (AVP Code 1468 conflict - use 1510)
+avp Complete-Data-List-Included-Indicator {
+  code = 1510;
+  vendor_id = 10415;
+  type = Enumerated;
+  must = true;
+  may_encrypt = false;
+  description = "Indicates if the complete list of PDP contexts is included";
+  // Values: 0=All_PDP_CONTEXTS_INCLUDED, 1=MODIFIED_ADDED_PDP_CONTEXTS_INCLUDED
+}
+
+// PDP-Context (AVP Code 1469) - Grouped
+avp PDP-Context {
+  code = 1469;
+  vendor_id = 10415;
+  type = Grouped;
+  must = true;
+  may_encrypt = false;
+  description = "Contains a single PDP context configuration for GPRS";
+
+  grouped {
+    required Context-Identifier context_identifier = 1;
+    required PDP-Type pdp_type = 2;                       // Code 1470
+    optional PDP-Address pdp_address = 3;                 // Code 1227
+    optional QoS-Subscribed qos_subscribed = 4;           // Code 1404
+    optional VPLMN-Dynamic-Address-Allowed vplmn_dynamic_address_allowed = 5;
+    optional Service-Selection service_selection = 6;
+    optional 3GPP-Charging-Characteristics charging_characteristics = 7;
+    optional Ext-PDP-Type ext_pdp_type = 8;               // Code 1243
+    optional Ext-PDP-Address ext_pdp_address = 9;         // Code 1244
+    optional AMBR ambr = 10;
+    optional Specific-APN-Info specific_apn_info = 11;
+    optional SIPTO-Permission sipto_permission = 12;
+    optional LIPA-Permission lipa_permission = 13;
+    optional Restoration-Priority restoration_priority = 14;
+    optional SIPTO-Local-Network-Permission sipto_local_network_permission = 15;
+  }
+}
+
+// PDP-Type (AVP Code 1470)
+avp PDP-Type {
+  code = 1470;
+  vendor_id = 10415;
+  type = OctetString;
+  must = true;
+  may_encrypt = false;
+  description = "PDP Type for GPRS context (e.g., IP, PPP)";
+}
+
+// PDP-Address (AVP Code 1227) - from 3GPP TS 32.299
+avp PDP-Address {
+  code = 1227;
+  vendor_id = 10415;
+  type = Address;
+  must = false;
+  may_encrypt = false;
+  description = "Static PDP address for a GPRS PDP context";
+}
+
+// QoS-Subscribed (AVP Code 1404)
+avp QoS-Subscribed {
+  code = 1404;
+  vendor_id = 10415;
+  type = OctetString;
+  must = true;
+  may_encrypt = false;
+  description = "Subscribed QoS profile for a GPRS PDP context";
+}
+
+// Ext-PDP-Type (AVP Code 1243) - from 3GPP TS 29.272
+avp Ext-PDP-Type {
+  code = 1243;
+  vendor_id = 10415;
+  type = OctetString;
+  must = false;
+  may_encrypt = false;
+  description = "Extended PDP type for non-IP PDP contexts";
+}
+
+// Ext-PDP-Address (AVP Code 1244) - from 3GPP TS 29.272
+avp Ext-PDP-Address {
+  code = 1244;
+  vendor_id = 10415;
+  type = Address;
+  must = false;
+  may_encrypt = false;
+  description = "Extended static PDP address (secondary IPv6 prefix)";
+}
+
+// CSG-Id (AVP Code 1437)
+// Closed Subscriber Group identifier
+// Flags: M, V
+avp CSG-Id {
+  code = 1437;
+  vendor_id = 10415;
+  type = Unsigned32;
+  must = true;
+  may_encrypt = false;
+  description = "Closed Subscriber Group identifier (28-bit value)";
+}
+
+// Expiration-Date (AVP Code 1439)
+// CSG subscription expiration date
+// Flags: M, V
+avp Expiration-Date {
+  code = 1439;
+  vendor_id = 10415;
+  type = Time;
+  must = true;
+  may_encrypt = false;
+  description = "Expiration date of the CSG subscription";
+}
+
+// LCS-Info (AVP Code 1473) - Grouped
+// Location Services information
+// Flags: M, V
+avp LCS-Info {
+  code = 1473;
+  vendor_id = 10415;
+  type = Grouped;
+  must = true;
+  may_encrypt = false;
+  description = "Contains Location Services subscription data";
+
+  grouped {
+    repeated GMLC-Address gmlc_address = 1;          // Code 1474
+    optional LCS-PrivacyException lcs_privacy_exception = 2;  // Code 1475
+    optional MO-LR mo_lr = 3;                         // Code 1486
+  }
+}
+
+// GMLC-Address (AVP Code 1474)
+avp GMLC-Address {
+  code = 1474;
+  vendor_id = 10415;
+  type = Address;
+  must = true;
+  may_encrypt = false;
+  description = "IP address of a Gateway Mobile Location Centre";
+}
+
+// LCS-PrivacyException (AVP Code 1475) - Grouped (simplified)
+avp LCS-PrivacyException {
+  code = 1475;
+  vendor_id = 10415;
+  type = Grouped;
+  must = true;
+  may_encrypt = false;
+  description = "LCS privacy exception class for the subscriber";
+
+  grouped {
+    required SS-Code ss_code = 1;                    // Code 1476
+    required SS-Status ss_status = 2;                // Code 1477
+    optional Notification-To-UE-User notification_to_ue_user = 3;  // Code 1478
+    repeated External-Client external_client = 4;    // Code 1479
+    repeated PLMN-Client plmn_client = 5;            // Code 1482
+    repeated Service-Type service_type = 6;          // Code 1483
+  }
+}
+
+// SS-Code (AVP Code 1476)
+avp SS-Code {
+  code = 1476;
+  vendor_id = 10415;
+  type = OctetString;
+  must = true;
+  may_encrypt = false;
+  description = "Supplementary service code";
+}
+
+// SS-Status (AVP Code 1477)
+avp SS-Status {
+  code = 1477;
+  vendor_id = 10415;
+  type = OctetString;
+  must = true;
+  may_encrypt = false;
+  description = "Supplementary service status bitmask";
+}
+
+// Notification-To-UE-User (AVP Code 1478)
+avp Notification-To-UE-User {
+  code = 1478;
+  vendor_id = 10415;
+  type = Enumerated;
+  must = false;
+  may_encrypt = false;
+  description = "Notification to UE user for LCS privacy";
+}
+
+// External-Client (AVP Code 1479) - Grouped (simplified)
+avp External-Client {
+  code = 1479;
+  vendor_id = 10415;
+  type = Grouped;
+  must = true;
+  may_encrypt = false;
+  description = "External LCS client identity and privacy";
+
+  grouped {
+    required Client-Identity client_identity = 1;     // Code 1480
+    optional GMLC-Restriction gmlc_restriction = 2;  // Code 1481
+    optional Notification-To-UE-User notification_to_ue_user = 3;
+  }
+}
+
+// Client-Identity (AVP Code 1480)
+avp Client-Identity {
+  code = 1480;
+  vendor_id = 10415;
+  type = OctetString;
+  must = true;
+  may_encrypt = false;
+  description = "LCS external client identity";
+}
+
+// GMLC-Restriction (AVP Code 1481)
+avp GMLC-Restriction {
+  code = 1481;
+  vendor_id = 10415;
+  type = Enumerated;
+  must = false;
+  may_encrypt = false;
+  description = "GMLC restriction for external LCS client";
+}
+
+// PLMN-Client (AVP Code 1482)
+avp PLMN-Client {
+  code = 1482;
+  vendor_id = 10415;
+  type = Enumerated;
+  must = false;
+  may_encrypt = false;
+  description = "PLMN operator LCS client type";
+}
+
+// Service-Type (AVP Code 1483) - Grouped (simplified)
+avp Service-Type {
+  code = 1483;
+  vendor_id = 10415;
+  type = Grouped;
+  must = false;
+  may_encrypt = false;
+  description = "LCS service type for privacy exception";
+
+  grouped {
+    required ServiceTypeIdentity service_type_identity = 1;  // Code 1484
+    optional GMLC-Restriction gmlc_restriction = 2;
+    optional Notification-To-UE-User notification_to_ue_user = 3;
+  }
+}
+
+// ServiceTypeIdentity (AVP Code 1484)
+avp ServiceTypeIdentity {
+  code = 1484;
+  vendor_id = 10415;
+  type = Unsigned32;
+  must = true;
+  may_encrypt = false;
+  description = "LCS service type identifier";
+}
+
+// MO-LR (AVP Code 1486) - Grouped (simplified)
+avp MO-LR {
+  code = 1486;
+  vendor_id = 10415;
+  type = Grouped;
+  must = true;
+  may_encrypt = false;
+  description = "Mobile Originated Location Request types allowed";
+
+  grouped {
+    repeated SS-Code ss_code = 1;
+    optional SS-Status ss_status = 2;
+  }
+}
+
+// Teleservice-List (AVP Code 1486 conflict - use 1485)
+// Note: Some sources cite 1486 for Teleservice-List, others 1485
+avp Teleservice-List {
+  code = 1485;
+  vendor_id = 10415;
+  type = Grouped;
+  must = true;
+  may_encrypt = false;
+  description = "List of teleservices subscribed";
+
+  grouped {
+    repeated TS-Code ts_code = 1;                  // Code 1487
+  }
+}
+
+// TS-Code (AVP Code 1487)
+avp TS-Code {
+  code = 1487;
+  vendor_id = 10415;
+  type = OctetString;
+  must = true;
+  may_encrypt = false;
+  description = "Teleservice code";
+}
+
+// Call-Barring-Info (AVP Code 1488) - Grouped
+// Call barring information
+// Flags: M, V
+avp Call-Barring-Info {
+  code = 1488;
+  vendor_id = 10415;
+  type = Grouped;
+  must = true;
+  may_encrypt = false;
+  description = "Contains call barring information for the subscriber";
+
+  grouped {
+    required SS-Code ss_code = 1;                  // Code 1476
+    required SS-Status ss_status = 2;              // Code 1477
+    optional Password password = 3;                // Code 258 (RFC 6733 reuse or own)
+    optional Wrong-Password-Attempts-Counter wrong_password_attempts_counter = 4;  // Code 1492
+  }
+}
+
+// Wrong-Password-Attempts-Counter (AVP Code 1492)
+avp Wrong-Password-Attempts-Counter {
+  code = 1492;
+  vendor_id = 10415;
+  type = Unsigned32;
+  must = false;
+  may_encrypt = false;
+  description = "Counter for wrong password attempts for call barring";
+}
+
+// ICS-Indicator (AVP Code 1491)
+// IMS Centralised Services indicator
+// Flags: V
+avp ICS-Indicator {
+  code = 1491;
+  vendor_id = 10415;
+  type = Enumerated;
+  must = false;
+  may_encrypt = false;
+  description = "Indicates if subscriber uses IMS Centralised Services";
+  // Values: 0=False, 1=True
+}
+
+// MPS-Priority (AVP Code 1616)
+// Mission Critical/Priority Service indicator
+// Flags: V
+avp MPS-Priority {
+  code = 1616;
+  vendor_id = 10415;
+  type = Unsigned32;
+  must = false;
+  may_encrypt = false;
+  description = "Bitmask for Mission Critical/Priority Service subscription";
+}
+
+// VPLMN-LIPA-Allowed (AVP Code 1617)
+// Indicates if LIPA is allowed in visited PLMN
+// Flags: V
+avp VPLMN-LIPA-Allowed {
+  code = 1617;
+  vendor_id = 10415;
+  type = Enumerated;
+  must = false;
+  may_encrypt = false;
+  description = "Indicates whether LIPA is allowed when the UE is in a visited PLMN";
+  // Values: 0=LIPA_NOT_ALLOWED, 1=LIPA_ALLOWED
+}
+
+// Subscribed-Periodic-RAU-TAU-Timer (AVP Code 1619)
+// Subscribed value for periodic RAU/TAU timer
+// Flags: V
+avp Subscribed-Periodic-RAU-TAU-Timer {
+  code = 1619;
+  vendor_id = 10415;
+  type = Unsigned32;
+  must = false;
+  may_encrypt = false;
+  description = "Subscribed value for periodic Routing Area Update/Tracking Area Update timer (seconds)";
+}
+
+// Relay-Node-Indicator (AVP Code 1633)
+// Indicates if subscriber is a relay node
+// Flags: V
+avp Relay-Node-Indicator {
+  code = 1633;
+  vendor_id = 10415;
+  type = Enumerated;
+  must = false;
+  may_encrypt = false;
+  description = "Indicates if the UE is a relay node";
+  // Values: 0=NOT_A_RELAY_NODE, 1=A_RELAY_NODE
+}
+
+// MDT-User-Consent (AVP Code 1634)
+// User consent for MDT data collection
+// Flags: V
+avp MDT-User-Consent {
+  code = 1634;
+  vendor_id = 10415;
+  type = Enumerated;
+  must = false;
+  may_encrypt = false;
+  description = "Indicates user consent status for MDT data collection";
+  // Values: 0=CONSENT_NOT_GIVEN, 1=CONSENT_GIVEN
+}
+
+// Subscribed-VSRVCC (AVP Code 1636)
+// Subscribed Voice Service via Circuit Switch
+// Flags: V
+avp Subscribed-VSRVCC {
+  code = 1636;
+  vendor_id = 10415;
+  type = Enumerated;
+  must = false;
+  may_encrypt = false;
+  description = "Indicates if subscriber is subscribed to Video SRVCC";
+  // Values: 0=VSRVCC_SUBSCRIBED
+}
+
+// Subscription-Data-Flags (AVP Code 1654)
+// Bitmask of subscription data control flags
+// Flags: V
+avp Subscription-Data-Flags {
+  code = 1654;
+  vendor_id = 10415;
+  type = Unsigned32;
+  must = false;
+  may_encrypt = false;
+  description = "Bitmask of various subscription flags";
+  // Bit 0: PS-And-SMS-Only-Service-Provision-Ind
+  // Bit 1: SMS-In-SGSN-Allowed-Indicator
+  // Bit 2: User-Plane-Integrity-Protection-Required
+}
+
+// Adjacent-Access-Restriction-Data (AVP Code 1673) - Grouped
+// Access restriction data for adjacent PLMN
+// Flags: V
+avp Adjacent-Access-Restriction-Data {
+  code = 1673;
+  vendor_id = 10415;
+  type = Grouped;
+  must = false;
+  may_encrypt = false;
+  description = "Contains access restriction data for an adjacent PLMN";
+
+  grouped {
+    required PLMN-Id plmn_id = 1;                       // Code 1407 (reuse Visited-PLMN-Id logic)
+    required Access-Restriction-Data access_restriction_data = 2;
+  }
+}
+
+// PLMN-Id (AVP Code 1458 conflict) - use dedicated PLMN-Id AVP
+avp PLMN-Id {
+  code = 1500;
+  vendor_id = 10415;
+  type = OctetString;
+  must = false;
+  may_encrypt = false;
+  description = "PLMN identifier (MCC+MNC encoded in 3 bytes)";
+}
+
+// DL-Buffering-Suggested-Packet-Count (AVP Code 1674)
+// Suggested number of downlink packets to buffer
+// Flags: V
+avp DL-Buffering-Suggested-Packet-Count {
+  code = 1674;
+  vendor_id = 10415;
+  type = Integer32;
+  must = false;
+  may_encrypt = false;
+  description = "Suggested number of downlink data packets the MME should buffer for the UE";
+}
+
+// IMSI-Group-Id (AVP Code 1675) - Grouped
+// Group identifier for IMSI-based groups
+// Flags: V
+avp IMSI-Group-Id {
+  code = 1675;
+  vendor_id = 10415;
+  type = Grouped;
+  must = false;
+  may_encrypt = false;
+  description = "Contains an IMSI-based group identifier";
+
+  grouped {
+    required Group-Service-Id group_service_id = 1;    // Code 1676
+    required Group-PLMN-Id group_plmn_id = 2;         // Code 1677
+    required Local-Group-Id local_group_id = 3;       // Code 1678
+  }
+}
+
+// Group-Service-Id (AVP Code 1676)
+avp Group-Service-Id {
+  code = 1676;
+  vendor_id = 10415;
+  type = Unsigned32;
+  must = true;
+  may_encrypt = false;
+  description = "Service identifier for an IMSI group";
+}
+
+// Group-PLMN-Id (AVP Code 1677)
+avp Group-PLMN-Id {
+  code = 1677;
+  vendor_id = 10415;
+  type = OctetString;
+  must = true;
+  may_encrypt = false;
+  description = "PLMN identifier for the IMSI group";
+}
+
+// Local-Group-Id (AVP Code 1678)
+avp Local-Group-Id {
+  code = 1678;
+  vendor_id = 10415;
+  type = OctetString;
+  must = true;
+  may_encrypt = false;
+  description = "Local group identifier within the PLMN";
+}
+
+// UE-Usage-Type (AVP Code 1680)
+// Usage type for IoT/MTC devices
+// Flags: V
+avp UE-Usage-Type {
+  code = 1680;
+  vendor_id = 10415;
+  type = Unsigned32;
+  must = false;
+  may_encrypt = false;
+  description = "Usage type for the UE (0=general, 1-255=specific IoT/MTC categories)";
+}
+
+// Emergency-Info (AVP Code 1687) - Grouped
+// Emergency subscription information
+// Flags: V
+avp Emergency-Info {
+  code = 1687;
+  vendor_id = 10415;
+  type = Grouped;
+  must = false;
+  may_encrypt = false;
+  description = "Contains information about emergency services subscription";
+
+  grouped {
+    repeated MIP6-Agent-Info mip6_agent_info = 1;   // Emergency PDN-GW addresses
+  }
+}
+
+// ProSe-Subscription-Data (AVP Code 3818) - Grouped
+// Proximity-based Services subscription data
+// Flags: V
+avp ProSe-Subscription-Data {
+  code = 3818;
+  vendor_id = 10415;
+  type = Grouped;
+  must = false;
+  may_encrypt = false;
+  description = "Contains Proximity-based Services (ProSe) subscription data";
+
+  grouped {
+    required ProSe-Permission prose_permission = 1;  // Code 3819
+  }
+}
+
+// ProSe-Permission (AVP Code 3819)
+avp ProSe-Permission {
+  code = 3819;
+  vendor_id = 10415;
+  type = Unsigned32;
+  must = true;
+  may_encrypt = false;
+  description = "Bitmask of ProSe permissions (discovery, communication, EPC-level)";
+}
+
+// V2X-Subscription-Data (AVP Code 3801) - Grouped
+// Vehicle-to-Everything subscription data
+// Flags: V
+avp V2X-Subscription-Data {
+  code = 3801;
+  vendor_id = 10415;
+  type = Grouped;
+  must = false;
+  may_encrypt = false;
+  description = "Contains V2X (Vehicle-to-Everything) subscription data";
+
+  grouped {
+    optional V2X-Permission v2x_permission = 1;           // Code 3802
+    optional UE-PC5-AMBR ue_pc5_ambr = 2;                 // Code 3803
+    optional V2X-PC5-QoS-Parameters v2x_pc5_qos_parameters = 3;  // Code 3804
+  }
+}
+
+// V2X-Permission (AVP Code 3802)
+avp V2X-Permission {
+  code = 3802;
+  vendor_id = 10415;
+  type = Unsigned32;
+  must = false;
+  may_encrypt = false;
+  description = "Bitmask of V2X communication permissions";
+}
+
+// UE-PC5-AMBR (AVP Code 3803)
+avp UE-PC5-AMBR {
+  code = 3803;
+  vendor_id = 10415;
+  type = Unsigned32;
+  must = false;
+  may_encrypt = false;
+  description = "Aggregate Maximum Bit Rate for PC5 interface (V2X)";
+}
+
+// V2X-PC5-QoS-Parameters (AVP Code 3804) - Grouped (simplified)
+avp V2X-PC5-QoS-Parameters {
+  code = 3804;
+  vendor_id = 10415;
+  type = Grouped;
+  must = false;
+  may_encrypt = false;
+  description = "QoS parameters for V2X PC5 interface";
+
+  grouped {
+    repeated V2X-PC5-QoS-Flow v2x_pc5_qos_flow = 1;  // Code 3805
+  }
+}
+
+// V2X-PC5-QoS-Flow (AVP Code 3805) - Grouped (simplified)
+avp V2X-PC5-QoS-Flow {
+  code = 3805;
+  vendor_id = 10415;
+  type = Grouped;
+  must = false;
+  may_encrypt = false;
+  description = "A single V2X PC5 QoS flow description";
+
+  grouped {
+    required QoS-Class-Identifier qos_class_identifier = 1;
+    optional UE-PC5-AMBR ue_pc5_ambr = 2;
+  }
+}
+
+// AESE-Communication-Pattern (AVP Code 3113) - Grouped
+// Application layer Event/Status/Error communication pattern
+// Flags: V
+avp AESE-Communication-Pattern {
+  code = 3113;
+  vendor_id = 10415;
+  type = Grouped;
+  must = false;
+  may_encrypt = false;
+  description = "Contains communication pattern parameters for MTC/IoT devices";
+
+  grouped {
+    optional SCEF-ID scef_id = 1;
+    repeated Communication-Pattern-Set communication_pattern_set = 2;  // Code 3114
+  }
+}
+
+// Communication-Pattern-Set (AVP Code 3114) - Grouped (simplified)
+avp Communication-Pattern-Set {
+  code = 3114;
+  vendor_id = 10415;
+  type = Grouped;
+  must = false;
+  may_encrypt = false;
+  description = "Set of communication pattern parameters";
+
+  grouped {
+    optional Periodic-Time periodic_time = 1;              // Code 3115
+    optional Scheduled-Communication-Time scheduled_communication_time = 2;  // Code 3116
+    optional Stationary-Indication stationary_indication = 3;  // Code 3117
+    optional Reference-ID-Validity-Time reference_id_validity_time = 4;  // Code 3118
+    optional Communication-Duration-Time communication_duration_time = 5;  // Code 3119
+  }
+}
+
+// Communication pattern sub-AVPs (simplified)
+avp Periodic-Time { code = 3115; vendor_id = 10415; type = Unsigned32; must = false; may_encrypt = false; description = "Periodic communication time in seconds"; }
+avp Scheduled-Communication-Time { code = 3116; vendor_id = 10415; type = Grouped; must = false; may_encrypt = false; description = "Scheduled communication time window"; grouped { } }
+avp Stationary-Indication { code = 3117; vendor_id = 10415; type = Enumerated; must = false; may_encrypt = false; description = "Indicates if UE is stationary"; }
+avp Reference-ID-Validity-Time { code = 3118; vendor_id = 10415; type = Time; must = false; may_encrypt = false; description = "Validity time of the reference ID"; }
+avp Communication-Duration-Time { code = 3119; vendor_id = 10415; type = Unsigned32; must = false; may_encrypt = false; description = "Expected duration of communication in seconds"; }
+
+// Monitoring-Event-Configuration (AVP Code 3142) - Grouped
+// Configuration for monitoring events (MTC/IoT)
+// Flags: V
+avp Monitoring-Event-Configuration {
+  code = 3142;
+  vendor_id = 10415;
+  type = Grouped;
+  must = false;
+  may_encrypt = false;
+  description = "Contains configuration for a monitoring event (e.g., loss of connectivity, UE reachability)";
+
+  grouped {
+    required SCEF-ID scef_id = 1;
+    required SCEF-Reference-ID scef_reference_id = 2;     // Code 3123
+    required Monitoring-Type monitoring_type = 3;          // Code 3141
+    optional Maximum-Number-Of-Reports maximum_number_of_reports = 4;  // Code 3143
+    optional Monitoring-Duration monitoring_duration = 5;  // Code 3130
+    optional Charged-Party charged_party = 6;              // Code 857
+    optional Maximum-Detection-Time maximum_detection_time = 7;  // Code 3144
+    optional UE-Reachability-Configuration ue_reachability_configuration = 8;  // Code 3145
+    optional IMSI-Group-Id imsi_group_id = 9;
+    optional Periodic-Communication-Indicator periodic_communication_indicator = 10;  // Code 3115 conflict - use 3120
+    optional Active-Time active_time = 11;                 // Code 1692
+    optional One-Time-Notification one_time_notification = 12;  // Sh AVP reuse
+  }
+}
+
+// Monitoring-Event sub-AVPs
+avp SCEF-Reference-ID { code = 3123; vendor_id = 10415; type = Unsigned32; must = true; may_encrypt = false; description = "Reference identifier assigned by SCEF for a monitoring event"; }
+avp Monitoring-Type { code = 3141; vendor_id = 10415; type = Enumerated; must = true; may_encrypt = false; description = "Type of monitoring event (loss-of-connectivity, UE-reachability, etc.)"; }
+avp Maximum-Number-Of-Reports { code = 3143; vendor_id = 10415; type = Unsigned32; must = false; may_encrypt = false; description = "Maximum number of event reports to deliver"; }
+avp Monitoring-Duration { code = 3130; vendor_id = 10415; type = Time; must = false; may_encrypt = false; description = "Expiry time for the monitoring configuration"; }
+avp Charged-Party { code = 857; vendor_id = 10415; type = UTF8String; must = false; may_encrypt = false; description = "Identity of the charged party for monitoring"; }
+avp Maximum-Detection-Time { code = 3144; vendor_id = 10415; type = Unsigned32; must = false; may_encrypt = false; description = "Maximum time (seconds) to detect loss of connectivity"; }
+avp UE-Reachability-Configuration { code = 3145; vendor_id = 10415; type = Grouped; must = false; may_encrypt = false; description = "UE reachability configuration parameters"; grouped { } }
+avp Periodic-Communication-Indicator { code = 3120; vendor_id = 10415; type = Enumerated; must = false; may_encrypt = false; description = "Indicates periodic communication pattern"; }
+avp Active-Time { code = 1692; vendor_id = 10415; type = Unsigned32; must = false; may_encrypt = false; description = "Active time value for Power Saving Mode in seconds"; }
+avp One-Time-Notification { code = 712; vendor_id = 10415; type = Enumerated; must = false; may_encrypt = false; description = "One-time notification indicator (from Sh interface)"; }
+
+// eDRX-Cycle-Length (AVP Code 1691) - Grouped
+// Extended Discontinuous Reception parameters
+// Flags: V
+avp eDRX-Cycle-Length {
+  code = 1691;
+  vendor_id = 10415;
+  type = Grouped;
+  must = false;
+  may_encrypt = false;
+  description = "Contains the eDRX cycle length parameters";
+
+  grouped {
+    required RAT-Type rat_type = 1;                          // Code 1032 - already defined
+    required eDRX-Cycle-Length-Value edrx_cycle_length_value = 2;  // Code 1694
+  }
+}
+
+// eDRX-Cycle-Length-Value (AVP Code 1694)
+avp eDRX-Cycle-Length-Value {
+  code = 1694;
+  vendor_id = 10415;
+  type = OctetString;
+  must = true;
+  may_encrypt = false;
+  description = "eDRX cycle length value as defined in TS 24.008";
+}
+
+// External-Identifier (AVP Code 3111)
+// External (non-MSISDN/IMSI) identifier for IoT
+// Flags: V
+avp External-Identifier {
+  code = 3111;
+  vendor_id = 10415;
+  type = UTF8String;
+  must = false;
+  may_encrypt = false;
+  description = "External identifier (e.g., user@realm) for IoT/MTC devices";
+}
+
+// Service-Gap-Time (AVP Code 1698)
+// Minimum time gap between two service requests
+// Flags: V
+avp Service-Gap-Time {
+  code = 1698;
+  vendor_id = 10415;
+  type = Unsigned32;
+  must = false;
+  may_encrypt = false;
+  description = "Minimum time gap in seconds between consecutive service requests for an MTC device";
+}
+
+// Broadcast-Location-Assistance-Data-Types (AVP Code 1700)
+// Types of broadcast location assistance data supported
+// Flags: V
+avp Broadcast-Location-Assistance-Data-Types {
+  code = 1700;
+  vendor_id = 10415;
+  type = Unsigned64;
+  must = false;
+  may_encrypt = false;
+  description = "Bitmask of broadcast location assistance data types supported by the UE";
+}
+
+// Aerial-UE-Subscription-Information (AVP Code 1699) - Grouped
+// Aerial (drone) UE subscription information
+// Flags: V
+avp Aerial-UE-Subscription-Information {
+  code = 1699;
+  vendor_id = 10415;
+  type = Grouped;
+  must = false;
+  may_encrypt = false;
+  description = "Contains aerial UE (drone) subscription information";
+
+  grouped {
+    optional Aerial-UE-Security-Information aerial_ue_security_information = 1;  // Code 1702
+  }
+}
+
+// Aerial-UE-Security-Information (AVP Code 1702)
+avp Aerial-UE-Security-Information {
+  code = 1702;
+  vendor_id = 10415;
+  type = Unsigned32;
+  must = false;
+  may_encrypt = false;
+  description = "Bitmask for aerial UE security information";
+}
+
+// Core-Network-Restrictions (AVP Code 1704) - Grouped
+// Restrictions on core network access
+// Flags: V
+avp Core-Network-Restrictions {
+  code = 1704;
+  vendor_id = 10415;
+  type = Grouped;
+  must = false;
+  may_encrypt = false;
+  description = "Contains core network restrictions for the subscriber";
+
+  grouped {
+    optional Core-Network-Restriction-Type core_network_restriction_type = 1;  // Code 1705
+  }
+}
+
+// Core-Network-Restriction-Type (AVP Code 1705)
+avp Core-Network-Restriction-Type {
+  code = 1705;
+  vendor_id = 10415;
+  type = Unsigned32;
+  must = false;
+  may_encrypt = false;
+  description = "Bitmask indicating which core network features are restricted";
+}
+
+// ================================================================================
+//                         ADDITIONAL AVP DEFINITIONS
+// ================================================================================
+
+// Password (AVP Code 258) - RFC 6733
+avp Password {
+  code = 258;
+  type = OctetString;
+  must = false;
+  may_encrypt = true;
+  description = "User password";
+}
+
+// Reset-ID (AVP Code 1602)
+avp Reset-ID {
+  code = 1602;
+  vendor_id = 10415;
+  type = OctetString;
+  must = true;
+  may_encrypt = false;
+  description = "Identifies the set of affected subscribers in a reset procedure";
+}
+
+// Subscription-Data-Deletion (AVP Code 1611) - Grouped
+avp Subscription-Data-Deletion {
+  code = 1611;
+  vendor_id = 10415;
+  type = Grouped;
+  must = true;
+  may_encrypt = false;
+  description = "Contains subscription data to be deleted from the MME/SGSN";
+  grouped {
+    optional DSR-Flags dsr_flags = 1;
+    optional Context-Identifier context_identifier = 2;
+  }
+}
+
+// Active-APN (AVP Code 1612) - Grouped
+avp Active-APN {
+  code = 1612;
+  vendor_id = 10415;
+  type = Grouped;
+  must = true;
+  may_encrypt = false;
+  description = "Contains information about an active APN context";
+  grouped {
+    required Context-Identifier context_identifier = 1;
+    optional Service-Selection service_selection = 2;
+    optional MIP6-Agent-Info mip6_agent_info = 3;
+    optional Visited-Network-Identifier visited_network_identifier = 4;
+    optional Specific-APN-Info specific_apn_info = 5;
+  }
+}
+
+// OC-Feature-Vector (AVP Code 622) - RFC 7683
+avp OC-Feature-Vector {
+  code = 622;
+  type = Unsigned64;
+  must = false;
+  may_encrypt = false;
+  description = "Bitmask of supported overload control features";
+}
+
+// OC-Supported-Features (AVP Code 621) - RFC 7683
+avp OC-Supported-Features {
+  code = 621;
+  type = Grouped;
+  must = false;
+  may_encrypt = false;
+  description = "Overload Control supported features (RFC 7683)";
+  grouped {
+    optional OC-Feature-Vector oc_feature_vector = 1;
+  }
+}
+
+// OC-Sequence-Number (AVP Code 624) - RFC 7683
+avp OC-Sequence-Number {
+  code = 624;
+  type = Unsigned64;
+  must = true;
+  may_encrypt = false;
+  description = "Sequence number for overload control report";
+}
+
+// OC-Report-Type (AVP Code 625) - RFC 7683
+avp OC-Report-Type {
+  code = 625;
+  type = Enumerated;
+  must = true;
+  may_encrypt = false;
+  description = "Type of overload report (0=HOST_REPORT, 1=REALM_REPORT)";
+}
+
+// OC-Reduction-Percentage (AVP Code 626) - RFC 7683
+avp OC-Reduction-Percentage {
+  code = 626;
+  type = Unsigned32;
+  must = false;
+  may_encrypt = false;
+  description = "Percentage by which the sender should reduce traffic";
+}
+
+// OC-Validity-Duration (AVP Code 627) - RFC 7683
+avp OC-Validity-Duration {
+  code = 627;
+  type = Unsigned32;
+  must = false;
+  may_encrypt = false;
+  description = "Duration in seconds for which the OC-OLR is valid";
+}
+
+// OC-OLR (AVP Code 623) - RFC 7683
+avp OC-OLR {
+  code = 623;
+  type = Grouped;
+  must = false;
+  may_encrypt = false;
+  description = "Overload Report (RFC 7683)";
+  grouped {
+    required OC-Sequence-Number oc_sequence_number = 1;
+    required OC-Report-Type oc_report_type = 2;
+    optional OC-Reduction-Percentage oc_reduction_percentage = 3;
+    optional OC-Validity-Duration oc_validity_duration = 4;
+  }
+}
+
+// Load-Type (AVP Code 652) - RFC 8583
+avp Load-Type {
+  code = 652;
+  type = Enumerated;
+  must = false;
+  may_encrypt = false;
+  description = "Type of load (0=HOST, 1=PEER)";
+}
+
+// Load-Value (AVP Code 653) - RFC 8583
+avp Load-Value {
+  code = 653;
+  type = Unsigned64;
+  must = false;
+  may_encrypt = false;
+  description = "Current load as percentage (0-100)";
+}
+
+// SourceID (AVP Code 649) - RFC 8583
+avp SourceID {
+  code = 649;
+  type = DiameterIdentity;
+  must = false;
+  may_encrypt = false;
+  description = "Identity of the Diameter entity providing load info";
+}
+
+// Load (AVP Code 651) - RFC 8583
+avp Load {
+  code = 651;
+  type = Grouped;
+  must = false;
+  may_encrypt = false;
+  description = "Load information (RFC 8583)";
+  grouped {
+    optional Load-Type load_type = 1;
+    optional Load-Value load_value = 2;
+    optional SourceID source_id = 3;
+  }
+}
+
+// IMS-Voice-Over-PS-Sessions-Supported (AVP Code 1492)
+avp IMS-Voice-Over-PS-Sessions-Supported {
+  code = 1492;
+  vendor_id = 10415;
+  type = Enumerated;
+  must = false;
+  may_encrypt = false;
+  description = "Indicates if IMS voice over PS sessions is supported";
+}
+
+// Last-UE-Activity-Time (AVP Code 1494)
+avp Last-UE-Activity-Time {
+  code = 1494;
+  vendor_id = 10415;
+  type = Time;
+  must = false;
+  may_encrypt = false;
+  description = "Time of last UE activity";
+}
+
+// MME-User-State (AVP Code 1498) - Grouped
+avp MME-User-State {
+  code = 1498;
+  vendor_id = 10415;
+  type = Grouped;
+  must = false;
+  may_encrypt = false;
+  description = "MME user state";
+  grouped {
+  }
+}
+
+// SGSN-User-State (AVP Code 1499) - Grouped
+avp SGSN-User-State {
+  code = 1499;
+  vendor_id = 10415;
+  type = Grouped;
+  must = false;
+  may_encrypt = false;
+  description = "SGSN user state";
+  grouped {
+  }
+}
+
+// EPS-User-State (AVP Code 1497) - Grouped
+avp EPS-User-State {
+  code = 1497;
+  vendor_id = 10415;
+  type = Grouped;
+  must = false;
+  may_encrypt = false;
+  description = "Current state of the UE in the EPS";
+  grouped {
+    optional MME-User-State mme_user_state = 1;
+    optional SGSN-User-State sgsn_user_state = 2;
+  }
+}
+
+// MME-Location-Information (AVP Code 1600) - Grouped
+avp MME-Location-Information {
+  code = 1600;
+  vendor_id = 10415;
+  type = Grouped;
+  must = false;
+  may_encrypt = false;
+  description = "Location information from MME";
+  grouped {
+  }
+}
+
+// SGSN-Location-Information (AVP Code 1601) - Grouped
+avp SGSN-Location-Information {
+  code = 1601;
+  vendor_id = 10415;
+  type = Grouped;
+  must = false;
+  may_encrypt = false;
+  description = "Location information from SGSN";
+  grouped {
+  }
+}
+
+// EPS-Location-Information (AVP Code 1496) - Grouped
+avp EPS-Location-Information {
+  code = 1496;
+  vendor_id = 10415;
+  type = Grouped;
+  must = false;
+  may_encrypt = false;
+  description = "Current location of the UE in the EPS";
+  grouped {
+    optional MME-Location-Information mme_location_information = 1;
+    optional SGSN-Location-Information sgsn_location_information = 2;
+  }
+}
+
+// Homogeneous-Support-of-IMS-Voice-Over-PS-Sessions (AVP Code 1493)
+avp Homogeneous-Support-of-IMS-Voice-Over-PS-Sessions {
+  code = 1493;
+  vendor_id = 10415;
+  type = Enumerated;
+  must = false;
+  may_encrypt = false;
+  description = "Homogeneous support of IMS VoPS across the TA/RA";
+}
+
+// Equivalent-PLMN-List (AVP Code 1336) - Grouped
+avp Equivalent-PLMN-List {
+  code = 1336;
+  vendor_id = 10415;
+  type = Grouped;
+  must = false;
+  may_encrypt = false;
+  description = "List of PLMNs equivalent to the HPLMN";
+  grouped {
+    repeated Visited-PLMN-Id visited_plmn_id = 1;
+  }
+}
+
+// MME-Number-for-MT-SMS (AVP Code 1645)
+avp MME-Number-for-MT-SMS {
+  code = 1645;
+  vendor_id = 10415;
+  type = OctetString;
+  must = false;
+  may_encrypt = false;
+  description = "E.164 number of the MME for MT-SMS delivery";
+}
+
+// SMS-Register-Request (AVP Code 1648)
+avp SMS-Register-Request {
+  code = 1648;
+  vendor_id = 10415;
+  type = Enumerated;
+  must = false;
+  may_encrypt = false;
+  description = "Indicates SMS registration request type";
+}
+
+// Coupled-Node-Diameter-ID (AVP Code 1666)
+avp Coupled-Node-Diameter-ID {
+  code = 1666;
+  vendor_id = 10415;
+  type = DiameterIdentity;
+  must = false;
+  may_encrypt = false;
+  description = "Diameter identity of the coupled MME/SGSN node";
+}
+
+// Adjacent-PLMNs (AVP Code 1672) - Grouped
+avp Adjacent-PLMNs {
+  code = 1672;
+  vendor_id = 10415;
+  type = Grouped;
+  must = false;
+  may_encrypt = false;
+  description = "List of PLMNs adjacent to the serving node";
+  grouped {
+    repeated Visited-PLMN-Id visited_plmn_id = 1;
+  }
+}
+
+// eDRX-Related-RAT (AVP Code 1705)
+avp eDRX-Related-RAT {
+  code = 1705;
+  vendor_id = 10415;
+  type = Unsigned32;
+  must = false;
+  may_encrypt = false;
+  description = "RAT type for which eDRX parameters apply";
+}
+
+// Emergency-Services (AVP Code 1538)
+avp Emergency-Services {
+  code = 1538;
+  vendor_id = 10415;
+  type = Unsigned32;
+  must = false;
+  may_encrypt = false;
+  description = "Bitmask of emergency services supported";
+}
+
+// Time-Zone (AVP Code 2349) - 3GPP TS 29.272
+avp Time-Zone {
+  code = 2349;
+  vendor_id = 10415;
+  type = UTF8String;
+  must = true;
+  may_encrypt = false;
+  description = "Time zone string";
+}
+
+// Daylight-Saving-Time (AVP Code 2350) - 3GPP TS 29.272
+avp Daylight-Saving-Time {
+  code = 2350;
+  vendor_id = 10415;
+  type = Enumerated;
+  must = true;
+  may_encrypt = false;
+  description = "Daylight saving time offset";
+}
+
+// Local-Time-Zone (AVP Code 2346) - Grouped
+avp Local-Time-Zone {
+  code = 2346;
+  vendor_id = 10415;
+  type = Grouped;
+  must = false;
+  may_encrypt = false;
+  description = "Local time zone information";
+  grouped {
+    required Time-Zone time_zone = 1;
+    required Daylight-Saving-Time daylight_saving_time = 2;
+  }
+}
+
+// Reachability-Information (AVP Code 3164)
+avp Reachability-Information {
+  code = 3164;
+  vendor_id = 10415;
+  type = Unsigned32;
+  must = false;
+  may_encrypt = false;
+  description = "UE reachability type";
+}
+
+// Communication-Failure-Information (AVP Code 4300) - Grouped
+avp Communication-Failure-Information {
+  code = 4300;
+  vendor_id = 10415;
+  type = Grouped;
+  must = false;
+  may_encrypt = false;
+  description = "Communication failure information";
+  grouped {
+  }
+}
+
+// Number-Of-UE-Per-Location-Configuration (AVP Code 3306) - Grouped
+avp Number-Of-UE-Per-Location-Configuration {
+  code = 3306;
+  vendor_id = 10415;
+  type = Grouped;
+  must = false;
+  may_encrypt = false;
+  description = "Number of UEs per location configuration";
+  grouped {
+  }
+}
+
+// Monitoring-Event-Report (AVP Code 3155) - Grouped
+avp Monitoring-Event-Report {
+  code = 3155;
+  vendor_id = 10415;
+  type = Grouped;
+  must = false;
+  may_encrypt = false;
+  description = "Contains a monitoring event report";
+  grouped {
+    required SCEF-Reference-ID scef_reference_id = 1;
+    optional Monitoring-Type monitoring_type = 2;
+    optional Reachability-Information reachability_information = 3;
+    optional EPS-Location-Information eps_location_information = 4;
+    optional Communication-Failure-Information communication_failure_information = 5;
+    optional Number-Of-UE-Per-Location-Configuration number_of_ue_per_location_configuration = 6;
+  }
+}
+
+// Serving-PLMN-Rate-Control (AVP Code 4310) - Grouped
+avp Serving-PLMN-Rate-Control {
+  code = 4310;
+  vendor_id = 10415;
+  type = Grouped;
+  must = false;
+  may_encrypt = false;
+  description = "Serving PLMN rate control";
+  grouped {
+  }
+}
+
+// Monitoring-Event-Config-Status (AVP Code 3172) - Grouped
+avp Monitoring-Event-Config-Status {
+  code = 3172;
+  vendor_id = 10415;
+  type = Grouped;
+  must = false;
+  may_encrypt = false;
+  description = "Status of a monitoring event configuration";
+  grouped {
+    required SCEF-Reference-ID scef_reference_id = 1;
+    optional SCEF-ID scef_id = 2;
+    optional Serving-PLMN-Rate-Control serving_plmn_rate_control = 3;
+  }
+}
+
+// Supported-Monitoring-Events (AVP Code 3144)
+avp Supported-Monitoring-Events {
+  code = 3144;
+  vendor_id = 10415;
+  type = Unsigned64;
+  must = false;
+  may_encrypt = false;
+  description = "Bitmask of supported monitoring event types";
+}
+
+// Supported-Services (AVP Code 3143) - Grouped
+avp Supported-Services {
+  code = 3143;
+  vendor_id = 10415;
+  type = Grouped;
+  must = false;
+  may_encrypt = false;
+  description = "Lists the monitoring event services supported by the HSS";
+  grouped {
+    optional Supported-Monitoring-Events supported_monitoring_events = 1;
+  }
+}
+
+// Maximum-UE-Availability-Time (AVP Code 3329)
+avp Maximum-UE-Availability-Time {
+  code = 3329;
+  vendor_id = 10415;
+  type = Time;
+  must = false;
+  may_encrypt = false;
+  description = "Maximum time the UE is expected to be available for communication";
+}
+
+// User-Id (AVP Code 1745)
+avp User-Id {
+  code = 1745;
+  vendor_id = 10415;
+  type = UTF8String;
+  must = false;
+  may_encrypt = false;
+  description = "External identifier representing the UE subscriber";
+}
+
+// SGs-MME-Identity (AVP Code 1664)
+avp SGs-MME-Identity {
+  code = 1664;
+  vendor_id = 10415;
+  type = UTF8String;
+  must = false;
+  may_encrypt = false;
+  description = "Identity of the MME for SGs interface";
+}
+
+// ================================================================================
 //                         COMMAND DEFINITIONS
 // ================================================================================
 

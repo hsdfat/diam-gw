@@ -114,9 +114,22 @@ func (p *ProtoParser) ParseFile(filename string) error {
 			blockLines = []string{line}
 		} else if currentBlock != "" {
 			blockLines = append(blockLines, line)
+		}
 
-			// Detect end of block
-			if line == "}" {
+		// Detect end of block using brace counting (handles both single-line and multi-line blocks)
+		if currentBlock != "" {
+			// Count net braces across all accumulated lines
+			depth := 0
+			for _, bl := range blockLines {
+				for _, ch := range bl {
+					if ch == '{' {
+						depth++
+					} else if ch == '}' {
+						depth--
+					}
+				}
+			}
+			if depth == 0 {
 				if currentBlock == "avp" {
 					if err := p.parseAVPBlock(blockLines); err != nil {
 						return err
@@ -171,6 +184,37 @@ func (p *ProtoParser) ResolveAVPReferences() {
 func (p *ProtoParser) parseAVPBlock(lines []string) error {
 	if len(lines) == 0 {
 		return fmt.Errorf("empty AVP block")
+	}
+
+	// Handle single-line AVP definitions: "avp Name { code = X; type = T; ... }"
+	// Expand them into multi-line format for uniform processing.
+	if len(lines) == 1 {
+		line := strings.TrimSpace(lines[0])
+		// Find the opening brace
+		openIdx := strings.Index(line, "{")
+		if openIdx >= 0 && strings.HasSuffix(line, "}") {
+			header := strings.TrimSpace(line[:openIdx])
+			body := strings.TrimSpace(line[openIdx+1 : len(line)-1])
+			expanded := []string{header + " {"}
+			// Body may contain nested "grouped { }" — handle by splitting on ";" but keeping grouped blocks intact
+			// Simple approach: split on ";" and re-expand "grouped {" blocks
+			for _, part := range strings.Split(body, ";") {
+				part = strings.TrimSpace(part)
+				if part == "" {
+					continue
+				}
+				if part == "grouped {" || part == "grouped { }" {
+					expanded = append(expanded, "grouped {", "}")
+				} else if strings.HasPrefix(part, "grouped {") {
+					// grouped { field1; field2 } — keep as is for now
+					expanded = append(expanded, part)
+				} else {
+					expanded = append(expanded, part+";")
+				}
+			}
+			expanded = append(expanded, "}")
+			lines = expanded
+		}
 	}
 
 	// Parse AVP name from first line: "avp Origin-Host {"
@@ -453,23 +497,27 @@ func (p *ProtoParser) parseFieldDefinition(cmd *CommandDefinition, line string) 
 	field := &AVPField{}
 	idx := 0
 
-	// Check for "fixed" or "repeated"
-	if parts[idx] == "fixed" {
-		field.Fixed = true
-		idx++
-	} else if parts[idx] == "repeated" {
-		field.Repeated = true
-		idx++
+	// Consume all modifier tokens: "fixed", "repeated", "required", "optional"
+	// in any order (e.g. "repeated fixed required", "fixed required", "repeated optional")
+	for idx < len(parts) {
+		switch parts[idx] {
+		case "fixed":
+			field.Fixed = true
+			idx++
+		case "repeated":
+			field.Repeated = true
+			idx++
+		case "required":
+			field.Required = true
+			idx++
+		case "optional":
+			field.Required = false
+			idx++
+		default:
+			goto doneModifiers
+		}
 	}
-
-	// Check for "required" or "optional"
-	if parts[idx] == "required" {
-		field.Required = true
-		idx++
-	} else if parts[idx] == "optional" {
-		field.Required = false
-		idx++
-	}
+doneModifiers:
 
 	// AVP name
 	avpName := parts[idx]

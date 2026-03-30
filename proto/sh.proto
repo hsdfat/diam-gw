@@ -1,0 +1,1059 @@
+// Diameter Sh Interface Application
+// Based on 3GPP TS 29.328 / TS 29.329 v16.x
+// Interface between Application Server (AS) / SCS and HSS (IMS)
+
+syntax = "diameter1";
+
+package diameter.sh;
+
+option go_package = "github.com/hsdfat/diam-gw/commands/sh";
+
+// ================================================================================
+//                         APPLICATION IDENTIFIER
+// ================================================================================
+// Sh Application ID: 16777217 (allocated by IANA)
+// Vendor ID: 10415 (3GPP)
+
+const SH_APPLICATION_ID = 16777217;
+const VENDOR_ID_3GPP = 10415;
+
+// ================================================================================
+//                         COMMAND CODE VALUES
+// ================================================================================
+// Table 6.1/1: Command-Code values for Sh Interface (3GPP TS 29.329)
+
+const UDR_COMMAND_CODE = 306;  // User-Data-Request/Answer
+const PUR_COMMAND_CODE = 307;  // Profile-Update-Request/Answer
+const SNR_COMMAND_CODE = 308;  // Subscribe-Notifications-Request/Answer
+const PNR_COMMAND_CODE = 309;  // Push-Notification-Request/Answer
+
+// ================================================================================
+//                         ENUMERATED VALUE DEFINITIONS
+// ================================================================================
+
+// Data-Reference (AVP Code 703)
+// Indicates which data is being requested or updated
+enum DataReference {
+  RepositoryData = 0;           // AS service-specific repository data
+  IMSPublicIdentity = 10;       // IMS public identities
+  IMSUserState = 11;            // IMS user state (registered/unregistered)
+  S_CSCFName = 12;              // Name of serving S-CSCF
+  InitialFilterCriteria = 13;   // iFC for service triggering
+  LocationInformation = 14;     // Location information (PS/CS domain)
+  UserState = 15;               // User state in PS/CS domain
+  ChargingInformation = 16;     // Charging function addresses
+  MSISDN = 17;                  // MSISDN associated with IMPU
+  PSIActivation = 18;           // Public Service Identity activation state
+  DSAI = 19;                    // Dynamic Service Activation Information
+  ServiceLevelTraceInfo = 21;   // Service level trace information
+  IPAddressSecureBindingInformation = 22;  // IP address binding
+  ServingNodeIndication = 23;   // Serving node for SMS/data
+  ApplicationPortInformation = 25;  // Application port configuration
+  AliasesRepositoryData = 26;   // Aliases repository data
+  ExternalIdentifier = 28;      // External identifier (IoT)
+}
+
+// Subs-Req-Type (AVP Code 705)
+// Indicates whether subscribing or unsubscribing from notifications
+enum SubsReqType {
+  Subscribe = 0;    // Subscribe to data change notifications
+  Unsubscribe = 1;  // Cancel notification subscription
+}
+
+// Requested-Domain (AVP Code 706)
+// Specifies the domain for location/state information
+enum RequestedDomain {
+  CS_Domain = 0;  // Circuit Switched domain
+  PS_Domain = 1;  // Packet Switched domain
+}
+
+// Current-Location (AVP Code 707)
+// Specifies whether current location update is needed
+enum CurrentLocation {
+  DoNotNeedInitialUELocation = 0;     // Cached location is acceptable
+  InitialUELocationIsRequired = 1;   // Fresh location update required (paging)
+}
+
+// Identity-Set (AVP Code 708)
+// Specifies which identities to return in the UDA
+enum IdentitySet {
+  ALL_IDENTITIES = 0;        // Return all public identities
+  REGISTERED_IDENTITIES = 1; // Return only registered identities
+  IMPLICIT_IDENTITIES = 2;   // Return identities in the implicit reg set
+  ALIAS_IDENTITIES = 3;      // Return alias identities
+}
+
+// Send-Data-Indication (AVP Code 710)
+// Indicates whether the HSS should include user data in the SNA
+enum SendDataIndication {
+  USER_DATA_NOT_REQUESTED = 0;  // Do not include user data in SNA
+  USER_DATA_REQUESTED = 1;      // Include user data in SNA
+}
+
+// One-Time-Notification (AVP Code 712)
+// Indicates whether the subscription is for a single notification
+enum OneTimeNotification {
+  ONE_TIME_NOTIFICATION_REQUESTED = 0;  // Single notification then auto-unsubscribe
+}
+
+// Serving-Node-Indication (AVP Code 714)
+// Indicates whether to return information from the serving node
+enum ServingNodeIndication {
+  ONLY_HSS_DATA = 0;              // Return only HSS-stored data
+  ALSO_NODE_INDICATION_NEEDED = 1;  // Also return serving node info
+}
+
+// Pre-Paging-Supported (AVP Code 717)
+// Indicates whether AS supports pre-paging
+enum PrePagingSupported {
+  PREPAGING_NOT_SUPPORTED = 0;  // AS does not support pre-paging
+  PREPAGING_SUPPORTED = 1;      // AS supports pre-paging
+}
+
+// Local-Time-Zone-Indication (AVP Code 718)
+// Indicates whether local timezone should be returned
+enum LocalTimeZoneIndication {
+  TIME_ZONE_NOT_REQUESTED = 0;  // Do not include timezone
+  TIME_ZONE_REQUESTED = 1;      // Include timezone information
+}
+
+// IMS-User-State enum values (used in User-Data XML)
+// Note: IMS-User-State is returned as XML data, not as a separate AVP
+// Values: NOT_REGISTERED=0, REGISTERED=1, REGISTERED_UNREG_SERVICES=2,
+//         UNREGISTERED=3
+
+// ================================================================================
+//                         EXPERIMENTAL RESULT CODES
+// ================================================================================
+// Sh Specific Experimental-Result-Code values (3GPP TS 29.329 Section 6.4)
+// Vendor-Id: 10415 (3GPP)
+
+const DIAMETER_ERROR_USER_UNKNOWN = 5001;                  // User not found in HSS
+const DIAMETER_ERROR_OPERATION_NOT_ALLOWED = 5011;         // Operation not permitted
+const DIAMETER_ERROR_USER_DATA_NOT_FOUND = 5012;           // Requested data not found
+const DIAMETER_ERROR_SUBS_DATA_ABSENT = 5013;              // No subscription data for SNR
+const DIAMETER_ERROR_NO_SUBSCRIPTION_TO_NOTIFICATION = 5014;  // PNR with no subscription
+
+// ================================================================================
+//                         BASE PROTOCOL AVP DEFINITIONS
+// ================================================================================
+// RFC 6733 AVPs (No Vendor-ID)
+
+// Session-Id (AVP Code 263)
+avp Session-Id {
+  code = 263;
+  type = UTF8String;
+  must = true;
+  may_encrypt = false;
+  description = "Uniquely identifies a Diameter session";
+}
+
+// Auth-Session-State (AVP Code 277)
+avp Auth-Session-State {
+  code = 277;
+  type = Enumerated;
+  must = true;
+  may_encrypt = false;
+  description = "Indicates whether state is maintained for a session";
+  // Values: 0 = STATE_MAINTAINED, 1 = NO_STATE_MAINTAINED
+}
+
+// Origin-Host (AVP Code 264)
+avp Origin-Host {
+  code = 264;
+  type = DiameterIdentity;
+  must = true;
+  may_encrypt = false;
+  description = "Identity of the node that originated the Diameter message";
+}
+
+// Origin-Realm (AVP Code 296)
+avp Origin-Realm {
+  code = 296;
+  type = DiameterIdentity;
+  must = true;
+  may_encrypt = false;
+  description = "Realm of the node that originated the Diameter message";
+}
+
+// Destination-Host (AVP Code 293)
+avp Destination-Host {
+  code = 293;
+  type = DiameterIdentity;
+  must = true;
+  may_encrypt = false;
+  description = "Identity of the destination Diameter node";
+}
+
+// Destination-Realm (AVP Code 283)
+avp Destination-Realm {
+  code = 283;
+  type = DiameterIdentity;
+  must = true;
+  may_encrypt = false;
+  description = "Realm of the destination Diameter node";
+}
+
+// User-Name (AVP Code 1)
+// Contains the IMSI in Sh context
+avp User-Name {
+  code = 1;
+  type = UTF8String;
+  must = true;
+  may_encrypt = true;
+  description = "User identifier (IMSI in Sh context)";
+}
+
+// Result-Code (AVP Code 268)
+avp Result-Code {
+  code = 268;
+  type = Unsigned32;
+  must = true;
+  may_encrypt = false;
+  description = "Result of the Diameter request";
+  // Common values: 2001=SUCCESS, 3xxx=Protocol Errors, 5xxx=Permanent Failures
+}
+
+// Experimental-Result (AVP Code 297)
+avp Experimental-Result {
+  code = 297;
+  type = Grouped;
+  must = true;
+  may_encrypt = false;
+  description = "Contains vendor-specific result information";
+
+  grouped {
+    required Vendor-Id vendor_id = 1;
+    required Experimental-Result-Code experimental_result_code = 2;
+  }
+}
+
+// Vendor-Id (AVP Code 266)
+avp Vendor-Id {
+  code = 266;
+  type = Unsigned32;
+  must = true;
+  may_encrypt = false;
+  description = "Vendor identifier (10415 for 3GPP)";
+}
+
+// Experimental-Result-Code (AVP Code 298)
+avp Experimental-Result-Code {
+  code = 298;
+  type = Unsigned32;
+  must = true;
+  may_encrypt = false;
+  description = "Vendor-specific result code";
+}
+
+// Vendor-Specific-Application-Id (AVP Code 260)
+avp Vendor-Specific-Application-Id {
+  code = 260;
+  type = Grouped;
+  must = true;
+  may_encrypt = false;
+  description = "Contains vendor-specific application identifier";
+
+  grouped {
+    optional Vendor-Id vendor_id = 1;
+    optional Auth-Application-Id auth_application_id = 2;
+    optional Acct-Application-Id acct_application_id = 3;
+  }
+}
+
+// Auth-Application-Id (AVP Code 258)
+avp Auth-Application-Id {
+  code = 258;
+  type = Unsigned32;
+  must = true;
+  may_encrypt = false;
+  description = "Authentication application identifier";
+}
+
+// Acct-Application-Id (AVP Code 259)
+avp Acct-Application-Id {
+  code = 259;
+  type = Unsigned32;
+  must = true;
+  may_encrypt = false;
+  description = "Accounting application identifier";
+}
+
+// Failed-AVP (AVP Code 279)
+avp Failed-AVP {
+  code = 279;
+  type = Grouped;
+  must = true;
+  may_encrypt = false;
+  description = "Contains AVPs that could not be processed successfully";
+
+  grouped {
+    repeated AVP avp = 1;
+  }
+}
+
+// Proxy-Info (AVP Code 284)
+avp Proxy-Info {
+  code = 284;
+  type = Grouped;
+  must = true;
+  may_encrypt = false;
+  description = "Contains proxy state information";
+
+  grouped {
+    required Proxy-Host proxy_host = 1;
+    optional Proxy-State proxy_state = 2;
+  }
+}
+
+// Proxy-Host (AVP Code 280)
+avp Proxy-Host {
+  code = 280;
+  type = DiameterIdentity;
+  must = true;
+  may_encrypt = false;
+  description = "Identity of the proxy server";
+}
+
+// Proxy-State (AVP Code 33)
+avp Proxy-State {
+  code = 33;
+  type = OctetString;
+  must = true;
+  may_encrypt = false;
+  description = "State information added by a proxy";
+}
+
+// Route-Record (AVP Code 282)
+avp Route-Record {
+  code = 282;
+  type = DiameterIdentity;
+  must = true;
+  may_encrypt = false;
+  description = "Identity of a Diameter node in the path";
+}
+
+// DRMP (AVP Code 301) - RFC 7944
+avp DRMP {
+  code = 301;
+  type = Enumerated;
+  must = false;
+  may_encrypt = false;
+  description = "Diameter Routing Message Priority";
+  // Values: 0=PRIORITY_0 (lowest) ... 15=PRIORITY_15 (highest)
+}
+
+// ================================================================================
+//                         SH-SPECIFIC AVP DEFINITIONS
+// ================================================================================
+// All Sh-specific AVPs have Vendor-ID = 10415 (3GPP)
+// Flags: M=Mandatory, V=Vendor-specific
+
+// Public-Identity (AVP Code 601) - defined in Cx, reused by Sh
+// Used inside User-Identity grouped AVP
+// Flags: M, V
+avp Public-Identity {
+  code = 601;
+  vendor_id = 10415;
+  type = UTF8String;
+  must = true;
+  may_encrypt = false;
+  description = "Public User Identity (SIP URI or TEL URI) - Cx/Sh shared AVP";
+}
+
+// Supported-Features (AVP Code 628) - defined in Cx, reused by Sh
+// Flags: V (no M)
+avp Supported-Features {
+  code = 628;
+  vendor_id = 10415;
+  type = Grouped;
+  must = false;
+  may_encrypt = false;
+  description = "Contains a list of features supported by the sending node";
+
+  grouped {
+    required Vendor-Id vendor_id = 1;
+    required Feature-List-ID feature_list_id = 2;
+    required Feature-List feature_list = 3;
+  }
+}
+
+// Feature-List-ID (AVP Code 629) - reused from Cx
+// Flags: V (no M)
+avp Feature-List-ID {
+  code = 629;
+  vendor_id = 10415;
+  type = Unsigned32;
+  must = false;
+  may_encrypt = false;
+  description = "Identifier for the feature list (typically 1 or 2)";
+}
+
+// Feature-List (AVP Code 630) - reused from Cx
+// Flags: V (no M)
+avp Feature-List {
+  code = 630;
+  vendor_id = 10415;
+  type = Unsigned32;
+  must = false;
+  may_encrypt = false;
+  description = "Bitmask indicating which features from the identified feature list are supported";
+}
+
+// User-Identity (AVP Code 700) - Grouped
+// Contains the IMS public identity or MSISDN identifying the user
+// Flags: M, V
+avp User-Identity {
+  code = 700;
+  vendor_id = 10415;
+  type = Grouped;
+  must = true;
+  may_encrypt = false;
+  description = "Contains the user identity (either Public-Identity or MSISDN)";
+
+  grouped {
+    optional Public-Identity public_identity = 1;  // Code 601 - SIP URI / TEL URI
+    optional MSISDN msisdn = 2;                    // Code 701 - E.164 number
+  }
+}
+
+// MSISDN (AVP Code 701)
+// Mobile Station International ISDN Number (E.164 format in BCD encoding)
+// Flags: M, V
+avp MSISDN {
+  code = 701;
+  vendor_id = 10415;
+  type = OctetString;
+  must = true;
+  may_encrypt = false;
+  description = "MSISDN in E.164 format encoded as OctetString (TBCD encoding per TS 29.002)";
+}
+
+// User-Data (AVP Code 702) - Sh User Data
+// Contains the user profile or repository data in XML format
+// Flags: M, V
+avp User-Data {
+  code = 702;
+  vendor_id = 10415;
+  type = OctetString;
+  must = true;
+  may_encrypt = false;
+  description = "User data in XML format (Sh-Data element per TS 29.328 Annex A)";
+}
+
+// Data-Reference (AVP Code 703)
+// Specifies which type of data is being requested
+// Flags: M, V
+avp Data-Reference {
+  code = 703;
+  vendor_id = 10415;
+  type = Enumerated;
+  must = true;
+  may_encrypt = false;
+  description = "Reference to the type of data requested or being updated";
+  // Values defined in DataReference enum above
+}
+
+// Service-Indication (AVP Code 704)
+// Identifies a specific service or repository data instance
+// Flags: M, V
+avp Service-Indication {
+  code = 704;
+  vendor_id = 10415;
+  type = OctetString;
+  must = true;
+  may_encrypt = false;
+  description = "Service identifier for repository data (required when Data-Reference=RepositoryData)";
+}
+
+// Subs-Req-Type (AVP Code 705)
+// Indicates whether this is a subscribe or unsubscribe request
+// Flags: M, V
+avp Subs-Req-Type {
+  code = 705;
+  vendor_id = 10415;
+  type = Enumerated;
+  must = true;
+  may_encrypt = false;
+  description = "Subscription request type: SUBSCRIBE(0) or UNSUBSCRIBE(1)";
+}
+
+// Requested-Domain (AVP Code 706)
+// Specifies which network domain location/state info should come from
+// Flags: M, V
+avp Requested-Domain {
+  code = 706;
+  vendor_id = 10415;
+  type = Enumerated;
+  must = true;
+  may_encrypt = false;
+  description = "Specifies the network domain for location or user state queries";
+  // Values: 0=CS_Domain, 1=PS_Domain
+}
+
+// Current-Location (AVP Code 707)
+// Specifies whether a fresh location update (paging) is required
+// Flags: M, V
+avp Current-Location {
+  code = 707;
+  vendor_id = 10415;
+  type = Enumerated;
+  must = true;
+  may_encrypt = false;
+  description = "Indicates whether HSS must obtain current location via paging";
+}
+
+// Identity-Set (AVP Code 708)
+// Specifies which set of public identities to return
+// Flags: M, V
+avp Identity-Set {
+  code = 708;
+  vendor_id = 10415;
+  type = Enumerated;
+  must = true;
+  may_encrypt = false;
+  description = "Specifies which set of identities to include in the response";
+}
+
+// Expiry-Time (AVP Code 709)
+// Absolute time when a subscription or repository data expires
+// Flags: M, V
+avp Expiry-Time {
+  code = 709;
+  vendor_id = 10415;
+  type = Time;
+  must = true;
+  may_encrypt = false;
+  description = "Absolute expiry time for a notification subscription or repository data entry";
+}
+
+// Send-Data-Indication (AVP Code 710)
+// Requests that current data be included in the SNA response
+// Flags: V (no M)
+avp Send-Data-Indication {
+  code = 710;
+  vendor_id = 10415;
+  type = Enumerated;
+  must = false;
+  may_encrypt = false;
+  description = "Requests HSS to include current user data in Subscribe-Notifications-Answer";
+}
+
+// DSAI-Tag (AVP Code 711)
+// Dynamic Service Activation Information tag for service-specific activation
+// Flags: M, V
+avp DSAI-Tag {
+  code = 711;
+  vendor_id = 10415;
+  type = OctetString;
+  must = true;
+  may_encrypt = false;
+  description = "Dynamic Service Activation Information (DSAI) tag identifier";
+}
+
+// One-Time-Notification (AVP Code 712)
+// Requests a single notification after which subscription auto-cancels
+// Flags: V (no M)
+avp One-Time-Notification {
+  code = 712;
+  vendor_id = 10415;
+  type = Enumerated;
+  must = false;
+  may_encrypt = false;
+  description = "Requests a single push notification with automatic unsubscription";
+}
+
+// Requested-Nodes (AVP Code 713)
+// Bitmask indicating which node types should be included in the response
+// Flags: V (no M)
+avp Requested-Nodes {
+  code = 713;
+  vendor_id = 10415;
+  type = Unsigned32;
+  must = false;
+  may_encrypt = false;
+  description = "Bitmask of requested serving node types (MME, SGSN, etc.)";
+  // Bit 0: MME
+  // Bit 1: SGSN
+  // Bit 2: 3GPP AAA Server
+  // Bit 3: TWAN node
+}
+
+// Serving-Node-Indication (AVP Code 714)
+// Indicates how to include serving node information
+// Flags: V (no M)
+avp Serving-Node-Indication {
+  code = 714;
+  vendor_id = 10415;
+  type = Enumerated;
+  must = false;
+  may_encrypt = false;
+  description = "Indicates whether serving node data should be included in the response";
+}
+
+// Repository-Data-ID (AVP Code 715) - Grouped
+// Uniquely identifies a repository data item for change tracking
+// Flags: M, V
+avp Repository-Data-ID {
+  code = 715;
+  vendor_id = 10415;
+  type = Grouped;
+  must = true;
+  may_encrypt = false;
+  description = "Uniquely identifies a repository data item (service indication + sequence number)";
+
+  grouped {
+    required Service-Indication service_indication = 1;  // Code 704
+    required Sequence-Number sequence_number = 2;        // Code 716
+  }
+}
+
+// Sequence-Number (AVP Code 716)
+// Sequential version number for repository data change tracking
+// Flags: M, V
+avp Sequence-Number {
+  code = 716;
+  vendor_id = 10415;
+  type = Unsigned32;
+  must = true;
+  may_encrypt = false;
+  description = "Sequence number for repository data version tracking";
+}
+
+// Pre-Paging-Supported (AVP Code 717)
+// Indicates whether the AS supports pre-paging optimization
+// Flags: V (no M)
+avp Pre-Paging-Supported {
+  code = 717;
+  vendor_id = 10415;
+  type = Enumerated;
+  must = false;
+  may_encrypt = false;
+  description = "Indicates whether the AS supports pre-paging for location queries";
+}
+
+// Local-Time-Zone-Indication (AVP Code 718)
+// Indicates whether local timezone info should be included
+// Flags: V (no M)
+avp Local-Time-Zone-Indication {
+  code = 718;
+  vendor_id = 10415;
+  type = Enumerated;
+  must = false;
+  may_encrypt = false;
+  description = "Indicates whether local time zone information should be included in the response";
+}
+
+// UDR-Flags (AVP Code 719)
+// Bitmask of flags for User-Data-Request
+// Flags: V (no M)
+avp UDR-Flags {
+  code = 719;
+  vendor_id = 10415;
+  type = Unsigned32;
+  must = false;
+  may_encrypt = false;
+  description = "Bitmask of control flags for the User-Data-Request";
+  // Bit 0: Null-Data-Indication (request confirmation of data presence)
+}
+
+// Wildcarded-IMPU (AVP Code 636) - from Cx interface, reused in Sh
+// Contains a wildcarded IMPU matching pattern
+// Flags: V (no M)
+avp Wildcarded-IMPU {
+  code = 636;
+  vendor_id = 10415;
+  type = UTF8String;
+  must = false;
+  may_encrypt = false;
+  description = "Wildcarded IMPU pattern that matched the requested public identity";
+}
+
+// ================================================================================
+//                         COMMAND DEFINITIONS
+// ================================================================================
+
+// ================================================================================
+// User-Data-Request (UDR) - Command Code 306
+// 3GPP TS 29.328 Section 6.1.1 / TS 29.329 Table 6.1.1-1
+// Sent from AS/SCS to HSS
+// Purpose: Request user data (profile, location, state, repository data)
+// ================================================================================
+command User-Data-Request {
+  code = 306;
+  application_id = 16777217;
+  request = true;
+  proxiable = true;
+  description = "Request user data from HSS (profile, location, state, or repository data)";
+
+  // Required AVPs (Table 6.1.1-1)
+  fixed required Session-Id session_id = 1;
+  fixed required Vendor-Specific-Application-Id vendor_specific_application_id = 2;
+  fixed required Auth-Session-State auth_session_state = 3;  // NO_STATE_MAINTAINED
+  fixed required Origin-Host origin_host = 4;                // AS identity
+  fixed required Origin-Realm origin_realm = 5;              // AS realm
+  fixed required Destination-Realm destination_realm = 6;    // HSS realm
+  fixed required User-Identity user_identity = 7;            // Public-Identity or MSISDN
+  repeated fixed required Data-Reference data_reference = 8; // What data to retrieve
+
+  // Conditional AVPs
+  repeated Service-Indication service_indication = 9;  // Required when Data-Reference=RepositoryData
+  optional Identity-Set identity_set = 10;                // Which identity set to return
+  optional Requested-Domain requested_domain = 11;        // CS or PS domain
+  optional Current-Location current_location = 12;        // Fresh location required?
+  repeated DSAI-Tag dsai_tag = 13;               // DSAI filter
+
+  // Optional AVPs
+  optional DRMP drmp = 14;
+  optional Destination-Host destination_host = 15;        // Specific HSS if known
+  optional User-Name user_name = 16;                      // IMSI (if known)
+  optional Wildcarded-IMPU wildcarded_impu = 17;          // Wildcarded IMPU
+  optional One-Time-Notification one_time_notification = 18;
+  optional Requested-Nodes requested_nodes = 19;
+  optional Serving-Node-Indication serving_node_indication = 20;
+  optional Pre-Paging-Supported pre_paging_supported = 21;
+  optional Local-Time-Zone-Indication local_time_zone_indication = 22;
+  optional UDR-Flags udr_flags = 23;
+  repeated Supported-Features supported_features = 24;
+  repeated Proxy-Info proxy_info = 25;
+  repeated Route-Record route_record = 26;
+  repeated AVP avp = 27;
+}
+
+// ================================================================================
+// User-Data-Answer (UDA) - Command Code 306
+// 3GPP TS 29.328 Section 6.1.1 / TS 29.329 Table 6.1.1-1
+// Sent from HSS to AS/SCS
+// Purpose: Return requested user data
+// ================================================================================
+command User-Data-Answer {
+  code = 306;
+  application_id = 16777217;
+  request = false;
+  proxiable = true;
+  description = "Response to UDR with requested user data";
+
+  // Required AVPs
+  fixed required Session-Id session_id = 1;
+  fixed required Vendor-Specific-Application-Id vendor_specific_application_id = 2;
+  fixed required Auth-Session-State auth_session_state = 3;
+  fixed required Origin-Host origin_host = 4;                // HSS identity
+  fixed required Origin-Realm origin_realm = 5;              // HSS realm
+
+  // Result (one of Result-Code or Experimental-Result must be present)
+  optional Result-Code result_code = 6;
+  optional Experimental-Result experimental_result = 7;
+
+  // Conditional AVPs (present on success)
+  optional User-Data user_data = 8;              // Requested user data (XML)
+  optional Wildcarded-IMPU wildcarded_impu = 9;  // Matching wildcard if applicable
+  repeated Repository-Data-ID repository_data_id = 10;  // For change tracking
+  optional Sequence-Number sequence_number = 11; // For repository data version
+
+  // Optional AVPs
+  optional DRMP drmp = 12;
+  repeated Supported-Features supported_features = 13;
+  optional Failed-AVP failed_avp = 14;
+  repeated Proxy-Info proxy_info = 15;
+  repeated Route-Record route_record = 16;
+  repeated AVP avp = 17;
+}
+
+// ================================================================================
+// Profile-Update-Request (PUR) - Command Code 307
+// 3GPP TS 29.328 Section 6.1.2 / TS 29.329 Table 6.1.2-1
+// Sent from AS/SCS to HSS
+// Purpose: Update repository data stored in HSS on behalf of a user
+// ================================================================================
+command Profile-Update-Request {
+  code = 307;
+  application_id = 16777217;
+  request = true;
+  proxiable = true;
+  description = "Update user repository data stored in HSS";
+
+  // Required AVPs (Table 6.1.2-1)
+  fixed required Session-Id session_id = 1;
+  fixed required Vendor-Specific-Application-Id vendor_specific_application_id = 2;
+  fixed required Auth-Session-State auth_session_state = 3;
+  fixed required Origin-Host origin_host = 4;
+  fixed required Origin-Realm origin_realm = 5;
+  fixed required Destination-Realm destination_realm = 6;
+  fixed required User-Identity user_identity = 7;            // Public-Identity or MSISDN
+  repeated fixed required Data-Reference data_reference = 8; // What data is being updated
+  fixed required User-Data user_data = 9;                    // Updated data (XML)
+
+  // Conditional AVPs
+  optional Service-Indication service_indication = 10;  // Required for RepositoryData
+  optional Expiry-Time expiry_time = 11;                // Expiry for repository data
+
+  // Optional AVPs
+  optional DRMP drmp = 12;
+  optional Destination-Host destination_host = 13;
+  optional Wildcarded-IMPU wildcarded_impu = 14;
+  repeated Supported-Features supported_features = 15;
+  repeated Proxy-Info proxy_info = 16;
+  repeated Route-Record route_record = 17;
+  repeated AVP avp = 18;
+}
+
+// ================================================================================
+// Profile-Update-Answer (PUA) - Command Code 307
+// 3GPP TS 29.328 Section 6.1.2 / TS 29.329 Table 6.1.2-1
+// Sent from HSS to AS/SCS
+// Purpose: Confirm the profile update result
+// ================================================================================
+command Profile-Update-Answer {
+  code = 307;
+  application_id = 16777217;
+  request = false;
+  proxiable = true;
+  description = "Response to PUR confirming data update result";
+
+  // Required AVPs
+  fixed required Session-Id session_id = 1;
+  fixed required Vendor-Specific-Application-Id vendor_specific_application_id = 2;
+  fixed required Auth-Session-State auth_session_state = 3;
+  fixed required Origin-Host origin_host = 4;
+  fixed required Origin-Realm origin_realm = 5;
+
+  // Result
+  optional Result-Code result_code = 6;
+  optional Experimental-Result experimental_result = 7;
+
+  // Conditional AVPs (on success)
+  optional Wildcarded-IMPU wildcarded_impu = 8;
+  optional Expiry-Time expiry_time = 9;             // Confirmed expiry time
+  optional Repository-Data-ID repository_data_id = 10;  // Updated data ID + sequence
+
+  // Optional AVPs
+  optional DRMP drmp = 11;
+  repeated Supported-Features supported_features = 12;
+  optional Failed-AVP failed_avp = 13;
+  repeated Proxy-Info proxy_info = 14;
+  repeated Route-Record route_record = 15;
+  repeated AVP avp = 16;
+}
+
+// ================================================================================
+// Subscribe-Notifications-Request (SNR) - Command Code 308
+// 3GPP TS 29.328 Section 6.1.3 / TS 29.329 Table 6.1.3-1
+// Sent from AS/SCS to HSS
+// Purpose: Subscribe to or unsubscribe from notifications about data changes
+// ================================================================================
+command Subscribe-Notifications-Request {
+  code = 308;
+  application_id = 16777217;
+  request = true;
+  proxiable = true;
+  description = "Subscribe to or unsubscribe from HSS data change notifications";
+
+  // Required AVPs (Table 6.1.3-1)
+  fixed required Session-Id session_id = 1;
+  fixed required Vendor-Specific-Application-Id vendor_specific_application_id = 2;
+  fixed required Auth-Session-State auth_session_state = 3;
+  fixed required Origin-Host origin_host = 4;
+  fixed required Origin-Realm origin_realm = 5;
+  fixed required Destination-Realm destination_realm = 6;
+  fixed required User-Identity user_identity = 7;            // Public-Identity or MSISDN
+  fixed required Subs-Req-Type subs_req_type = 8;            // SUBSCRIBE or UNSUBSCRIBE
+  repeated fixed required Data-Reference data_reference = 9; // What data to monitor
+
+  // Conditional AVPs
+  repeated Service-Indication service_indication = 10;  // Required for RepositoryData
+  optional Identity-Set identity_set = 11;
+  optional Expiry-Time expiry_time = 12;                     // Desired subscription expiry
+  repeated DSAI-Tag dsai_tag = 13;
+
+  // Optional AVPs
+  optional DRMP drmp = 14;
+  optional Destination-Host destination_host = 15;
+  optional User-Name user_name = 16;                         // IMSI
+  optional Wildcarded-IMPU wildcarded_impu = 17;
+  optional Send-Data-Indication send_data_indication = 18;   // Include current data in SNA
+  optional One-Time-Notification one_time_notification = 19;
+  repeated Supported-Features supported_features = 20;
+  repeated Proxy-Info proxy_info = 21;
+  repeated Route-Record route_record = 22;
+  repeated AVP avp = 23;
+}
+
+// ================================================================================
+// Subscribe-Notifications-Answer (SNA) - Command Code 308
+// 3GPP TS 29.328 Section 6.1.3 / TS 29.329 Table 6.1.3-1
+// Sent from HSS to AS/SCS
+// Purpose: Confirm the notification subscription
+// ================================================================================
+command Subscribe-Notifications-Answer {
+  code = 308;
+  application_id = 16777217;
+  request = false;
+  proxiable = true;
+  description = "Response to SNR confirming notification subscription status";
+
+  // Required AVPs
+  fixed required Session-Id session_id = 1;
+  fixed required Vendor-Specific-Application-Id vendor_specific_application_id = 2;
+  fixed required Auth-Session-State auth_session_state = 3;
+  fixed required Origin-Host origin_host = 4;
+  fixed required Origin-Realm origin_realm = 5;
+
+  // Result
+  optional Result-Code result_code = 6;
+  optional Experimental-Result experimental_result = 7;
+
+  // Conditional AVPs (on success)
+  optional Wildcarded-IMPU wildcarded_impu = 8;
+  optional Expiry-Time expiry_time = 9;         // Granted subscription expiry
+  optional User-Data user_data = 10;            // Current data (if Send-Data-Indication was set)
+
+  // Optional AVPs
+  optional DRMP drmp = 11;
+  repeated Supported-Features supported_features = 12;
+  optional Failed-AVP failed_avp = 13;
+  repeated Proxy-Info proxy_info = 14;
+  repeated Route-Record route_record = 15;
+  repeated AVP avp = 16;
+}
+
+// ================================================================================
+// Push-Notification-Request (PNR) - Command Code 309
+// 3GPP TS 29.328 Section 6.1.4 / TS 29.329 Table 6.1.4-1
+// Sent from HSS to AS/SCS
+// Purpose: Notify the AS that subscribed data has changed
+// ================================================================================
+command Push-Notification-Request {
+  code = 309;
+  application_id = 16777217;
+  request = true;
+  proxiable = true;
+  description = "Notify AS of subscribed data change (HSS-initiated)";
+
+  // Required AVPs (Table 6.1.4-1)
+  fixed required Session-Id session_id = 1;
+  fixed required Vendor-Specific-Application-Id vendor_specific_application_id = 2;
+  fixed required Auth-Session-State auth_session_state = 3;
+  fixed required Origin-Host origin_host = 4;                // HSS identity
+  fixed required Origin-Realm origin_realm = 5;
+  fixed required Destination-Host destination_host = 6;      // AS (must be direct)
+  fixed required Destination-Realm destination_realm = 7;
+  fixed required User-Identity user_identity = 8;            // Affected user
+
+  // Conditional AVPs
+  optional User-Data user_data = 9;              // Changed data (XML)
+  optional Wildcarded-IMPU wildcarded_impu = 10;
+  repeated Repository-Data-ID repository_data_id = 11;  // Changed data IDs
+  repeated Service-Indication service_indication = 12;  // Which service changed
+
+  // Optional AVPs
+  optional DRMP drmp = 13;
+  repeated Supported-Features supported_features = 14;
+  repeated Proxy-Info proxy_info = 15;
+  repeated Route-Record route_record = 16;
+  repeated AVP avp = 17;
+}
+
+// ================================================================================
+// Push-Notification-Answer (PNA) - Command Code 309
+// 3GPP TS 29.328 Section 6.1.4 / TS 29.329 Table 6.1.4-1
+// Sent from AS/SCS to HSS
+// Purpose: Acknowledge the notification
+// ================================================================================
+command Push-Notification-Answer {
+  code = 309;
+  application_id = 16777217;
+  request = false;
+  proxiable = true;
+  description = "Acknowledgement of data change notification from AS to HSS";
+
+  // Required AVPs
+  fixed required Session-Id session_id = 1;
+  fixed required Vendor-Specific-Application-Id vendor_specific_application_id = 2;
+  fixed required Auth-Session-State auth_session_state = 3;
+  fixed required Origin-Host origin_host = 4;
+  fixed required Origin-Realm origin_realm = 5;
+
+  // Result
+  optional Result-Code result_code = 6;
+  optional Experimental-Result experimental_result = 7;
+
+  // Optional AVPs
+  optional DRMP drmp = 8;
+  repeated Supported-Features supported_features = 9;
+  optional Failed-AVP failed_avp = 10;
+  repeated Proxy-Info proxy_info = 11;
+  repeated Route-Record route_record = 12;
+  repeated AVP avp = 13;
+}
+
+// ================================================================================
+//                         USAGE NOTES
+// ================================================================================
+//
+// 1. SESSION HANDLING:
+//    - Sh uses implicitly terminated sessions
+//    - Auth-Session-State MUST be set to NO_STATE_MAINTAINED (1)
+//
+// 2. INTERFACE ROLES:
+//    - UDR/UDA: AS/SCS → HSS (pull user data)
+//    - PUR/PUA: AS/SCS → HSS (update repository data)
+//    - SNR/SNA: AS/SCS → HSS (subscribe/unsubscribe notifications)
+//    - PNR/PNA: HSS → AS/SCS (push notification on data change)
+//
+// 3. DATA FORMAT:
+//    - User-Data AVP contains XML conforming to the Sh-Data schema (TS 29.328 Annex A)
+//    - Repository data is service-specific XML identified by Service-Indication
+//    - HSS data (location, state, etc.) follows defined XML schema
+//
+// 4. SUBSCRIPTION LIFECYCLE:
+//    - AS subscribes via SNR with Subs-Req-Type = SUBSCRIBE(0)
+//    - HSS confirms with SNA including granted Expiry-Time
+//    - When data changes, HSS sends PNR to AS
+//    - AS acknowledges with PNA
+//    - AS unsubscribes via SNR with Subs-Req-Type = UNSUBSCRIBE(1)
+//    - Subscriptions with One-Time-Notification auto-cancel after first PNR
+//
+// 5. TRANSPORT:
+//    - Uses SCTP or TCP as transport protocol
+//    - Port: 3868 (Diameter standard port)
+//
+// 6. RELATED SPECIFICATIONS:
+//    - 3GPP TS 29.328: IMS Application Level Gateway for the Sh interface
+//    - 3GPP TS 29.329: Sh Interface Based on the Diameter Protocol
+//    - 3GPP TS 23.228: IP Multimedia Subsystem (IMS) Stage 2
+//    - 3GPP TS 29.229: Cx/Cx interfaces (defines AVPs 601, 628-630 reused here)
+//    - RFC 6733: Diameter Base Protocol
+//
+// ================================================================================
+//                         AVP CODE SUMMARY
+// ================================================================================
+//
+// SH-SPECIFIC AVPs (Vendor-ID = 10415 / 3GPP):
+// -----------------------------------------------
+//   Public-Identity              (601)  - UTF8String  - M,V  (from Cx, reused)
+//   Supported-Features           (628)  - Grouped     - V    (from Cx, reused)
+//   Feature-List-ID              (629)  - Unsigned32  - V    (from Cx, reused)
+//   Feature-List                 (630)  - Unsigned32  - V    (from Cx, reused)
+//   Wildcarded-IMPU              (636)  - UTF8String  - V    (from Cx, reused)
+//   User-Identity                (700)  - Grouped     - M,V
+//   MSISDN                       (701)  - OctetString - M,V
+//   User-Data (Sh)               (702)  - OctetString - M,V
+//   Data-Reference               (703)  - Enumerated  - M,V
+//   Service-Indication           (704)  - OctetString - M,V
+//   Subs-Req-Type                (705)  - Enumerated  - M,V
+//   Requested-Domain             (706)  - Enumerated  - M,V
+//   Current-Location             (707)  - Enumerated  - M,V
+//   Identity-Set                 (708)  - Enumerated  - M,V
+//   Expiry-Time                  (709)  - Time        - M,V
+//   Send-Data-Indication         (710)  - Enumerated  - V
+//   DSAI-Tag                     (711)  - OctetString - M,V
+//   One-Time-Notification        (712)  - Enumerated  - V
+//   Requested-Nodes              (713)  - Unsigned32  - V
+//   Serving-Node-Indication      (714)  - Enumerated  - V
+//   Repository-Data-ID           (715)  - Grouped     - M,V
+//   Sequence-Number              (716)  - Unsigned32  - M,V
+//   Pre-Paging-Supported         (717)  - Enumerated  - V
+//   Local-Time-Zone-Indication   (718)  - Enumerated  - V
+//   UDR-Flags                    (719)  - Unsigned32  - V
+//
+// ================================================================================

@@ -1,0 +1,1649 @@
+// Diameter Cx Interface Application
+// Based on 3GPP TS 29.228 / TS 29.229 v16.x
+// Interface between P-CSCF/I-CSCF/S-CSCF and HSS (IMS)
+
+syntax = "diameter1";
+
+package diameter.cx;
+
+option go_package = "github.com/hsdfat/diam-gw/commands/cx";
+
+// ================================================================================
+//                         APPLICATION IDENTIFIER
+// ================================================================================
+// Cx/Dx Application ID: 16777216 (allocated by IANA)
+// Vendor ID: 10415 (3GPP)
+
+const CX_APPLICATION_ID = 16777216;
+const VENDOR_ID_3GPP = 10415;
+
+// ================================================================================
+//                         COMMAND CODE VALUES
+// ================================================================================
+// Table 6.1/1: Command-Code values for Cx Interface (3GPP TS 29.228)
+
+const UAR_COMMAND_CODE = 300;  // User-Authorization-Request/Answer
+const SAR_COMMAND_CODE = 301;  // Server-Assignment-Request/Answer
+const LIR_COMMAND_CODE = 302;  // Location-Info-Request/Answer
+const MAR_COMMAND_CODE = 303;  // Multimedia-Auth-Request/Answer
+const RTR_COMMAND_CODE = 304;  // Registration-Termination-Request/Answer
+const PPR_COMMAND_CODE = 305;  // Push-Profile-Request/Answer
+
+// ================================================================================
+//                         ENUMERATED VALUE DEFINITIONS
+// ================================================================================
+
+// User-Authorization-Type (AVP Code 623)
+// Indicates the type of user authorization being requested
+enum UserAuthorizationType {
+  REGISTRATION = 0;                    // Initial registration
+  DE_REGISTRATION = 1;                 // De-registration
+  REGISTRATION_AND_CAPABILITIES = 2;  // Registration with server capabilities query
+}
+
+// Server-Assignment-Type (AVP Code 614)
+// Indicates the type of server assignment operation
+enum ServerAssignmentType {
+  NO_ASSIGNMENT = 0;                              // No assignment, data download only
+  REGISTRATION = 1;                               // Initial registration
+  RE_REGISTRATION = 2;                            // Re-registration (same S-CSCF)
+  UNREGISTERED_USER = 3;                          // Unregistered user originating call
+  TIMEOUT_DEREGISTRATION = 4;                     // Registration timer expired
+  USER_DEREGISTRATION = 5;                        // User-initiated de-registration
+  TIMEOUT_DEREGISTRATION_STORE_SERVER_NAME = 6;   // Timer expiry, store server name
+  USER_DEREGISTRATION_STORE_SERVER_NAME = 7;      // User deregister, store server name
+  ADMINISTRATIVE_DEREGISTRATION = 8;              // Network-initiated de-registration
+  AUTHENTICATION_FAILURE = 9;                     // Authentication procedure failure
+  AUTHENTICATION_TIMEOUT = 10;                    // Authentication timeout
+  DEREGISTRATION_TOO_MUCH_DATA = 11;              // De-reg due to excess subscription data
+}
+
+// Reason-Code (AVP Code 616)
+// Indicates the reason for de-registration in RTR
+enum ReasonCode {
+  PERMANENT_TERMINATION = 0;  // User permanently terminated
+  NEW_SERVER_ASSIGNED = 1;    // New S-CSCF assigned
+  SERVER_CHANGE = 2;          // S-CSCF change required
+  REMOVE_S_CSCF = 3;          // Remove current S-CSCF assignment
+}
+
+// User-Data-Already-Available (AVP Code 624)
+// Indicates whether S-CSCF already has the user profile
+enum UserDataAlreadyAvailable {
+  USER_DATA_NOT_AVAILABLE = 0;  // S-CSCF does not have user data
+  USER_DATA_ALREADY_AVAILABLE = 1;  // S-CSCF already has user data
+}
+
+// Originating-Request (AVP Code 633)
+// Indicates request originates from originating side
+enum OriginatingRequest {
+  ORIGINATING = 0;  // Request is for originating service
+}
+
+// Loose-Route-Indication (AVP Code 638)
+// Indicates whether loose routing is required
+enum LooseRouteIndication {
+  LOOSE_ROUTE_NOT_REQUIRED = 0;  // Standard routing
+  LOOSE_ROUTE_REQUIRED = 1;      // Loose route required for restoration
+}
+
+// Multiple-Registration-Indication (AVP Code 648)
+// Indicates whether multiple registration is involved
+enum MultipleRegistrationIndication {
+  NOT_MULTIPLE_REGISTRATION = 0;  // Single registration
+  MULTIPLE_REGISTRATION = 1;      // Multiple registered contacts
+}
+
+// Session-Priority (AVP Code 650)
+// Indicates the priority of the IMS session
+enum SessionPriority {
+  PRIORITY_0 = 0;  // Lowest priority
+  PRIORITY_1 = 1;
+  PRIORITY_2 = 2;
+  PRIORITY_3 = 3;
+  PRIORITY_4 = 4;  // Highest priority
+}
+
+// Emergency-Registration-Result (AVP Code 652)
+// Result of an emergency registration
+enum EmergencyRegistrationResult {
+  EMERGENCY_REGISTRATION = 0;      // Registered as emergency
+  IMS_EMERGENCY_REGISTRATION = 1;  // IMS emergency registration
+}
+
+// ================================================================================
+//                         EXPERIMENTAL RESULT CODES
+// ================================================================================
+// Cx Specific Experimental-Result-Code values (3GPP TS 29.229 Section 6.2)
+// Vendor-Id: 10415 (3GPP)
+
+const DIAMETER_SUBSEQUENT_REQUEST = 4121;            // Success - subsequent request
+const DIAMETER_ERROR_USER_UNKNOWN = 5001;            // User not found in HSS
+const DIAMETER_ERROR_IDENTITIES_DONT_MATCH = 5002;   // Public/Private identity mismatch
+const DIAMETER_ERROR_IDENTITY_NOT_REGISTERED = 5003; // Identity not registered
+const DIAMETER_ERROR_ROAMING_NOT_ALLOWED = 5004;     // Roaming not permitted
+const DIAMETER_ERROR_IDENTITY_ALREADY_REGISTERED = 5005; // Identity already registered
+const DIAMETER_ERROR_AUTH_SCHEME_NOT_SUPPORTED = 5006;    // Auth scheme not supported
+const DIAMETER_ERROR_IN_ASSIGNMENT_TYPE = 5007;      // Invalid assignment type
+const DIAMETER_ERROR_TOO_MUCH_DATA = 5008;           // Subscription data too large
+const DIAMETER_ERROR_NOT_SUPPORTED_USER_DATA = 5009; // User data format not supported
+
+// ================================================================================
+//                         BASE PROTOCOL AVP DEFINITIONS
+// ================================================================================
+// RFC 6733 AVPs (No Vendor-ID)
+
+// Session-Id (AVP Code 263)
+avp Session-Id {
+  code = 263;
+  type = UTF8String;
+  must = true;
+  may_encrypt = false;
+  description = "Uniquely identifies a Diameter session";
+}
+
+// Auth-Session-State (AVP Code 277)
+avp Auth-Session-State {
+  code = 277;
+  type = Enumerated;
+  must = true;
+  may_encrypt = false;
+  description = "Indicates whether state is maintained for a session";
+  // Values: 0 = STATE_MAINTAINED, 1 = NO_STATE_MAINTAINED
+}
+
+// Origin-Host (AVP Code 264)
+avp Origin-Host {
+  code = 264;
+  type = DiameterIdentity;
+  must = true;
+  may_encrypt = false;
+  description = "Identity of the node that originated the Diameter message";
+}
+
+// Origin-Realm (AVP Code 296)
+avp Origin-Realm {
+  code = 296;
+  type = DiameterIdentity;
+  must = true;
+  may_encrypt = false;
+  description = "Realm of the node that originated the Diameter message";
+}
+
+// Destination-Host (AVP Code 293)
+avp Destination-Host {
+  code = 293;
+  type = DiameterIdentity;
+  must = true;
+  may_encrypt = false;
+  description = "Identity of the destination Diameter node";
+}
+
+// Destination-Realm (AVP Code 283)
+avp Destination-Realm {
+  code = 283;
+  type = DiameterIdentity;
+  must = true;
+  may_encrypt = false;
+  description = "Realm of the destination Diameter node";
+}
+
+// User-Name (AVP Code 1)
+// Contains the Private User Identity (IMPI) in Cx context
+avp User-Name {
+  code = 1;
+  type = UTF8String;
+  must = true;
+  may_encrypt = true;
+  description = "Private User Identity (IMPI) in Cx context";
+}
+
+// Result-Code (AVP Code 268)
+avp Result-Code {
+  code = 268;
+  type = Unsigned32;
+  must = true;
+  may_encrypt = false;
+  description = "Result of the Diameter request";
+  // Common values: 2001=SUCCESS, 3xxx=Protocol Errors, 5xxx=Permanent Failures
+}
+
+// Experimental-Result (AVP Code 297)
+avp Experimental-Result {
+  code = 297;
+  type = Grouped;
+  must = true;
+  may_encrypt = false;
+  description = "Contains vendor-specific result information";
+
+  grouped {
+    required Vendor-Id vendor_id = 1;
+    required Experimental-Result-Code experimental_result_code = 2;
+  }
+}
+
+// Vendor-Id (AVP Code 266)
+avp Vendor-Id {
+  code = 266;
+  type = Unsigned32;
+  must = true;
+  may_encrypt = false;
+  description = "Vendor identifier (10415 for 3GPP)";
+}
+
+// Experimental-Result-Code (AVP Code 298)
+avp Experimental-Result-Code {
+  code = 298;
+  type = Unsigned32;
+  must = true;
+  may_encrypt = false;
+  description = "Vendor-specific result code";
+}
+
+// Vendor-Specific-Application-Id (AVP Code 260)
+avp Vendor-Specific-Application-Id {
+  code = 260;
+  type = Grouped;
+  must = true;
+  may_encrypt = false;
+  description = "Contains vendor-specific application identifier";
+
+  grouped {
+    optional Vendor-Id vendor_id = 1;
+    optional Auth-Application-Id auth_application_id = 2;
+    optional Acct-Application-Id acct_application_id = 3;
+  }
+}
+
+// Auth-Application-Id (AVP Code 258)
+avp Auth-Application-Id {
+  code = 258;
+  type = Unsigned32;
+  must = true;
+  may_encrypt = false;
+  description = "Authentication application identifier";
+}
+
+// Acct-Application-Id (AVP Code 259)
+avp Acct-Application-Id {
+  code = 259;
+  type = Unsigned32;
+  must = true;
+  may_encrypt = false;
+  description = "Accounting application identifier";
+}
+
+// Failed-AVP (AVP Code 279)
+avp Failed-AVP {
+  code = 279;
+  type = Grouped;
+  must = true;
+  may_encrypt = false;
+  description = "Contains AVPs that could not be processed successfully";
+
+  grouped {
+    repeated AVP avp = 1;
+  }
+}
+
+// Proxy-Info (AVP Code 284)
+avp Proxy-Info {
+  code = 284;
+  type = Grouped;
+  must = true;
+  may_encrypt = false;
+  description = "Contains proxy state information";
+
+  grouped {
+    required Proxy-Host proxy_host = 1;
+    optional Proxy-State proxy_state = 2;
+  }
+}
+
+// Proxy-Host (AVP Code 280)
+avp Proxy-Host {
+  code = 280;
+  type = DiameterIdentity;
+  must = true;
+  may_encrypt = false;
+  description = "Identity of the proxy server";
+}
+
+// Proxy-State (AVP Code 33)
+avp Proxy-State {
+  code = 33;
+  type = OctetString;
+  must = true;
+  may_encrypt = false;
+  description = "State information added by a proxy";
+}
+
+// Route-Record (AVP Code 282)
+avp Route-Record {
+  code = 282;
+  type = DiameterIdentity;
+  must = true;
+  may_encrypt = false;
+  description = "Identity of a Diameter node in the path";
+}
+
+// DRMP (AVP Code 301) - RFC 7944
+avp DRMP {
+  code = 301;
+  type = Enumerated;
+  must = false;
+  may_encrypt = false;
+  description = "Diameter Routing Message Priority";
+  // Values: 0=PRIORITY_0 (lowest) ... 15=PRIORITY_15 (highest)
+}
+
+// ================================================================================
+//                         CX-SPECIFIC AVP DEFINITIONS
+// ================================================================================
+// All Cx-specific AVPs have Vendor-ID = 10415 (3GPP)
+// Flags: M=Mandatory, V=Vendor-specific (all Cx AVPs use M,V unless noted)
+
+// Visited-Network-Identifier (AVP Code 600)
+// Identifies the visited network where the UE is registered
+// Flags: M, V
+avp Visited-Network-Identifier {
+  code = 600;
+  vendor_id = 10415;
+  type = OctetString;
+  must = true;
+  may_encrypt = false;
+  description = "Identifies the visited network (domain name as OctetString)";
+}
+
+// Public-Identity (AVP Code 601)
+// SIP URL or TEL URL identifying a public user identity or Public Service Identity
+// Flags: M, V
+avp Public-Identity {
+  code = 601;
+  vendor_id = 10415;
+  type = UTF8String;
+  must = true;
+  may_encrypt = false;
+  description = "Public User Identity (SIP URI or TEL URI)";
+}
+
+// Server-Name (AVP Code 602)
+// SIP URL identifying the S-CSCF assigned to the user
+// Flags: M, V
+avp Server-Name {
+  code = 602;
+  vendor_id = 10415;
+  type = UTF8String;
+  must = true;
+  may_encrypt = false;
+  description = "SIP URL of the S-CSCF assigned to the user";
+}
+
+// Server-Capabilities (AVP Code 603) - Grouped
+// Contains capability information needed to select an S-CSCF
+// Flags: M, V
+avp Server-Capabilities {
+  code = 603;
+  vendor_id = 10415;
+  type = Grouped;
+  must = true;
+  may_encrypt = false;
+  description = "Contains mandatory and optional capabilities required for S-CSCF selection";
+
+  grouped {
+    repeated Mandatory-Capability mandatory_capability = 1;  // Code 604
+    repeated Optional-Capability optional_capability = 2;    // Code 605
+    repeated Server-Name server_name = 3;                    // Code 602, preferred S-CSCFs
+  }
+}
+
+// Mandatory-Capability (AVP Code 604)
+// Indicates a required capability of the S-CSCF
+// Flags: M, V
+avp Mandatory-Capability {
+  code = 604;
+  vendor_id = 10415;
+  type = Unsigned32;
+  must = true;
+  may_encrypt = false;
+  description = "Required capability identifier for S-CSCF selection";
+}
+
+// Optional-Capability (AVP Code 605)
+// Indicates an optional capability of the S-CSCF
+// Flags: M, V
+avp Optional-Capability {
+  code = 605;
+  vendor_id = 10415;
+  type = Unsigned32;
+  must = true;
+  may_encrypt = false;
+  description = "Optional capability identifier for S-CSCF selection";
+}
+
+// User-Data (AVP Code 606) - Cx User Data
+// Contains the IMS subscription data (XML format per TS 29.228)
+// Flags: M, V
+avp User-Data {
+  code = 606;
+  vendor_id = 10415;
+  type = OctetString;
+  must = true;
+  may_encrypt = false;
+  description = "IMS subscription data in XML format (IMSSubscription element)";
+}
+
+// SIP-Number-Auth-Items (AVP Code 607)
+// Number of authentication items requested or provided
+// Flags: M, V
+avp SIP-Number-Auth-Items {
+  code = 607;
+  vendor_id = 10415;
+  type = Unsigned32;
+  must = true;
+  may_encrypt = false;
+  description = "Number of SIP authentication items requested or available";
+}
+
+// SIP-Authentication-Scheme (AVP Code 608)
+// Authentication scheme to be used (e.g., Digest-AKAv1-MD5, SIP Digest)
+// Flags: M, V
+avp SIP-Authentication-Scheme {
+  code = 608;
+  vendor_id = 10415;
+  type = UTF8String;
+  must = true;
+  may_encrypt = false;
+  description = "SIP authentication scheme (e.g., Digest-AKAv1-MD5, Digest-AKAv2-MD5, SIP Digest)";
+}
+
+// SIP-Authenticate (AVP Code 609)
+// Contains the authentication challenge (RAND, AUTN for AKA)
+// Flags: M, V
+avp SIP-Authenticate {
+  code = 609;
+  vendor_id = 10415;
+  type = OctetString;
+  must = true;
+  may_encrypt = false;
+  description = "SIP authentication challenge data (RAND||AUTN for AKA)";
+}
+
+// SIP-Authorization (AVP Code 610)
+// Contains the expected response (XRES for AKA)
+// Flags: M, V
+avp SIP-Authorization {
+  code = 610;
+  vendor_id = 10415;
+  type = OctetString;
+  must = true;
+  may_encrypt = false;
+  description = "Expected SIP authorization response (XRES for AKA)";
+}
+
+// SIP-Authentication-Context (AVP Code 611)
+// Additional authentication context (IK, CK or AUTS for AKA re-sync)
+// Flags: M, V
+avp SIP-Authentication-Context {
+  code = 611;
+  vendor_id = 10415;
+  type = OctetString;
+  must = true;
+  may_encrypt = false;
+  description = "SIP authentication context (AUTS for AKA re-synchronization)";
+}
+
+// SIP-Auth-Data-Item (AVP Code 612) - Grouped
+// Groups all authentication data for a single authentication attempt
+// Flags: M, V
+avp SIP-Auth-Data-Item {
+  code = 612;
+  vendor_id = 10415;
+  type = Grouped;
+  must = true;
+  may_encrypt = false;
+  description = "Contains all authentication parameters for a single auth vector";
+
+  grouped {
+    optional SIP-Item-Number sip_item_number = 1;                // Code 613
+    optional SIP-Authentication-Scheme sip_authentication_scheme = 2;  // Code 608
+    optional SIP-Authenticate sip_authenticate = 3;              // Code 609
+    optional SIP-Authorization sip_authorization = 4;            // Code 610
+    optional SIP-Authentication-Context sip_authentication_context = 5;  // Code 611
+    optional Confidentiality-Key confidentiality_key = 6;        // Code 625
+    optional Integrity-Key integrity_key = 7;                    // Code 626
+    optional SIP-Digest-Authenticate sip_digest_authenticate = 8;  // Code 635
+    optional Line-Identifier line_identifier = 9;                // Code 500 (ETSI)
+  }
+}
+
+// SIP-Item-Number (AVP Code 613)
+// Sequential item number in a list of SIP auth data items
+// Flags: M, V
+avp SIP-Item-Number {
+  code = 613;
+  vendor_id = 10415;
+  type = Unsigned32;
+  must = true;
+  may_encrypt = false;
+  description = "Sequential number identifying this SIP auth data item";
+}
+
+// Server-Assignment-Type (AVP Code 614)
+// Indicates the reason for the server assignment request
+// Flags: M, V
+avp Server-Assignment-Type {
+  code = 614;
+  vendor_id = 10415;
+  type = Enumerated;
+  must = true;
+  may_encrypt = false;
+  description = "Indicates type of server assignment in SAR";
+  // Values defined in ServerAssignmentType enum above
+}
+
+// Deregistration-Reason (AVP Code 615) - Grouped
+// Contains reason information for RTR de-registration
+// Flags: M, V
+avp Deregistration-Reason {
+  code = 615;
+  vendor_id = 10415;
+  type = Grouped;
+  must = true;
+  may_encrypt = false;
+  description = "Contains the reason for network-initiated de-registration (RTR)";
+
+  grouped {
+    required Reason-Code reason_code = 1;  // Code 616
+    optional Reason-Info reason_info = 2;  // Code 617
+  }
+}
+
+// Reason-Code (AVP Code 616)
+// Indicates the reason for de-registration
+// Flags: M, V
+avp Reason-Code {
+  code = 616;
+  vendor_id = 10415;
+  type = Enumerated;
+  must = true;
+  may_encrypt = false;
+  description = "Reason for the de-registration";
+  // Values defined in ReasonCode enum above
+}
+
+// Reason-Info (AVP Code 617)
+// Free-form text describing the de-registration reason
+// Flags: M, V
+avp Reason-Info {
+  code = 617;
+  vendor_id = 10415;
+  type = UTF8String;
+  must = true;
+  may_encrypt = false;
+  description = "Textual description of the de-registration reason";
+}
+
+// Charging-Information (AVP Code 618) - Grouped
+// Contains addresses of charging function nodes
+// Flags: M, V
+avp Charging-Information {
+  code = 618;
+  vendor_id = 10415;
+  type = Grouped;
+  must = true;
+  may_encrypt = false;
+  description = "Contains primary and secondary charging collection function addresses";
+
+  grouped {
+    optional Primary-Event-Charging-Function-Name primary_event_charging_function_name = 1;       // Code 619
+    optional Secondary-Event-Charging-Function-Name secondary_event_charging_function_name = 2;   // Code 620
+    optional Primary-Charging-Collection-Function-Name primary_charging_collection_function_name = 3;     // Code 621
+    optional Secondary-Charging-Collection-Function-Name secondary_charging_collection_function_name = 4; // Code 622
+  }
+}
+
+// Primary-Event-Charging-Function-Name (AVP Code 619)
+// Primary ECF (Event Charging Function) SIP URI
+// Flags: M, V
+avp Primary-Event-Charging-Function-Name {
+  code = 619;
+  vendor_id = 10415;
+  type = DiameterURI;
+  must = true;
+  may_encrypt = false;
+  description = "SIP URI of the primary Event Charging Function (ECF)";
+}
+
+// Secondary-Event-Charging-Function-Name (AVP Code 620)
+// Secondary ECF SIP URI
+// Flags: M, V
+avp Secondary-Event-Charging-Function-Name {
+  code = 620;
+  vendor_id = 10415;
+  type = DiameterURI;
+  must = true;
+  may_encrypt = false;
+  description = "SIP URI of the secondary Event Charging Function (ECF)";
+}
+
+// Primary-Charging-Collection-Function-Name (AVP Code 621)
+// Primary CDF (Charging Data Function) SIP URI
+// Flags: M, V
+avp Primary-Charging-Collection-Function-Name {
+  code = 621;
+  vendor_id = 10415;
+  type = DiameterURI;
+  must = true;
+  may_encrypt = false;
+  description = "SIP URI of the primary Charging Collection Function (CDF)";
+}
+
+// Secondary-Charging-Collection-Function-Name (AVP Code 622)
+// Secondary CDF SIP URI
+// Flags: M, V
+avp Secondary-Charging-Collection-Function-Name {
+  code = 622;
+  vendor_id = 10415;
+  type = DiameterURI;
+  must = true;
+  may_encrypt = false;
+  description = "SIP URI of the secondary Charging Collection Function (CDF)";
+}
+
+// User-Authorization-Type (AVP Code 623)
+// Indicates the type of user authorization being requested (UAR)
+// Flags: M, V
+avp User-Authorization-Type {
+  code = 623;
+  vendor_id = 10415;
+  type = Enumerated;
+  must = true;
+  may_encrypt = false;
+  description = "Type of user authorization: registration, de-registration, or capabilities query";
+  // Values defined in UserAuthorizationType enum above
+}
+
+// User-Data-Already-Available (AVP Code 624)
+// Indicates whether S-CSCF already has the user profile
+// Flags: M, V
+avp User-Data-Already-Available {
+  code = 624;
+  vendor_id = 10415;
+  type = Enumerated;
+  must = true;
+  may_encrypt = false;
+  description = "Indicates if S-CSCF already possesses the user subscription data";
+}
+
+// Confidentiality-Key (AVP Code 625)
+// Cipher Key (CK) for UMTS AKA authentication
+// Flags: M, V
+avp Confidentiality-Key {
+  code = 625;
+  vendor_id = 10415;
+  type = OctetString;
+  must = true;
+  may_encrypt = false;
+  description = "Cipher Key (CK) for UMTS/IMS AKA authentication";
+}
+
+// Integrity-Key (AVP Code 626)
+// Integrity Key (IK) for UMTS AKA authentication
+// Flags: M, V
+avp Integrity-Key {
+  code = 626;
+  vendor_id = 10415;
+  type = OctetString;
+  must = true;
+  may_encrypt = false;
+  description = "Integrity Key (IK) for UMTS/IMS AKA authentication";
+}
+
+// Supported-Features (AVP Code 628) - Grouped
+// Used for feature negotiation between Diameter peers
+// Flags: V (no M)
+avp Supported-Features {
+  code = 628;
+  vendor_id = 10415;
+  type = Grouped;
+  must = false;
+  may_encrypt = false;
+  description = "Contains a list of features supported by the sending node";
+
+  grouped {
+    required Vendor-Id vendor_id = 1;          // Code 266
+    required Feature-List-ID feature_list_id = 2;  // Code 629
+    required Feature-List feature_list = 3;    // Code 630
+  }
+}
+
+// Feature-List-ID (AVP Code 629)
+// Identifies which feature list the Feature-List AVP belongs to
+// Flags: V (no M)
+avp Feature-List-ID {
+  code = 629;
+  vendor_id = 10415;
+  type = Unsigned32;
+  must = false;
+  may_encrypt = false;
+  description = "Identifier for the feature list (typically 1 or 2)";
+}
+
+// Feature-List (AVP Code 630)
+// Bitmask of supported features
+// Flags: V (no M)
+avp Feature-List {
+  code = 630;
+  vendor_id = 10415;
+  type = Unsigned32;
+  must = false;
+  may_encrypt = false;
+  description = "Bitmask indicating which features from the identified feature list are supported";
+}
+
+// Associated-Identities (AVP Code 632) - Grouped
+// Contains private identities associated with a public identity
+// Flags: V (no M)
+avp Associated-Identities {
+  code = 632;
+  vendor_id = 10415;
+  type = Grouped;
+  must = false;
+  may_encrypt = false;
+  description = "Contains private user identities associated with the IMS subscription";
+
+  grouped {
+    repeated User-Name user_name = 1;  // Code 1 - private user identities
+  }
+}
+
+// Originating-Request (AVP Code 633)
+// Indicates that the LIR is for an originating request
+// Flags: M, V
+avp Originating-Request {
+  code = 633;
+  vendor_id = 10415;
+  type = Enumerated;
+  must = true;
+  may_encrypt = false;
+  description = "Indicates request is for the originating side (LIR)";
+  // Values: 0 = ORIGINATING
+}
+
+// Wildcarded-Public-Identity (AVP Code 634)
+// Wildcarded PSI or IMPU that matched the Public-Identity
+// Flags: V (no M)
+avp Wildcarded-Public-Identity {
+  code = 634;
+  vendor_id = 10415;
+  type = UTF8String;
+  must = false;
+  may_encrypt = false;
+  description = "Wildcarded PSI or IMPU pattern that matched the requested identity";
+}
+
+// SIP-Digest-Authenticate (AVP Code 635) - Grouped
+// Contains SIP Digest authentication parameters
+// Flags: V (no M)
+avp SIP-Digest-Authenticate {
+  code = 635;
+  vendor_id = 10415;
+  type = Grouped;
+  must = false;
+  may_encrypt = false;
+  description = "Contains HTTP Digest authentication parameters for SIP Digest auth scheme";
+
+  grouped {
+    required Digest-Realm digest_realm = 1;          // Code 104 (RFC 4590)
+    optional Digest-Algorithm digest_algorithm = 2;   // Code 111 (RFC 4590)
+    optional Digest-QoP digest_qop = 3;              // Code 110 (RFC 4590)
+    optional Digest-HA1 digest_ha1 = 4;              // Code 121 (RFC 4590)
+  }
+}
+
+// Wildcarded-IMPU (AVP Code 636)
+// Contains a wildcarded IMPU matching pattern
+// Flags: V (no M)
+avp Wildcarded-IMPU {
+  code = 636;
+  vendor_id = 10415;
+  type = UTF8String;
+  must = false;
+  may_encrypt = false;
+  description = "Wildcarded IMPU pattern that matched the requested public identity";
+}
+
+// UAR-Flags (AVP Code 637)
+// Bitmask of flags for User-Authorization-Request
+// Flags: V (no M)
+avp UAR-Flags {
+  code = 637;
+  vendor_id = 10415;
+  type = Unsigned32;
+  must = false;
+  may_encrypt = false;
+  description = "Bitmask of flags for UAR procedure";
+  // Bit 0: IMS_Emergency_Registration_Flag
+}
+
+// Loose-Route-Indication (AVP Code 638)
+// Indicates whether loose routing is required for restoration
+// Flags: V (no M)
+avp Loose-Route-Indication {
+  code = 638;
+  vendor_id = 10415;
+  type = Enumerated;
+  must = false;
+  may_encrypt = false;
+  description = "Indicates whether loose routing is required for S-CSCF restoration";
+}
+
+// SCSCF-Restoration-Info (AVP Code 639) - Grouped
+// Contains restoration information for S-CSCF recovery
+// Flags: V (no M)
+avp SCSCF-Restoration-Info {
+  code = 639;
+  vendor_id = 10415;
+  type = Grouped;
+  must = false;
+  may_encrypt = false;
+  description = "Contains the full restoration information set for S-CSCF recovery";
+
+  grouped {
+    required User-Name user_name = 1;                             // Code 1 - private user identity
+    repeated Restoration-Info restoration_info = 2;      // Code 649
+    optional SIP-Authentication-Scheme sip_authentication_scheme = 3;  // Code 608
+    optional SIP-Authenticate sip_authenticate = 4;               // Code 609
+    optional SIP-Authorization sip_authorization = 5;             // Code 610
+    optional Confidentiality-Key confidentiality_key = 6;         // Code 625
+    optional Integrity-Key integrity_key = 7;                     // Code 626
+    optional Wildcarded-IMPU wildcarded_impu = 8;                 // Code 636
+  }
+}
+
+// Path (AVP Code 640)
+// Contains a SIP Path header field value for restoration
+// Flags: M, V
+avp Path {
+  code = 640;
+  vendor_id = 10415;
+  type = OctetString;
+  must = true;
+  may_encrypt = false;
+  description = "SIP Path header field value for S-CSCF restoration";
+}
+
+// Contact (AVP Code 641)
+// Contains a SIP Contact header field value for restoration
+// Flags: M, V
+avp Contact {
+  code = 641;
+  vendor_id = 10415;
+  type = OctetString;
+  must = true;
+  may_encrypt = false;
+  description = "SIP Contact header field value for S-CSCF restoration";
+}
+
+// Subscription-Info (AVP Code 642) - Grouped
+// Contains SIP subscription state for restoration
+// Flags: M, V
+avp Subscription-Info {
+  code = 642;
+  vendor_id = 10415;
+  type = Grouped;
+  must = true;
+  may_encrypt = false;
+  description = "Contains SIP subscription information for S-CSCF restoration";
+
+  grouped {
+    required Call-ID-SIP-Header call_id_sip_header = 1;  // Code 643
+    required From-SIP-Header from_sip_header = 2;        // Code 644
+    required To-SIP-Header to_sip_header = 3;            // Code 645
+    repeated Record-Route record_route = 4;     // Code 646
+    required Contact contact = 5;                        // Code 641
+  }
+}
+
+// Call-ID-SIP-Header (AVP Code 643)
+// Contains the SIP Call-ID header field for restoration
+// Flags: M, V
+avp Call-ID-SIP-Header {
+  code = 643;
+  vendor_id = 10415;
+  type = OctetString;
+  must = true;
+  may_encrypt = false;
+  description = "SIP Call-ID header field value";
+}
+
+// From-SIP-Header (AVP Code 644)
+// Contains the SIP From header field for restoration
+// Flags: M, V
+avp From-SIP-Header {
+  code = 644;
+  vendor_id = 10415;
+  type = OctetString;
+  must = true;
+  may_encrypt = false;
+  description = "SIP From header field value";
+}
+
+// To-SIP-Header (AVP Code 645)
+// Contains the SIP To header field for restoration
+// Flags: M, V
+avp To-SIP-Header {
+  code = 645;
+  vendor_id = 10415;
+  type = OctetString;
+  must = true;
+  may_encrypt = false;
+  description = "SIP To header field value";
+}
+
+// Record-Route (AVP Code 646)
+// Contains a SIP Record-Route header field for restoration
+// Flags: M, V
+avp Record-Route {
+  code = 646;
+  vendor_id = 10415;
+  type = OctetString;
+  must = true;
+  may_encrypt = false;
+  description = "SIP Record-Route header field value";
+}
+
+// Associated-Registered-Identities (AVP Code 647) - Grouped
+// Contains public identities associated via implicit registration set
+// Flags: V (no M)
+avp Associated-Registered-Identities {
+  code = 647;
+  vendor_id = 10415;
+  type = Grouped;
+  must = false;
+  may_encrypt = false;
+  description = "Contains public identities in the same implicit registration set";
+
+  grouped {
+    repeated User-Name user_name = 1;  // Code 1 - private user identities
+  }
+}
+
+// Multiple-Registration-Indication (AVP Code 648)
+// Indicates whether multiple registration is involved
+// Flags: V (no M)
+avp Multiple-Registration-Indication {
+  code = 648;
+  vendor_id = 10415;
+  type = Enumerated;
+  must = false;
+  may_encrypt = false;
+  description = "Indicates whether this SAR involves multiple registered contacts";
+}
+
+// Restoration-Info (AVP Code 649) - Grouped
+// Contains per-contact restoration data
+// Flags: M, V
+avp Restoration-Info {
+  code = 649;
+  vendor_id = 10415;
+  type = Grouped;
+  must = true;
+  may_encrypt = false;
+  description = "Contains restoration data for a single registered contact";
+
+  grouped {
+    required Path path = 1;                              // Code 640
+    required Contact contact = 2;                        // Code 641
+    optional Subscription-Info subscription_info = 3;   // Code 642
+  }
+}
+
+// Session-Priority (AVP Code 650)
+// Indicates the priority of the IMS session
+// Flags: V (no M)
+avp Session-Priority {
+  code = 650;
+  vendor_id = 10415;
+  type = Enumerated;
+  must = false;
+  may_encrypt = false;
+  description = "Priority of the IMS session (0=lowest, 4=highest)";
+}
+
+// Identity-With-Emergency-Registration (AVP Code 651) - Grouped
+// Associates a public identity with its emergency registration
+// Flags: V (no M)
+avp Identity-With-Emergency-Registration {
+  code = 651;
+  vendor_id = 10415;
+  type = Grouped;
+  must = false;
+  may_encrypt = false;
+  description = "Associates a public identity with its emergency IMS registration";
+
+  grouped {
+    required User-Name user_name = 1;          // Code 1 - private identity
+    required Public-Identity public_identity = 2;  // Code 601 - public identity
+  }
+}
+
+// Emergency-Registration-Result (AVP Code 652)
+// Indicates the result type for an emergency registration
+// Flags: V (no M)
+avp Emergency-Registration-Result {
+  code = 652;
+  vendor_id = 10415;
+  type = Enumerated;
+  must = false;
+  may_encrypt = false;
+  description = "Result type for an emergency registration request";
+}
+
+// PPR-Flags (AVP Code 659)
+// Bitmask of flags for Push-Profile-Request
+// Flags: V (no M)
+avp PPR-Flags {
+  code = 659;
+  vendor_id = 10415;
+  type = Unsigned32;
+  must = false;
+  may_encrypt = false;
+  description = "Bitmask of flags for PPR procedure";
+  // Bit 0: Restoration_Indication
+}
+
+// Line-Identifier (AVP Code 500) - ETSI
+// DSL line identifier for fixed broadband access
+// Flags: V (no M)
+avp Line-Identifier {
+  code = 500;
+  vendor_id = 13019;
+  type = OctetString;
+  must = false;
+  may_encrypt = false;
+  description = "DSL line identifier for fixed broadband access networks (ETSI)";
+}
+
+// ================================================================================
+//                         RFC 4590 DIGEST AVP DEFINITIONS
+// ================================================================================
+// These AVPs are defined in RFC 4590 for HTTP Digest in Diameter
+// No Vendor-ID (base IETF AVPs)
+
+// Digest-Realm (AVP Code 104)
+avp Digest-Realm {
+  code = 104;
+  type = OctetString;
+  must = true;
+  may_encrypt = false;
+  description = "HTTP Digest realm value";
+}
+
+// Digest-Algorithm (AVP Code 111)
+avp Digest-Algorithm {
+  code = 111;
+  type = UTF8String;
+  must = false;
+  may_encrypt = false;
+  description = "HTTP Digest algorithm (e.g., MD5, MD5-sess)";
+}
+
+// Digest-QoP (AVP Code 110)
+avp Digest-QoP {
+  code = 110;
+  type = UTF8String;
+  must = false;
+  may_encrypt = false;
+  description = "HTTP Digest quality of protection value";
+}
+
+// Digest-HA1 (AVP Code 121)
+avp Digest-HA1 {
+  code = 121;
+  type = OctetString;
+  must = true;
+  may_encrypt = true;
+  description = "H(A1) value for HTTP Digest authentication";
+}
+
+// ================================================================================
+//                         COMMAND DEFINITIONS
+// ================================================================================
+
+// ================================================================================
+// User-Authorization-Request (UAR) - Command Code 300
+// 3GPP TS 29.228 Section 6.1.1
+// Sent from I-CSCF to HSS
+// Purpose: Authorize user registration and determine the S-CSCF to use
+// ================================================================================
+command User-Authorization-Request {
+  code = 300;
+  application_id = 16777216;
+  request = true;
+  proxiable = true;
+  description = "Request authorization for user registration and S-CSCF selection";
+
+  // Required AVPs (Table 6.1.1.1)
+  fixed required Session-Id session_id = 1;
+  fixed required Vendor-Specific-Application-Id vendor_specific_application_id = 2;
+  fixed required Auth-Session-State auth_session_state = 3;  // NO_STATE_MAINTAINED
+  fixed required Origin-Host origin_host = 4;                // I-CSCF identity
+  fixed required Origin-Realm origin_realm = 5;              // I-CSCF realm
+  fixed required Destination-Realm destination_realm = 6;    // HSS realm
+  fixed required User-Name user_name = 7;                    // Private User Identity (IMPI)
+  fixed required Public-Identity public_identity = 8;        // Public User Identity
+  fixed required Visited-Network-Identifier visited_network_identifier = 9;  // Visited NW ID
+
+  // Optional AVPs
+  optional DRMP drmp = 10;
+  optional Destination-Host destination_host = 11;          // Specific HSS if known
+  optional User-Authorization-Type user_authorization_type = 12;  // Default: REGISTRATION(0)
+  optional UAR-Flags uar_flags = 13;                        // Bit 0: emergency reg
+  repeated Supported-Features supported_features = 14;
+  repeated Proxy-Info proxy_info = 15;
+  repeated Route-Record route_record = 16;
+  repeated AVP avp = 17;
+}
+
+// ================================================================================
+// User-Authorization-Answer (UAA) - Command Code 300
+// 3GPP TS 29.228 Section 6.1.1
+// Sent from HSS to I-CSCF
+// Purpose: Return authorization result and S-CSCF selection information
+// ================================================================================
+command User-Authorization-Answer {
+  code = 300;
+  application_id = 16777216;
+  request = false;
+  proxiable = true;
+  description = "Response to UAR with S-CSCF selection information";
+
+  // Required AVPs
+  fixed required Session-Id session_id = 1;
+  fixed required Vendor-Specific-Application-Id vendor_specific_application_id = 2;
+  fixed required Auth-Session-State auth_session_state = 3;
+  fixed required Origin-Host origin_host = 4;                // HSS identity
+  fixed required Origin-Realm origin_realm = 5;              // HSS realm
+
+  // Result (one of Result-Code or Experimental-Result must be present)
+  optional Result-Code result_code = 6;
+  optional Experimental-Result experimental_result = 7;
+
+  // Conditional AVPs (present on success)
+  optional Server-Name server_name = 8;              // Assigned S-CSCF SIP URI
+  optional Server-Capabilities server_capabilities = 9;  // If no S-CSCF assigned
+
+  // Optional AVPs
+  optional DRMP drmp = 10;
+  optional Wildcarded-Public-Identity wildcarded_public_identity = 11;
+  optional UAR-Flags uar_flags = 12;
+  repeated Supported-Features supported_features = 13;
+  optional Failed-AVP failed_avp = 14;
+  repeated Proxy-Info proxy_info = 15;
+  repeated Route-Record route_record = 16;
+  repeated AVP avp = 17;
+}
+
+// ================================================================================
+// Server-Assignment-Request (SAR) - Command Code 301
+// 3GPP TS 29.228 Section 6.1.2
+// Sent from S-CSCF to HSS
+// Purpose: Register/deregister S-CSCF and download user profile
+// ================================================================================
+command Server-Assignment-Request {
+  code = 301;
+  application_id = 16777216;
+  request = true;
+  proxiable = true;
+  description = "Request S-CSCF registration in HSS and user profile download";
+
+  // Required AVPs (Table 6.1.2.1)
+  fixed required Session-Id session_id = 1;
+  fixed required Vendor-Specific-Application-Id vendor_specific_application_id = 2;
+  fixed required Auth-Session-State auth_session_state = 3;
+  fixed required Origin-Host origin_host = 4;                // S-CSCF identity
+  fixed required Origin-Realm origin_realm = 5;              // S-CSCF realm
+  fixed required Destination-Realm destination_realm = 6;    // HSS realm
+  fixed required Server-Name server_name = 7;                // S-CSCF SIP URI
+  fixed required Server-Assignment-Type server_assignment_type = 8;  // Reason for assignment
+
+  // Conditional AVPs
+  optional User-Name user_name = 9;                         // IMPI (if known)
+  repeated Public-Identity public_identity = 10;   // IMPUs being deregistered
+
+  // Optional AVPs
+  optional DRMP drmp = 11;
+  optional Destination-Host destination_host = 12;
+  optional User-Data-Already-Available user_data_already_available = 13;
+  optional SCSCF-Restoration-Info scscf_restoration_info = 14;
+  optional Multiple-Registration-Indication multiple_registration_indication = 15;
+  optional Session-Priority session_priority = 16;
+  optional Wildcarded-IMPU wildcarded_impu = 17;
+  repeated Supported-Features supported_features = 18;
+  repeated Proxy-Info proxy_info = 19;
+  repeated Route-Record route_record = 20;
+  repeated AVP avp = 21;
+}
+
+// ================================================================================
+// Server-Assignment-Answer (SAA) - Command Code 301
+// 3GPP TS 29.228 Section 6.1.2
+// Sent from HSS to S-CSCF
+// Purpose: Confirm assignment and provide user subscription data
+// ================================================================================
+command Server-Assignment-Answer {
+  code = 301;
+  application_id = 16777216;
+  request = false;
+  proxiable = true;
+  description = "Response to SAR with user profile and charging function addresses";
+
+  // Required AVPs
+  fixed required Session-Id session_id = 1;
+  fixed required Vendor-Specific-Application-Id vendor_specific_application_id = 2;
+  fixed required Auth-Session-State auth_session_state = 3;
+  fixed required Origin-Host origin_host = 4;
+  fixed required Origin-Realm origin_realm = 5;
+
+  // Result
+  optional Result-Code result_code = 6;
+  optional Experimental-Result experimental_result = 7;
+
+  // Conditional AVPs (present on success)
+  optional User-Name user_name = 8;               // Confirmed IMPI
+  optional User-Data user_data = 9;               // IMS subscription XML
+  optional Charging-Information charging_information = 10;  // Charging function addresses
+  optional Associated-Identities associated_identities = 11;  // Other private identities
+  optional Loose-Route-Indication loose_route_indication = 12;
+  optional SCSCF-Restoration-Info scscf_restoration_info = 13;
+  optional Associated-Registered-Identities associated_registered_identities = 14;
+  optional Server-Name server_name = 15;          // Confirmed S-CSCF name
+
+  // Optional AVPs
+  optional DRMP drmp = 16;
+  optional Wildcarded-IMPU wildcarded_impu = 17;
+  repeated Supported-Features supported_features = 18;
+  optional Failed-AVP failed_avp = 19;
+  repeated Proxy-Info proxy_info = 20;
+  repeated Route-Record route_record = 21;
+  repeated AVP avp = 22;
+}
+
+// ================================================================================
+// Location-Info-Request (LIR) - Command Code 302
+// 3GPP TS 29.228 Section 6.1.3
+// Sent from I-CSCF to HSS
+// Purpose: Request the name of the S-CSCF currently serving a user
+// ================================================================================
+command Location-Info-Request {
+  code = 302;
+  application_id = 16777216;
+  request = true;
+  proxiable = true;
+  description = "Request current S-CSCF location information for a user";
+
+  // Required AVPs (Table 6.1.3.1)
+  fixed required Session-Id session_id = 1;
+  fixed required Vendor-Specific-Application-Id vendor_specific_application_id = 2;
+  fixed required Auth-Session-State auth_session_state = 3;
+  fixed required Origin-Host origin_host = 4;
+  fixed required Origin-Realm origin_realm = 5;
+  fixed required Destination-Realm destination_realm = 6;
+  fixed required Originating-Request originating_request = 7;  // ORIGINATING(0) if originating
+  fixed required Public-Identity public_identity = 8;          // Requested public identity
+
+  // Optional AVPs
+  optional DRMP drmp = 9;
+  optional Destination-Host destination_host = 10;
+  optional User-Authorization-Type user_authorization_type = 11;  // For emergency override
+  optional UAR-Flags uar_flags = 12;
+  repeated Supported-Features supported_features = 13;
+  repeated Proxy-Info proxy_info = 14;
+  repeated Route-Record route_record = 15;
+  repeated AVP avp = 16;
+}
+
+// ================================================================================
+// Location-Info-Answer (LIA) - Command Code 302
+// 3GPP TS 29.228 Section 6.1.3
+// Sent from HSS to I-CSCF
+// Purpose: Return serving S-CSCF name or capabilities for re-assignment
+// ================================================================================
+command Location-Info-Answer {
+  code = 302;
+  application_id = 16777216;
+  request = false;
+  proxiable = true;
+  description = "Response to LIR with S-CSCF name or selection capabilities";
+
+  // Required AVPs
+  fixed required Session-Id session_id = 1;
+  fixed required Vendor-Specific-Application-Id vendor_specific_application_id = 2;
+  fixed required Auth-Session-State auth_session_state = 3;
+  fixed required Origin-Host origin_host = 4;
+  fixed required Origin-Realm origin_realm = 5;
+
+  // Result
+  optional Result-Code result_code = 6;
+  optional Experimental-Result experimental_result = 7;
+
+  // Conditional AVPs (present on success)
+  optional Server-Name server_name = 8;              // Serving S-CSCF SIP URI
+  optional Server-Capabilities server_capabilities = 9;  // If selection needed
+  optional Wildcarded-Public-Identity wildcarded_public_identity = 10;  // Matching wildcard
+  optional Loose-Route-Indication loose_route_indication = 11;
+  optional SCSCF-Restoration-Info scscf_restoration_info = 12;
+
+  // Optional AVPs
+  optional DRMP drmp = 13;
+  repeated Supported-Features supported_features = 14;
+  optional Failed-AVP failed_avp = 15;
+  repeated Proxy-Info proxy_info = 16;
+  repeated Route-Record route_record = 17;
+  repeated AVP avp = 18;
+}
+
+// ================================================================================
+// Multimedia-Auth-Request (MAR) - Command Code 303
+// 3GPP TS 29.228 Section 6.1.4
+// Sent from S-CSCF to HSS
+// Purpose: Request authentication vectors for a user
+// ================================================================================
+command Multimedia-Auth-Request {
+  code = 303;
+  application_id = 16777216;
+  request = true;
+  proxiable = true;
+  description = "Request SIP authentication vectors from HSS for a user";
+
+  // Required AVPs (Table 6.1.4.1)
+  fixed required Session-Id session_id = 1;
+  fixed required Vendor-Specific-Application-Id vendor_specific_application_id = 2;
+  fixed required Auth-Session-State auth_session_state = 3;
+  fixed required Origin-Host origin_host = 4;                // S-CSCF identity
+  fixed required Origin-Realm origin_realm = 5;
+  fixed required Destination-Realm destination_realm = 6;
+  fixed required User-Name user_name = 7;                    // Private User Identity (IMPI)
+  fixed required Public-Identity public_identity = 8;        // Public User Identity
+  fixed required SIP-Auth-Data-Item sip_auth_data_item = 9;  // Auth scheme + challenge response
+  fixed required SIP-Number-Auth-Items sip_number_auth_items = 10;  // Number of vectors requested
+  fixed required Server-Name server_name = 11;               // S-CSCF SIP URI
+
+  // Optional AVPs
+  optional DRMP drmp = 12;
+  optional Destination-Host destination_host = 13;
+  repeated Supported-Features supported_features = 14;
+  repeated Proxy-Info proxy_info = 15;
+  repeated Route-Record route_record = 16;
+  repeated AVP avp = 17;
+}
+
+// ================================================================================
+// Multimedia-Auth-Answer (MAA) - Command Code 303
+// 3GPP TS 29.228 Section 6.1.4
+// Sent from HSS to S-CSCF
+// Purpose: Provide authentication vectors
+// ================================================================================
+command Multimedia-Auth-Answer {
+  code = 303;
+  application_id = 16777216;
+  request = false;
+  proxiable = true;
+  description = "Response to MAR with SIP authentication vectors";
+
+  // Required AVPs
+  fixed required Session-Id session_id = 1;
+  fixed required Vendor-Specific-Application-Id vendor_specific_application_id = 2;
+  fixed required Auth-Session-State auth_session_state = 3;
+  fixed required Origin-Host origin_host = 4;
+  fixed required Origin-Realm origin_realm = 5;
+
+  // Result
+  optional Result-Code result_code = 6;
+  optional Experimental-Result experimental_result = 7;
+
+  // Conditional AVPs (present on success)
+  optional User-Name user_name = 8;                          // Confirmed IMPI
+  optional SIP-Number-Auth-Items sip_number_auth_items = 9;  // Number of vectors provided
+  repeated SIP-Auth-Data-Item sip_auth_data_item = 10;  // Authentication vectors
+
+  // Optional AVPs
+  optional DRMP drmp = 11;
+  repeated Supported-Features supported_features = 12;
+  optional Failed-AVP failed_avp = 13;
+  repeated Proxy-Info proxy_info = 14;
+  repeated Route-Record route_record = 15;
+  repeated AVP avp = 16;
+}
+
+// ================================================================================
+// Registration-Termination-Request (RTR) - Command Code 304
+// 3GPP TS 29.228 Section 6.1.5
+// Sent from HSS to S-CSCF
+// Purpose: Request network-initiated de-registration of a user
+// ================================================================================
+command Registration-Termination-Request {
+  code = 304;
+  application_id = 16777216;
+  request = true;
+  proxiable = true;
+  description = "Request S-CSCF to de-register a user (network-initiated)";
+
+  // Required AVPs (Table 6.1.5.1)
+  fixed required Session-Id session_id = 1;
+  fixed required Vendor-Specific-Application-Id vendor_specific_application_id = 2;
+  fixed required Auth-Session-State auth_session_state = 3;
+  fixed required Origin-Host origin_host = 4;                // HSS identity
+  fixed required Origin-Realm origin_realm = 5;
+  fixed required Destination-Host destination_host = 6;      // S-CSCF (always direct)
+  fixed required Destination-Realm destination_realm = 7;
+  fixed required User-Name user_name = 8;                    // Private User Identity
+  fixed required Deregistration-Reason deregistration_reason = 9;  // Reason for de-reg
+
+  // Conditional AVPs
+  repeated Public-Identity public_identity = 10;   // Specific identities to deregister
+  optional Associated-Identities associated_identities = 11;  // All related private identities
+
+  // Optional AVPs
+  optional DRMP drmp = 12;
+  repeated Supported-Features supported_features = 13;
+  repeated Proxy-Info proxy_info = 14;
+  repeated Route-Record route_record = 15;
+  repeated AVP avp = 16;
+}
+
+// ================================================================================
+// Registration-Termination-Answer (RTA) - Command Code 304
+// 3GPP TS 29.228 Section 6.1.5
+// Sent from S-CSCF to HSS
+// Purpose: Confirm the de-registration
+// ================================================================================
+command Registration-Termination-Answer {
+  code = 304;
+  application_id = 16777216;
+  request = false;
+  proxiable = true;
+  description = "Acknowledgement of network-initiated de-registration";
+
+  // Required AVPs
+  fixed required Session-Id session_id = 1;
+  fixed required Vendor-Specific-Application-Id vendor_specific_application_id = 2;
+  fixed required Auth-Session-State auth_session_state = 3;
+  fixed required Origin-Host origin_host = 4;
+  fixed required Origin-Realm origin_realm = 5;
+
+  // Result
+  optional Result-Code result_code = 6;
+  optional Experimental-Result experimental_result = 7;
+
+  // Optional AVPs
+  optional DRMP drmp = 8;
+  repeated Associated-Identities associated_identities = 9;
+  optional Deregistration-Reason deregistration_reason = 10;
+  repeated Supported-Features supported_features = 11;
+  optional Failed-AVP failed_avp = 12;
+  repeated Proxy-Info proxy_info = 13;
+  repeated Route-Record route_record = 14;
+  repeated AVP avp = 15;
+}
+
+// ================================================================================
+// Push-Profile-Request (PPR) - Command Code 305
+// 3GPP TS 29.228 Section 6.1.6
+// Sent from HSS to S-CSCF
+// Purpose: Push updated user profile or charging information to S-CSCF
+// ================================================================================
+command Push-Profile-Request {
+  code = 305;
+  application_id = 16777216;
+  request = true;
+  proxiable = true;
+  description = "Push updated user profile, charging info, or auth data to S-CSCF";
+
+  // Required AVPs (Table 6.1.6.1)
+  fixed required Session-Id session_id = 1;
+  fixed required Vendor-Specific-Application-Id vendor_specific_application_id = 2;
+  fixed required Auth-Session-State auth_session_state = 3;
+  fixed required Origin-Host origin_host = 4;                // HSS identity
+  fixed required Origin-Realm origin_realm = 5;
+  fixed required Destination-Host destination_host = 6;      // S-CSCF (always direct)
+  fixed required Destination-Realm destination_realm = 7;
+  fixed required User-Name user_name = 8;                    // Private User Identity
+
+  // Conditional AVPs (at least one must be present)
+  optional Charging-Information charging_information = 9;    // Updated charging info
+  optional SIP-Auth-Data-Item sip_auth_data_item = 10;       // Updated auth data
+  optional User-Data user_data = 11;                         // Updated IMS subscription XML
+
+  // Optional AVPs
+  optional DRMP drmp = 12;
+  optional PPR-Flags ppr_flags = 13;                         // Bit 0: Restoration_Indication
+  repeated Supported-Features supported_features = 14;
+  repeated Proxy-Info proxy_info = 15;
+  repeated Route-Record route_record = 16;
+  repeated AVP avp = 17;
+}
+
+// ================================================================================
+// Push-Profile-Answer (PPA) - Command Code 305
+// 3GPP TS 29.228 Section 6.1.6
+// Sent from S-CSCF to HSS
+// Purpose: Confirm the profile update
+// ================================================================================
+command Push-Profile-Answer {
+  code = 305;
+  application_id = 16777216;
+  request = false;
+  proxiable = true;
+  description = "Acknowledgement of pushed profile update";
+
+  // Required AVPs
+  fixed required Session-Id session_id = 1;
+  fixed required Vendor-Specific-Application-Id vendor_specific_application_id = 2;
+  fixed required Auth-Session-State auth_session_state = 3;
+  fixed required Origin-Host origin_host = 4;
+  fixed required Origin-Realm origin_realm = 5;
+
+  // Result
+  optional Result-Code result_code = 6;
+  optional Experimental-Result experimental_result = 7;
+
+  // Optional AVPs
+  optional DRMP drmp = 8;
+  repeated Supported-Features supported_features = 9;
+  optional Failed-AVP failed_avp = 10;
+  repeated Proxy-Info proxy_info = 11;
+  repeated Route-Record route_record = 12;
+  repeated AVP avp = 13;
+}
+
+// ================================================================================
+//                         USAGE NOTES
+// ================================================================================
+//
+// 1. SESSION HANDLING:
+//    - Cx uses implicitly terminated sessions
+//    - Auth-Session-State MUST be set to NO_STATE_MAINTAINED (1)
+//
+// 2. INTERFACE ROLES:
+//    - UAR/UAA: I-CSCF → HSS (registration/roaming authorization)
+//    - SAR/SAA: S-CSCF → HSS (assignment, profile download, deregistration)
+//    - LIR/LIA: I-CSCF → HSS (routing, terminating call to registered user)
+//    - MAR/MAA: S-CSCF → HSS (authentication vector retrieval)
+//    - RTR/RTA: HSS → S-CSCF (network-initiated deregistration)
+//    - PPR/PPA: HSS → S-CSCF (subscriber data push/update)
+//
+// 3. TRANSPORT:
+//    - Uses SCTP or TCP as transport protocol
+//    - Port: 3868 (Diameter standard port)
+//
+// 4. RELATED SPECIFICATIONS:
+//    - 3GPP TS 29.228: Cx/Dx interface (IMS Cx Interface Based on the Diameter Protocol)
+//    - 3GPP TS 29.229: Cx and Dx Interfaces Based on the Diameter Protocol
+//    - 3GPP TS 23.228: IP Multimedia Subsystem (IMS) Stage 2
+//    - 3GPP TS 24.229: SIP and SDP Stage 3
+//    - RFC 6733: Diameter Base Protocol
+//    - RFC 4590: Diameter Protocol for HTTP Digest
+//
+// ================================================================================
+//                         AVP CODE SUMMARY
+// ================================================================================
+//
+// CX-SPECIFIC AVPs (Vendor-ID = 10415 / 3GPP):
+// -----------------------------------------------
+//   Visited-Network-Identifier       (600)  - OctetString  - M,V
+//   Public-Identity                  (601)  - UTF8String   - M,V
+//   Server-Name                      (602)  - UTF8String   - M,V
+//   Server-Capabilities              (603)  - Grouped      - M,V
+//   Mandatory-Capability             (604)  - Unsigned32   - M,V
+//   Optional-Capability              (605)  - Unsigned32   - M,V
+//   User-Data (Cx)                   (606)  - OctetString  - M,V
+//   SIP-Number-Auth-Items            (607)  - Unsigned32   - M,V
+//   SIP-Authentication-Scheme        (608)  - UTF8String   - M,V
+//   SIP-Authenticate                 (609)  - OctetString  - M,V
+//   SIP-Authorization                (610)  - OctetString  - M,V
+//   SIP-Authentication-Context       (611)  - OctetString  - M,V
+//   SIP-Auth-Data-Item               (612)  - Grouped      - M,V
+//   SIP-Item-Number                  (613)  - Unsigned32   - M,V
+//   Server-Assignment-Type           (614)  - Enumerated   - M,V
+//   Deregistration-Reason            (615)  - Grouped      - M,V
+//   Reason-Code                      (616)  - Enumerated   - M,V
+//   Reason-Info                      (617)  - UTF8String   - M,V
+//   Charging-Information             (618)  - Grouped      - M,V
+//   Primary-Event-Charging-Fn-Name   (619)  - DiameterURI  - M,V
+//   Secondary-Event-Charging-Fn-Name (620)  - DiameterURI  - M,V
+//   Primary-Charging-Coll-Fn-Name    (621)  - DiameterURI  - M,V
+//   Secondary-Charging-Coll-Fn-Name  (622)  - DiameterURI  - M,V
+//   User-Authorization-Type          (623)  - Enumerated   - M,V
+//   User-Data-Already-Available      (624)  - Enumerated   - M,V
+//   Confidentiality-Key              (625)  - OctetString  - M,V
+//   Integrity-Key                    (626)  - OctetString  - M,V
+//   Supported-Features               (628)  - Grouped      - V
+//   Feature-List-ID                  (629)  - Unsigned32   - V
+//   Feature-List                     (630)  - Unsigned32   - V
+//   Associated-Identities            (632)  - Grouped      - V
+//   Originating-Request              (633)  - Enumerated   - M,V
+//   Wildcarded-Public-Identity       (634)  - UTF8String   - V
+//   SIP-Digest-Authenticate          (635)  - Grouped      - V
+//   Wildcarded-IMPU                  (636)  - UTF8String   - V
+//   UAR-Flags                        (637)  - Unsigned32   - V
+//   Loose-Route-Indication           (638)  - Enumerated   - V
+//   SCSCF-Restoration-Info           (639)  - Grouped      - V
+//   Path                             (640)  - OctetString  - M,V
+//   Contact                          (641)  - OctetString  - M,V
+//   Subscription-Info                (642)  - Grouped      - M,V
+//   Call-ID-SIP-Header               (643)  - OctetString  - M,V
+//   From-SIP-Header                  (644)  - OctetString  - M,V
+//   To-SIP-Header                    (645)  - OctetString  - M,V
+//   Record-Route                     (646)  - OctetString  - M,V
+//   Associated-Registered-Identities (647)  - Grouped      - V
+//   Multiple-Registration-Indication (648)  - Enumerated   - V
+//   Restoration-Info                 (649)  - Grouped      - M,V
+//   Session-Priority                 (650)  - Enumerated   - V
+//   Identity-With-Emergency-Reg      (651)  - Grouped      - V
+//   Emergency-Registration-Result    (652)  - Enumerated   - V
+//   PPR-Flags                        (659)  - Unsigned32   - V
+//
+// ================================================================================

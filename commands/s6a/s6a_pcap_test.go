@@ -258,8 +258,16 @@ func TestAI_Pair_PCAP(t *testing.T) {
 		AcctApplicationId: ptrUnsigned32(1),
 	}
 	request.DestinationHost = ptrDiameterIdentity("server.example.com")
-	request.OcSupportedFeatures = ptrOctetString([]byte{0x01, 0x02, 0x03})
-	request.SupportedFeatures = []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})}
+	request.OcSupportedFeatures = &OCSupportedFeatures{
+		OcFeatureVector: ptrUnsigned64(1),
+	}
+	request.SupportedFeatures = []*SupportedFeatures{
+		&SupportedFeatures{
+			VendorId:      models_base.Unsigned32(10415),
+			FeatureListId: models_base.Unsigned32(1),
+			FeatureList:   models_base.Unsigned32(1),
+		},
+	}
 	request.RequestedEutranAuthenticationInfo = &RequestedEUTRANAuthenticationInfo{
 		NumberOfRequestedVectors:   ptrUnsigned32(1),
 		ImmediateResponsePreferred: ptrUnsigned32(1),
@@ -302,10 +310,29 @@ func TestAI_Pair_PCAP(t *testing.T) {
 		ExperimentalResultCode: models_base.Unsigned32(1),
 	}
 	answer.ErrorDiagnostic = ptrEnumerated(1)
-	answer.OcSupportedFeatures = ptrOctetString([]byte{0x01, 0x02, 0x03})
-	answer.OcOlr = ptrOctetString([]byte{0x01, 0x02, 0x03})
-	answer.Load = []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})}
-	answer.SupportedFeatures = []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})}
+	answer.OcSupportedFeatures = &OCSupportedFeatures{
+		OcFeatureVector: ptrUnsigned64(1),
+	}
+	answer.OcOlr = &OCOLR{
+		OcSequenceNumber:      models_base.Unsigned64(1),
+		OcReportType:          models_base.Enumerated(1),
+		OcReductionPercentage: ptrUnsigned32(1),
+		OcValidityDuration:    ptrUnsigned32(1),
+	}
+	answer.Load = []*Load{
+		&Load{
+			LoadType:  ptrEnumerated(1),
+			LoadValue: ptrUnsigned64(1),
+			SourceId:  ptrDiameterIdentity("client.example.com"),
+		},
+	}
+	answer.SupportedFeatures = []*SupportedFeatures{
+		&SupportedFeatures{
+			VendorId:      models_base.Unsigned32(10415),
+			FeatureListId: models_base.Unsigned32(1),
+			FeatureList:   models_base.Unsigned32(1),
+		},
+	}
 	answer.AuthenticationInfo = &AuthenticationInfo{
 		EUtranVector: []*EUTRANVector{
 			&EUTRANVector{
@@ -335,10 +362,10 @@ func TestAI_Pair_PCAP(t *testing.T) {
 			},
 		},
 	}
-	answer.UeUsageType = ptrOctetString([]byte{0x01, 0x02, 0x03})
+	answer.UeUsageType = ptrUnsigned32(1)
 	answer.Avp = []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})}
 	answer.FailedAvp = &FailedAVP{
-		AVP: []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})},
+		Avp: []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})},
 	}
 	answer.ProxyInfo = []*ProxyInfo{
 		&ProxyInfo{
@@ -410,7 +437,13 @@ func TestCL_Pair_PCAP(t *testing.T) {
 		AuthApplicationId: ptrUnsigned32(16777252),
 		AcctApplicationId: ptrUnsigned32(1),
 	}
-	request.SupportedFeatures = []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})}
+	request.SupportedFeatures = []*SupportedFeatures{
+		&SupportedFeatures{
+			VendorId:      models_base.Unsigned32(10415),
+			FeatureListId: models_base.Unsigned32(1),
+			FeatureList:   models_base.Unsigned32(1),
+		},
+	}
 	request.ClrFlags = ptrUnsigned32(1)
 	request.Avp = []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})}
 	request.ProxyInfo = []*ProxyInfo{
@@ -437,7 +470,13 @@ func TestCL_Pair_PCAP(t *testing.T) {
 		AuthApplicationId: ptrUnsigned32(16777252),
 		AcctApplicationId: ptrUnsigned32(1),
 	}
-	answer.SupportedFeatures = []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})}
+	answer.SupportedFeatures = []*SupportedFeatures{
+		&SupportedFeatures{
+			VendorId:      models_base.Unsigned32(10415),
+			FeatureListId: models_base.Unsigned32(1),
+			FeatureList:   models_base.Unsigned32(1),
+		},
+	}
 	answer.ResultCode = ptrUnsigned32(2001) // DIAMETER_SUCCESS
 	answer.ExperimentalResult = &ExperimentalResult{
 		VendorId:               models_base.Unsigned32(10415),
@@ -445,7 +484,7 @@ func TestCL_Pair_PCAP(t *testing.T) {
 	}
 	answer.Avp = []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})}
 	answer.FailedAvp = &FailedAVP{
-		AVP: []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})},
+		Avp: []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})},
 	}
 	answer.ProxyInfo = []*ProxyInfo{
 		&ProxyInfo{
@@ -517,14 +556,20 @@ func TestDSD_Pair_PCAP(t *testing.T) {
 		AuthApplicationId: ptrUnsigned32(16777252),
 		AcctApplicationId: ptrUnsigned32(1),
 	}
-	request.SupportedFeatures = []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})}
-	request.ScefId = ptrOctetString([]byte{0x01, 0x02, 0x03})
+	request.SupportedFeatures = []*SupportedFeatures{
+		&SupportedFeatures{
+			VendorId:      models_base.Unsigned32(10415),
+			FeatureListId: models_base.Unsigned32(1),
+			FeatureList:   models_base.Unsigned32(1),
+		},
+	}
+	request.ScefId = ptrDiameterIdentity("client.example.com")
 	request.ContextIdentifier = []models_base.Unsigned32{models_base.Unsigned32(1)}
 	request.TraceReference = ptrOctetString([]byte{0x01, 0x02, 0x03})
 	request.TsCode = []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})}
 	request.SsCode = []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})}
-	request.EdrxRelatedRat = ptrOctetString([]byte{0x01, 0x02, 0x03})
-	request.ExternalIdentifier = []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})}
+	request.EdrxRelatedRat = ptrUnsigned32(1)
+	request.ExternalIdentifier = []models_base.UTF8String{models_base.UTF8String("452040000000010")}
 	request.Avp = []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})}
 	request.ProxyInfo = []*ProxyInfo{
 		&ProxyInfo{
@@ -550,7 +595,13 @@ func TestDSD_Pair_PCAP(t *testing.T) {
 		AuthApplicationId: ptrUnsigned32(16777252),
 		AcctApplicationId: ptrUnsigned32(1),
 	}
-	answer.SupportedFeatures = []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})}
+	answer.SupportedFeatures = []*SupportedFeatures{
+		&SupportedFeatures{
+			VendorId:      models_base.Unsigned32(10415),
+			FeatureListId: models_base.Unsigned32(1),
+			FeatureList:   models_base.Unsigned32(1),
+		},
+	}
 	answer.ResultCode = ptrUnsigned32(2001) // DIAMETER_SUCCESS
 	answer.ExperimentalResult = &ExperimentalResult{
 		VendorId:               models_base.Unsigned32(10415),
@@ -559,7 +610,7 @@ func TestDSD_Pair_PCAP(t *testing.T) {
 	answer.DsaFlags = ptrUnsigned32(1)
 	answer.Avp = []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})}
 	answer.FailedAvp = &FailedAVP{
-		AVP: []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})},
+		Avp: []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})},
 	}
 	answer.ProxyInfo = []*ProxyInfo{
 		&ProxyInfo{
@@ -629,63 +680,134 @@ func TestISD_Pair_PCAP(t *testing.T) {
 		Msisdn:                       ptrOctetString([]byte{0x01, 0x02, 0x03}),
 		AMsisdn:                      ptrOctetString([]byte{0x01, 0x02, 0x03}),
 		StnSr:                        ptrOctetString([]byte{0x01, 0x02, 0x03}),
-		IcsIndicator:                 ptrOctetString([]byte{0x01, 0x02, 0x03}),
-		NetworkAccessMode:            ptrOctetString([]byte{0x01, 0x02, 0x03}),
+		IcsIndicator:                 ptrEnumerated(1),
+		NetworkAccessMode:            ptrEnumerated(1),
 		OperatorDeterminedBarring:    ptrUnsigned32(1),
-		HplmnOdb:                     ptrOctetString([]byte{0x00, 0xF1, 0x10}),
+		HplmnOdb:                     ptrUnsigned32(1),
 		RegionalSubscriptionZoneCode: []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})},
 		AccessRestrictionData:        ptrUnsigned32(1),
 		ApnOiReplacement:             ptrUTF8String("452040000000010"),
-		LcsInfo:                      ptrOctetString([]byte{0x01, 0x02, 0x03}),
-		TeleserviceList:              ptrOctetString([]byte{0x01, 0x02, 0x03}),
-		CallBarringInfo:              []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})},
-		ChargingCharacteristics:      ptrOctetString([]byte{0x01, 0x02, 0x03}),
+		LcsInfo:                      &LCSInfo{
+			// GmlcAddress: nil, // (type: Address) needs to be set
+			// LcsPrivacyException: nil, // (type: Grouped) needs to be set
+			// MoLr: nil, // (type: Grouped) needs to be set
+		},
+		TeleserviceList: &TeleserviceList{
+			TsCode: []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})},
+		},
+		CallBarringInfo: []*CallBarringInfo{
+			&CallBarringInfo{
+				SsCode:                       models_base.OctetString([]byte{0x01, 0x02, 0x03}),
+				SsStatus:                     models_base.OctetString([]byte{0x01, 0x02, 0x03}),
+				Password:                     ptrOctetString([]byte{0x01, 0x02, 0x03}),
+				WrongPasswordAttemptsCounter: ptrUnsigned32(1),
+			},
+		},
+		ChargingCharacteristics: ptrUTF8String("452040000000010"),
 		Ambr: &AMBR{
-			MaxRequestedBandwidthUl:  models_base.OctetString([]byte{0x01, 0x02, 0x03}),
-			MaxRequestedBandwidthDl:  models_base.OctetString([]byte{0x01, 0x02, 0x03}),
-			ExtendedMaxRequestedBwUl: ptrOctetString([]byte{0x01, 0x02, 0x03}),
-			ExtendedMaxRequestedBwDl: ptrOctetString([]byte{0x01, 0x02, 0x03}),
+			MaxRequestedBandwidthUl:  models_base.Unsigned32(1),
+			MaxRequestedBandwidthDl:  models_base.Unsigned32(1),
+			ExtendedMaxRequestedBwUl: ptrUnsigned32(1),
+			ExtendedMaxRequestedBwDl: ptrUnsigned32(1),
 		},
 		ApnConfigurationProfile: &APNConfigurationProfile{
 			ContextIdentifier: models_base.Unsigned32(1),
 			// AllApnConfigIncluded: nil, // (type: Enumerated) needs to be set
 			// ApnConfiguration: nil, // (type: Grouped) needs to be set
 		},
-		RatFrequencySelectionPriorityId: ptrOctetString([]byte{0x01, 0x02, 0x03}),
-		TraceData:                       ptrOctetString([]byte{0x01, 0x02, 0x03}),
-		GprsSubscriptionData:            ptrOctetString([]byte{0x01, 0x02, 0x03}),
+		RatFrequencySelectionPriorityId: ptrUnsigned32(1),
+		TraceData: &TraceData{
+			TraceReference: models_base.OctetString([]byte{0x01, 0x02, 0x03}),
+			// TraceDepth: nil, // (type: Enumerated) needs to be set
+			TraceNeTypeList:    models_base.OctetString([]byte{0x01, 0x02, 0x03}),
+			TraceInterfaceList: ptrOctetString([]byte{0x01, 0x02, 0x03}),
+			TraceEventList:     models_base.OctetString([]byte{0x01, 0x02, 0x03}),
+			OmcId:              ptrOctetString([]byte{0x01, 0x02, 0x03}),
+			// TraceCollectionEntity: nil, // (type: Address) needs to be set
+			// MdtConfiguration: nil, // (type: Grouped) needs to be set
+		},
+		GprsSubscriptionData: &GPRSSubscriptionData{
+			// CompleteDataListIncludedIndicator: nil, // (type: Enumerated) needs to be set
+			// PdpContext: nil, // (type: Grouped) needs to be set
+		},
 		CsgSubscriptionData: []*CSGSubscriptionData{
 			&CSGSubscriptionData{
-				CsgId:            models_base.OctetString([]byte{0x01, 0x02, 0x03}),
-				ExpirationDate:   ptrOctetString([]byte{0x01, 0x02, 0x03}),
+				CsgId: models_base.Unsigned32(1),
+				// ExpirationDate: nil, // (type: Time) needs to be set
 				ServiceSelection: []models_base.UTF8String{models_base.UTF8String("test")},
 				VisitedPlmnId:    ptrOctetString([]byte{0x01, 0x02, 0x03}),
 			},
 		},
-		RoamingRestricted:                    ptrOctetString([]byte{0x01, 0x02, 0x03}),
-		SubscribedPeriodicRauTauTimer:        ptrOctetString([]byte{0x01, 0x02, 0x03}),
-		MpsPriority:                          ptrOctetString([]byte{0x01, 0x02, 0x03}),
-		VplmnLipaAllowed:                     ptrOctetString([]byte{0x00, 0xF1, 0x10}),
-		RelayNodeIndicator:                   ptrOctetString([]byte{0x01, 0x02, 0x03}),
-		MdtUserConsent:                       ptrOctetString([]byte{0x01, 0x02, 0x03}),
-		SubscribedVsrvcc:                     ptrOctetString([]byte{0x01, 0x02, 0x03}),
-		ProseSubscriptionData:                ptrOctetString([]byte{0x01, 0x02, 0x03}),
-		SubscriptionDataFlags:                ptrOctetString([]byte{0x01, 0x02, 0x03}),
-		AdjacentAccessRestrictionData:        []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})},
-		DlBufferingSuggestedPacketCount:      ptrOctetString([]byte{0x01, 0x02, 0x03}),
-		ImsiGroupId:                          []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})},
-		UeUsageType:                          ptrOctetString([]byte{0x01, 0x02, 0x03}),
-		AeseCommunicationPattern:             []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})},
-		MonitoringEventConfiguration:         []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})},
-		EmergencyInfo:                        ptrOctetString([]byte{0x01, 0x02, 0x03}),
-		V2xSubscriptionData:                  ptrOctetString([]byte{0x01, 0x02, 0x03}),
-		EdrxCycleLength:                      ptrOctetString([]byte{0x01, 0x02, 0x03}),
-		ExternalIdentifier:                   ptrOctetString([]byte{0x01, 0x02, 0x03}),
-		ActiveTime:                           ptrOctetString([]byte{0x01, 0x02, 0x03}),
-		ServiceGapTime:                       ptrOctetString([]byte{0x01, 0x02, 0x03}),
-		BroadcastLocationAssistanceDataTypes: ptrOctetString([]byte{0x01, 0x02, 0x03}),
-		AerialUeSubscriptionInformation:      ptrOctetString([]byte{0x01, 0x02, 0x03}),
-		CoreNetworkRestrictions:              ptrOctetString([]byte{0x01, 0x02, 0x03}),
+		RoamingRestricted:             ptrEnumerated(1),
+		SubscribedPeriodicRauTauTimer: ptrUnsigned32(1),
+		MpsPriority:                   ptrUnsigned32(1),
+		VplmnLipaAllowed:              ptrEnumerated(1),
+		RelayNodeIndicator:            ptrEnumerated(1),
+		MdtUserConsent:                ptrEnumerated(1),
+		SubscribedVsrvcc:              ptrEnumerated(1),
+		ProseSubscriptionData: &ProSeSubscriptionData{
+			ProsePermission: models_base.Unsigned32(1),
+		},
+		SubscriptionDataFlags: ptrUnsigned32(1),
+		AdjacentAccessRestrictionData: []*AdjacentAccessRestrictionData{
+			&AdjacentAccessRestrictionData{
+				PlmnId:                models_base.OctetString([]byte{0x01, 0x02, 0x03}),
+				AccessRestrictionData: models_base.Unsigned32(1),
+			},
+		},
+		// DlBufferingSuggestedPacketCount: nil, // (type: Integer32) needs to be set
+		ImsiGroupId: []*IMSIGroupId{
+			&IMSIGroupId{
+				GroupServiceId: models_base.Unsigned32(1),
+				GroupPlmnId:    models_base.OctetString([]byte{0x01, 0x02, 0x03}),
+				LocalGroupId:   models_base.OctetString([]byte{0x01, 0x02, 0x03}),
+			},
+		},
+		UeUsageType: ptrUnsigned32(1),
+		AeseCommunicationPattern: []*AESECommunicationPattern{
+			&AESECommunicationPattern{
+				// ScefId: nil, // (type: DiameterIdentity) needs to be set
+				// CommunicationPatternSet: nil, // (type: Grouped) needs to be set
+			},
+		},
+		MonitoringEventConfiguration: []*MonitoringEventConfiguration{
+			&MonitoringEventConfiguration{
+				// ScefId: nil, // (type: DiameterIdentity) needs to be set
+				ScefReferenceId: models_base.Unsigned32(1),
+				// MonitoringType: nil, // (type: Enumerated) needs to be set
+				MaximumNumberOfReports: ptrUnsigned32(1),
+				// MonitoringDuration: nil, // (type: Time) needs to be set
+				ChargedParty:         ptrUTF8String("test"),
+				MaximumDetectionTime: ptrUnsigned32(1),
+				// UeReachabilityConfiguration: nil, // (type: Grouped) needs to be set
+				// ImsiGroupId: nil, // (type: Grouped) needs to be set
+				// PeriodicCommunicationIndicator: nil, // (type: Enumerated) needs to be set
+				ActiveTime: ptrUnsigned32(1),
+				// OneTimeNotification: nil, // (type: Enumerated) needs to be set
+			},
+		},
+		EmergencyInfo: &EmergencyInfo{
+			// Mip6AgentInfo: nil, // (type: Grouped) needs to be set
+		},
+		V2xSubscriptionData: &V2XSubscriptionData{
+			V2xPermission: ptrUnsigned32(1),
+			UePc5Ambr:     ptrUnsigned32(1),
+			// V2xPc5QosParameters: nil, // (type: Grouped) needs to be set
+		},
+		EdrxCycleLength: &EDRXCycleLength{
+			// RatType: nil, // (type: Enumerated) needs to be set
+			EdrxCycleLengthValue: models_base.OctetString([]byte{0x01, 0x02, 0x03}),
+		},
+		ExternalIdentifier:                   ptrUTF8String("452040000000010"),
+		ActiveTime:                           ptrUnsigned32(1),
+		ServiceGapTime:                       ptrUnsigned32(1),
+		BroadcastLocationAssistanceDataTypes: ptrUnsigned64(1),
+		AerialUeSubscriptionInformation: &AerialUESubscriptionInformation{
+			AerialUeSecurityInformation: ptrUnsigned32(1),
+		},
+		CoreNetworkRestrictions: &CoreNetworkRestrictions{
+			CoreNetworkRestrictionType: ptrUnsigned32(1),
+		},
 	}
 	request.Drmp = ptrEnumerated(1)
 	request.VendorSpecificApplicationId = &VendorSpecificApplicationId{
@@ -693,7 +815,13 @@ func TestISD_Pair_PCAP(t *testing.T) {
 		AuthApplicationId: ptrUnsigned32(16777252),
 		AcctApplicationId: ptrUnsigned32(1),
 	}
-	request.SupportedFeatures = []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})}
+	request.SupportedFeatures = []*SupportedFeatures{
+		&SupportedFeatures{
+			VendorId:      models_base.Unsigned32(10415),
+			FeatureListId: models_base.Unsigned32(1),
+			FeatureList:   models_base.Unsigned32(1),
+		},
+	}
 	request.IdrFlags = ptrUnsigned32(1)
 	request.ResetId = []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})}
 	request.Avp = []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})}
@@ -721,25 +849,60 @@ func TestISD_Pair_PCAP(t *testing.T) {
 		AuthApplicationId: ptrUnsigned32(16777252),
 		AcctApplicationId: ptrUnsigned32(1),
 	}
-	answer.SupportedFeatures = []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})}
+	answer.SupportedFeatures = []*SupportedFeatures{
+		&SupportedFeatures{
+			VendorId:      models_base.Unsigned32(10415),
+			FeatureListId: models_base.Unsigned32(1),
+			FeatureList:   models_base.Unsigned32(1),
+		},
+	}
 	answer.ResultCode = ptrUnsigned32(2001) // DIAMETER_SUCCESS
 	answer.ExperimentalResult = &ExperimentalResult{
 		VendorId:               models_base.Unsigned32(10415),
 		ExperimentalResultCode: models_base.Unsigned32(1),
 	}
-	answer.ImsVoiceOverPsSessionsSupported = ptrOctetString([]byte{0x01, 0x02, 0x03})
-	answer.LastUeActivityTime = ptrOctetString([]byte{0x01, 0x02, 0x03})
+	answer.ImsVoiceOverPsSessionsSupported = ptrEnumerated(1)
+	answer.LastUeActivityTime = ptrTime(models_base.Time(time.Now()))
 	answer.RatType = ptrEnumerated(1)
 	answer.IdaFlags = ptrUnsigned32(1)
-	answer.EpsUserState = ptrOctetString([]byte{0x01, 0x02, 0x03})
-	answer.EpsLocationInformation = ptrOctetString([]byte{0x01, 0x02, 0x03})
-	answer.LocalTimeZone = ptrOctetString([]byte{0x01, 0x02, 0x03})
-	answer.SupportedServices = ptrOctetString([]byte{0x01, 0x02, 0x03})
-	answer.MonitoringEventReport = []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})}
-	answer.MonitoringEventConfigStatus = []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})}
+	answer.EpsUserState = &EPSUserState{
+		// MmeUserState: nil, // (type: Grouped) needs to be set
+		// SgsnUserState: nil, // (type: Grouped) needs to be set
+	}
+	answer.EpsLocationInformation = &EPSLocationInformation{
+		// MmeLocationInformation: nil, // (type: Grouped) needs to be set
+		// SgsnLocationInformation: nil, // (type: Grouped) needs to be set
+	}
+	answer.LocalTimeZone = &LocalTimeZone{
+		TimeZone:           models_base.UTF8String("452040000000010"),
+		DaylightSavingTime: models_base.Enumerated(1),
+	}
+	answer.SupportedServices = &SupportedServices{
+		SupportedMonitoringEvents: ptrUnsigned64(1),
+	}
+	answer.MonitoringEventReport = []*MonitoringEventReport{
+		&MonitoringEventReport{
+			ScefReferenceId:         models_base.Unsigned32(1),
+			MonitoringType:          ptrEnumerated(1),
+			ReachabilityInformation: ptrUnsigned32(1),
+			EpsLocationInformation:  &EPSLocationInformation{
+				// MmeLocationInformation: nil, // (type: Grouped) needs to be set
+				// SgsnLocationInformation: nil, // (type: Grouped) needs to be set
+			},
+			// CommunicationFailureInformation: nil, // (type: Grouped) needs to be set
+			// NumberOfUePerLocationConfiguration: nil, // (type: Grouped) needs to be set
+		},
+	}
+	answer.MonitoringEventConfigStatus = []*MonitoringEventConfigStatus{
+		&MonitoringEventConfigStatus{
+			ScefReferenceId: models_base.Unsigned32(1),
+			ScefId:          ptrDiameterIdentity("client.example.com"),
+			// ServingPlmnRateControl: nil, // (type: Grouped) needs to be set
+		},
+	}
 	answer.Avp = []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})}
 	answer.FailedAvp = &FailedAVP{
-		AVP: []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})},
+		Avp: []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})},
 	}
 	answer.ProxyInfo = []*ProxyInfo{
 		&ProxyInfo{
@@ -810,15 +973,23 @@ func TestN_Pair_PCAP(t *testing.T) {
 		AcctApplicationId: ptrUnsigned32(1),
 	}
 	request.DestinationHost = ptrDiameterIdentity("server.example.com")
-	request.OcSupportedFeatures = ptrOctetString([]byte{0x01, 0x02, 0x03})
-	request.SupportedFeatures = []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})}
+	request.OcSupportedFeatures = &OCSupportedFeatures{
+		OcFeatureVector: ptrUnsigned64(1),
+	}
+	request.SupportedFeatures = []*SupportedFeatures{
+		&SupportedFeatures{
+			VendorId:      models_base.Unsigned32(10415),
+			FeatureListId: models_base.Unsigned32(1),
+			FeatureList:   models_base.Unsigned32(1),
+		},
+	}
 	request.TerminalInformation = &TerminalInformation{
 		Imei:            ptrUTF8String("123456789012345"),
 		Meid:            ptrOctetString([]byte{0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07}),
 		SoftwareVersion: ptrUTF8String("01"),
 	}
 	request.Mip6AgentInfo = &MIP6AgentInfo{
-		MipHomeAgentAddress: []models_base.Address{models_base.Address(net.ParseIP("192.168.1.100"))},
+		MipHomeAgentAddress: ptrAddress(models_base.Address(net.ParseIP("192.168.1.100"))),
 		MipHomeAgentHost:    &MIPHomeAgentHost{
 			// DestinationRealm: nil, // (type: DiameterIdentity) needs to be set
 			// DestinationHost: nil, // (type: DiameterIdentity) needs to be set
@@ -831,10 +1002,16 @@ func TestN_Pair_PCAP(t *testing.T) {
 	request.AlertReason = ptrEnumerated(1)
 	request.UeSrvccCapability = ptrEnumerated(1)
 	request.NorFlags = ptrUnsigned32(1)
-	request.HomogeneousSupportImsVoice = ptrOctetString([]byte{0x01, 0x02, 0x03})
-	request.MaximumUeAvailabilityTime = ptrOctetString([]byte{0x01, 0x02, 0x03})
-	request.MonitoringEventConfigStatus = []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})}
-	request.EmergencyServices = ptrOctetString([]byte{0x01, 0x02, 0x03})
+	request.HomogeneousSupportImsVoice = ptrEnumerated(1)
+	request.MaximumUeAvailabilityTime = ptrTime(models_base.Time(time.Now()))
+	request.MonitoringEventConfigStatus = []*MonitoringEventConfigStatus{
+		&MonitoringEventConfigStatus{
+			ScefReferenceId: models_base.Unsigned32(1),
+			ScefId:          ptrDiameterIdentity("client.example.com"),
+			// ServingPlmnRateControl: nil, // (type: Grouped) needs to be set
+		},
+	}
+	request.EmergencyServices = ptrUnsigned32(1)
 	request.Avp = []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})}
 	request.ProxyInfo = []*ProxyInfo{
 		&ProxyInfo{
@@ -865,13 +1042,32 @@ func TestN_Pair_PCAP(t *testing.T) {
 		VendorId:               models_base.Unsigned32(10415),
 		ExperimentalResultCode: models_base.Unsigned32(1),
 	}
-	answer.OcSupportedFeatures = ptrOctetString([]byte{0x01, 0x02, 0x03})
-	answer.OcOlr = ptrOctetString([]byte{0x01, 0x02, 0x03})
-	answer.Load = []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})}
-	answer.SupportedFeatures = []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})}
+	answer.OcSupportedFeatures = &OCSupportedFeatures{
+		OcFeatureVector: ptrUnsigned64(1),
+	}
+	answer.OcOlr = &OCOLR{
+		OcSequenceNumber:      models_base.Unsigned64(1),
+		OcReportType:          models_base.Enumerated(1),
+		OcReductionPercentage: ptrUnsigned32(1),
+		OcValidityDuration:    ptrUnsigned32(1),
+	}
+	answer.Load = []*Load{
+		&Load{
+			LoadType:  ptrEnumerated(1),
+			LoadValue: ptrUnsigned64(1),
+			SourceId:  ptrDiameterIdentity("client.example.com"),
+		},
+	}
+	answer.SupportedFeatures = []*SupportedFeatures{
+		&SupportedFeatures{
+			VendorId:      models_base.Unsigned32(10415),
+			FeatureListId: models_base.Unsigned32(1),
+			FeatureList:   models_base.Unsigned32(1),
+		},
+	}
 	answer.Avp = []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})}
 	answer.FailedAvp = &FailedAVP{
-		AVP: []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})},
+		Avp: []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})},
 	}
 	answer.ProxyInfo = []*ProxyInfo{
 		&ProxyInfo{
@@ -942,10 +1138,21 @@ func TestPU_Pair_PCAP(t *testing.T) {
 		AcctApplicationId: ptrUnsigned32(1),
 	}
 	request.DestinationHost = ptrDiameterIdentity("server.example.com")
-	request.OcSupportedFeatures = ptrOctetString([]byte{0x01, 0x02, 0x03})
+	request.OcSupportedFeatures = &OCSupportedFeatures{
+		OcFeatureVector: ptrUnsigned64(1),
+	}
 	request.PurFlags = ptrUnsigned32(1)
-	request.SupportedFeatures = []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})}
-	request.EpsLocationInformation = ptrOctetString([]byte{0x01, 0x02, 0x03})
+	request.SupportedFeatures = []*SupportedFeatures{
+		&SupportedFeatures{
+			VendorId:      models_base.Unsigned32(10415),
+			FeatureListId: models_base.Unsigned32(1),
+			FeatureList:   models_base.Unsigned32(1),
+		},
+	}
+	request.EpsLocationInformation = &EPSLocationInformation{
+		// MmeLocationInformation: nil, // (type: Grouped) needs to be set
+		// SgsnLocationInformation: nil, // (type: Grouped) needs to be set
+	}
 	request.Avp = []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})}
 	request.ProxyInfo = []*ProxyInfo{
 		&ProxyInfo{
@@ -971,19 +1178,38 @@ func TestPU_Pair_PCAP(t *testing.T) {
 		AuthApplicationId: ptrUnsigned32(16777252),
 		AcctApplicationId: ptrUnsigned32(1),
 	}
-	answer.SupportedFeatures = []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})}
+	answer.SupportedFeatures = []*SupportedFeatures{
+		&SupportedFeatures{
+			VendorId:      models_base.Unsigned32(10415),
+			FeatureListId: models_base.Unsigned32(1),
+			FeatureList:   models_base.Unsigned32(1),
+		},
+	}
 	answer.ResultCode = ptrUnsigned32(2001) // DIAMETER_SUCCESS
 	answer.ExperimentalResult = &ExperimentalResult{
 		VendorId:               models_base.Unsigned32(10415),
 		ExperimentalResultCode: models_base.Unsigned32(1),
 	}
-	answer.OcSupportedFeatures = ptrOctetString([]byte{0x01, 0x02, 0x03})
-	answer.OcOlr = ptrOctetString([]byte{0x01, 0x02, 0x03})
-	answer.Load = []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})}
+	answer.OcSupportedFeatures = &OCSupportedFeatures{
+		OcFeatureVector: ptrUnsigned64(1),
+	}
+	answer.OcOlr = &OCOLR{
+		OcSequenceNumber:      models_base.Unsigned64(1),
+		OcReportType:          models_base.Enumerated(1),
+		OcReductionPercentage: ptrUnsigned32(1),
+		OcValidityDuration:    ptrUnsigned32(1),
+	}
+	answer.Load = []*Load{
+		&Load{
+			LoadType:  ptrEnumerated(1),
+			LoadValue: ptrUnsigned64(1),
+			SourceId:  ptrDiameterIdentity("client.example.com"),
+		},
+	}
 	answer.PuaFlags = ptrUnsigned32(1)
 	answer.Avp = []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})}
 	answer.FailedAvp = &FailedAVP{
-		AVP: []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})},
+		Avp: []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})},
 	}
 	answer.ProxyInfo = []*ProxyInfo{
 		&ProxyInfo{
@@ -1053,73 +1279,153 @@ func TestR_Pair_PCAP(t *testing.T) {
 		AuthApplicationId: ptrUnsigned32(16777252),
 		AcctApplicationId: ptrUnsigned32(1),
 	}
-	request.SupportedFeatures = []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})}
-	request.UserId = []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})}
+	request.SupportedFeatures = []*SupportedFeatures{
+		&SupportedFeatures{
+			VendorId:      models_base.Unsigned32(10415),
+			FeatureListId: models_base.Unsigned32(1),
+			FeatureList:   models_base.Unsigned32(1),
+		},
+	}
+	request.UserId = []models_base.UTF8String{models_base.UTF8String("452040000000010")}
 	request.ResetId = []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})}
 	request.SubscriptionData = &SubscriptionData{
 		SubscriberStatus:             ptrEnumerated(1),
 		Msisdn:                       ptrOctetString([]byte{0x01, 0x02, 0x03}),
 		AMsisdn:                      ptrOctetString([]byte{0x01, 0x02, 0x03}),
 		StnSr:                        ptrOctetString([]byte{0x01, 0x02, 0x03}),
-		IcsIndicator:                 ptrOctetString([]byte{0x01, 0x02, 0x03}),
-		NetworkAccessMode:            ptrOctetString([]byte{0x01, 0x02, 0x03}),
+		IcsIndicator:                 ptrEnumerated(1),
+		NetworkAccessMode:            ptrEnumerated(1),
 		OperatorDeterminedBarring:    ptrUnsigned32(1),
-		HplmnOdb:                     ptrOctetString([]byte{0x00, 0xF1, 0x10}),
+		HplmnOdb:                     ptrUnsigned32(1),
 		RegionalSubscriptionZoneCode: []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})},
 		AccessRestrictionData:        ptrUnsigned32(1),
 		ApnOiReplacement:             ptrUTF8String("452040000000010"),
-		LcsInfo:                      ptrOctetString([]byte{0x01, 0x02, 0x03}),
-		TeleserviceList:              ptrOctetString([]byte{0x01, 0x02, 0x03}),
-		CallBarringInfo:              []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})},
-		ChargingCharacteristics:      ptrOctetString([]byte{0x01, 0x02, 0x03}),
+		LcsInfo:                      &LCSInfo{
+			// GmlcAddress: nil, // (type: Address) needs to be set
+			// LcsPrivacyException: nil, // (type: Grouped) needs to be set
+			// MoLr: nil, // (type: Grouped) needs to be set
+		},
+		TeleserviceList: &TeleserviceList{
+			TsCode: []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})},
+		},
+		CallBarringInfo: []*CallBarringInfo{
+			&CallBarringInfo{
+				SsCode:                       models_base.OctetString([]byte{0x01, 0x02, 0x03}),
+				SsStatus:                     models_base.OctetString([]byte{0x01, 0x02, 0x03}),
+				Password:                     ptrOctetString([]byte{0x01, 0x02, 0x03}),
+				WrongPasswordAttemptsCounter: ptrUnsigned32(1),
+			},
+		},
+		ChargingCharacteristics: ptrUTF8String("452040000000010"),
 		Ambr: &AMBR{
-			MaxRequestedBandwidthUl:  models_base.OctetString([]byte{0x01, 0x02, 0x03}),
-			MaxRequestedBandwidthDl:  models_base.OctetString([]byte{0x01, 0x02, 0x03}),
-			ExtendedMaxRequestedBwUl: ptrOctetString([]byte{0x01, 0x02, 0x03}),
-			ExtendedMaxRequestedBwDl: ptrOctetString([]byte{0x01, 0x02, 0x03}),
+			MaxRequestedBandwidthUl:  models_base.Unsigned32(1),
+			MaxRequestedBandwidthDl:  models_base.Unsigned32(1),
+			ExtendedMaxRequestedBwUl: ptrUnsigned32(1),
+			ExtendedMaxRequestedBwDl: ptrUnsigned32(1),
 		},
 		ApnConfigurationProfile: &APNConfigurationProfile{
 			ContextIdentifier: models_base.Unsigned32(1),
 			// AllApnConfigIncluded: nil, // (type: Enumerated) needs to be set
 			// ApnConfiguration: nil, // (type: Grouped) needs to be set
 		},
-		RatFrequencySelectionPriorityId: ptrOctetString([]byte{0x01, 0x02, 0x03}),
-		TraceData:                       ptrOctetString([]byte{0x01, 0x02, 0x03}),
-		GprsSubscriptionData:            ptrOctetString([]byte{0x01, 0x02, 0x03}),
+		RatFrequencySelectionPriorityId: ptrUnsigned32(1),
+		TraceData: &TraceData{
+			TraceReference: models_base.OctetString([]byte{0x01, 0x02, 0x03}),
+			// TraceDepth: nil, // (type: Enumerated) needs to be set
+			TraceNeTypeList:    models_base.OctetString([]byte{0x01, 0x02, 0x03}),
+			TraceInterfaceList: ptrOctetString([]byte{0x01, 0x02, 0x03}),
+			TraceEventList:     models_base.OctetString([]byte{0x01, 0x02, 0x03}),
+			OmcId:              ptrOctetString([]byte{0x01, 0x02, 0x03}),
+			// TraceCollectionEntity: nil, // (type: Address) needs to be set
+			// MdtConfiguration: nil, // (type: Grouped) needs to be set
+		},
+		GprsSubscriptionData: &GPRSSubscriptionData{
+			// CompleteDataListIncludedIndicator: nil, // (type: Enumerated) needs to be set
+			// PdpContext: nil, // (type: Grouped) needs to be set
+		},
 		CsgSubscriptionData: []*CSGSubscriptionData{
 			&CSGSubscriptionData{
-				CsgId:            models_base.OctetString([]byte{0x01, 0x02, 0x03}),
-				ExpirationDate:   ptrOctetString([]byte{0x01, 0x02, 0x03}),
+				CsgId: models_base.Unsigned32(1),
+				// ExpirationDate: nil, // (type: Time) needs to be set
 				ServiceSelection: []models_base.UTF8String{models_base.UTF8String("test")},
 				VisitedPlmnId:    ptrOctetString([]byte{0x01, 0x02, 0x03}),
 			},
 		},
-		RoamingRestricted:                    ptrOctetString([]byte{0x01, 0x02, 0x03}),
-		SubscribedPeriodicRauTauTimer:        ptrOctetString([]byte{0x01, 0x02, 0x03}),
-		MpsPriority:                          ptrOctetString([]byte{0x01, 0x02, 0x03}),
-		VplmnLipaAllowed:                     ptrOctetString([]byte{0x00, 0xF1, 0x10}),
-		RelayNodeIndicator:                   ptrOctetString([]byte{0x01, 0x02, 0x03}),
-		MdtUserConsent:                       ptrOctetString([]byte{0x01, 0x02, 0x03}),
-		SubscribedVsrvcc:                     ptrOctetString([]byte{0x01, 0x02, 0x03}),
-		ProseSubscriptionData:                ptrOctetString([]byte{0x01, 0x02, 0x03}),
-		SubscriptionDataFlags:                ptrOctetString([]byte{0x01, 0x02, 0x03}),
-		AdjacentAccessRestrictionData:        []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})},
-		DlBufferingSuggestedPacketCount:      ptrOctetString([]byte{0x01, 0x02, 0x03}),
-		ImsiGroupId:                          []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})},
-		UeUsageType:                          ptrOctetString([]byte{0x01, 0x02, 0x03}),
-		AeseCommunicationPattern:             []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})},
-		MonitoringEventConfiguration:         []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})},
-		EmergencyInfo:                        ptrOctetString([]byte{0x01, 0x02, 0x03}),
-		V2xSubscriptionData:                  ptrOctetString([]byte{0x01, 0x02, 0x03}),
-		EdrxCycleLength:                      ptrOctetString([]byte{0x01, 0x02, 0x03}),
-		ExternalIdentifier:                   ptrOctetString([]byte{0x01, 0x02, 0x03}),
-		ActiveTime:                           ptrOctetString([]byte{0x01, 0x02, 0x03}),
-		ServiceGapTime:                       ptrOctetString([]byte{0x01, 0x02, 0x03}),
-		BroadcastLocationAssistanceDataTypes: ptrOctetString([]byte{0x01, 0x02, 0x03}),
-		AerialUeSubscriptionInformation:      ptrOctetString([]byte{0x01, 0x02, 0x03}),
-		CoreNetworkRestrictions:              ptrOctetString([]byte{0x01, 0x02, 0x03}),
+		RoamingRestricted:             ptrEnumerated(1),
+		SubscribedPeriodicRauTauTimer: ptrUnsigned32(1),
+		MpsPriority:                   ptrUnsigned32(1),
+		VplmnLipaAllowed:              ptrEnumerated(1),
+		RelayNodeIndicator:            ptrEnumerated(1),
+		MdtUserConsent:                ptrEnumerated(1),
+		SubscribedVsrvcc:              ptrEnumerated(1),
+		ProseSubscriptionData: &ProSeSubscriptionData{
+			ProsePermission: models_base.Unsigned32(1),
+		},
+		SubscriptionDataFlags: ptrUnsigned32(1),
+		AdjacentAccessRestrictionData: []*AdjacentAccessRestrictionData{
+			&AdjacentAccessRestrictionData{
+				PlmnId:                models_base.OctetString([]byte{0x01, 0x02, 0x03}),
+				AccessRestrictionData: models_base.Unsigned32(1),
+			},
+		},
+		// DlBufferingSuggestedPacketCount: nil, // (type: Integer32) needs to be set
+		ImsiGroupId: []*IMSIGroupId{
+			&IMSIGroupId{
+				GroupServiceId: models_base.Unsigned32(1),
+				GroupPlmnId:    models_base.OctetString([]byte{0x01, 0x02, 0x03}),
+				LocalGroupId:   models_base.OctetString([]byte{0x01, 0x02, 0x03}),
+			},
+		},
+		UeUsageType: ptrUnsigned32(1),
+		AeseCommunicationPattern: []*AESECommunicationPattern{
+			&AESECommunicationPattern{
+				// ScefId: nil, // (type: DiameterIdentity) needs to be set
+				// CommunicationPatternSet: nil, // (type: Grouped) needs to be set
+			},
+		},
+		MonitoringEventConfiguration: []*MonitoringEventConfiguration{
+			&MonitoringEventConfiguration{
+				// ScefId: nil, // (type: DiameterIdentity) needs to be set
+				ScefReferenceId: models_base.Unsigned32(1),
+				// MonitoringType: nil, // (type: Enumerated) needs to be set
+				MaximumNumberOfReports: ptrUnsigned32(1),
+				// MonitoringDuration: nil, // (type: Time) needs to be set
+				ChargedParty:         ptrUTF8String("test"),
+				MaximumDetectionTime: ptrUnsigned32(1),
+				// UeReachabilityConfiguration: nil, // (type: Grouped) needs to be set
+				// ImsiGroupId: nil, // (type: Grouped) needs to be set
+				// PeriodicCommunicationIndicator: nil, // (type: Enumerated) needs to be set
+				ActiveTime: ptrUnsigned32(1),
+				// OneTimeNotification: nil, // (type: Enumerated) needs to be set
+			},
+		},
+		EmergencyInfo: &EmergencyInfo{
+			// Mip6AgentInfo: nil, // (type: Grouped) needs to be set
+		},
+		V2xSubscriptionData: &V2XSubscriptionData{
+			V2xPermission: ptrUnsigned32(1),
+			UePc5Ambr:     ptrUnsigned32(1),
+			// V2xPc5QosParameters: nil, // (type: Grouped) needs to be set
+		},
+		EdrxCycleLength: &EDRXCycleLength{
+			// RatType: nil, // (type: Enumerated) needs to be set
+			EdrxCycleLengthValue: models_base.OctetString([]byte{0x01, 0x02, 0x03}),
+		},
+		ExternalIdentifier:                   ptrUTF8String("452040000000010"),
+		ActiveTime:                           ptrUnsigned32(1),
+		ServiceGapTime:                       ptrUnsigned32(1),
+		BroadcastLocationAssistanceDataTypes: ptrUnsigned64(1),
+		AerialUeSubscriptionInformation: &AerialUESubscriptionInformation{
+			AerialUeSecurityInformation: ptrUnsigned32(1),
+		},
+		CoreNetworkRestrictions: &CoreNetworkRestrictions{
+			CoreNetworkRestrictionType: ptrUnsigned32(1),
+		},
 	}
-	request.SubscriptionDataDeletion = ptrOctetString([]byte{0x01, 0x02, 0x03})
+	request.SubscriptionDataDeletion = &SubscriptionDataDeletion{
+		DsrFlags:          ptrUnsigned32(1),
+		ContextIdentifier: ptrUnsigned32(1),
+	}
 	request.Avp = []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})}
 	request.ProxyInfo = []*ProxyInfo{
 		&ProxyInfo{
@@ -1145,7 +1451,13 @@ func TestR_Pair_PCAP(t *testing.T) {
 		AuthApplicationId: ptrUnsigned32(16777252),
 		AcctApplicationId: ptrUnsigned32(1),
 	}
-	answer.SupportedFeatures = []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})}
+	answer.SupportedFeatures = []*SupportedFeatures{
+		&SupportedFeatures{
+			VendorId:      models_base.Unsigned32(10415),
+			FeatureListId: models_base.Unsigned32(1),
+			FeatureList:   models_base.Unsigned32(1),
+		},
+	}
 	answer.ResultCode = ptrUnsigned32(2001) // DIAMETER_SUCCESS
 	answer.ExperimentalResult = &ExperimentalResult{
 		VendorId:               models_base.Unsigned32(10415),
@@ -1153,7 +1465,7 @@ func TestR_Pair_PCAP(t *testing.T) {
 	}
 	answer.Avp = []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})}
 	answer.FailedAvp = &FailedAVP{
-		AVP: []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})},
+		Avp: []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})},
 	}
 	answer.ProxyInfo = []*ProxyInfo{
 		&ProxyInfo{
@@ -1227,8 +1539,16 @@ func TestUL_Pair_PCAP(t *testing.T) {
 		AcctApplicationId: ptrUnsigned32(1),
 	}
 	request.DestinationHost = ptrDiameterIdentity("server.example.com")
-	request.OcSupportedFeatures = ptrOctetString([]byte{0x01, 0x02, 0x03})
-	request.SupportedFeatures = []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})}
+	request.OcSupportedFeatures = &OCSupportedFeatures{
+		OcFeatureVector: ptrUnsigned64(1),
+	}
+	request.SupportedFeatures = []*SupportedFeatures{
+		&SupportedFeatures{
+			VendorId:      models_base.Unsigned32(10415),
+			FeatureListId: models_base.Unsigned32(1),
+			FeatureList:   models_base.Unsigned32(1),
+		},
+	}
 	request.TerminalInformation = &TerminalInformation{
 		Imei:            ptrUTF8String("123456789012345"),
 		Meid:            ptrOctetString([]byte{0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07}),
@@ -1236,16 +1556,38 @@ func TestUL_Pair_PCAP(t *testing.T) {
 	}
 	request.UeSrvccCapability = ptrEnumerated(1)
 	request.SgsnNumber = ptrOctetString([]byte{0x01, 0x02, 0x03})
-	request.HomogeneousSupportImsVoice = ptrOctetString([]byte{0x01, 0x02, 0x03})
-	request.GmlcAddress = ptrOctetString([]byte{0x01, 0x02, 0x03})
-	request.ActiveApn = []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})}
-	request.EquivalentPlmnList = ptrOctetString([]byte{0x00, 0xF1, 0x10})
+	request.HomogeneousSupportImsVoice = ptrEnumerated(1)
+	request.GmlcAddress = ptrAddress(models_base.Address(net.ParseIP("192.168.1.100")))
+	request.ActiveApn = []*ActiveAPN{
+		&ActiveAPN{
+			ContextIdentifier: models_base.Unsigned32(1),
+			ServiceSelection:  ptrUTF8String("452040000000010"),
+			Mip6AgentInfo: &MIP6AgentInfo{
+				// MipHomeAgentAddress: nil, // (type: Address) needs to be set
+				// MipHomeAgentHost: nil, // (type: Grouped) needs to be set
+				Mip6HomeLinkPrefix: ptrOctetString([]byte{0x01, 0x02, 0x03}),
+			},
+			VisitedNetworkIdentifier: ptrOctetString([]byte{0x01, 0x02, 0x03}),
+			SpecificApnInfo: &SpecificAPNInfo{
+				ServiceSelection: models_base.UTF8String("test"),
+				// Mip6AgentInfo: nil, // (type: Grouped) needs to be set
+				VisitedNetworkIdentifier: ptrOctetString([]byte{0x01, 0x02, 0x03}),
+			},
+		},
+	}
+	request.EquivalentPlmnList = &EquivalentPLMNList{
+		VisitedPlmnId: []models_base.OctetString{models_base.OctetString([]byte{0x00, 0xF1, 0x10})},
+	}
 	request.MmeNumberForMtSms = ptrOctetString([]byte{0x01, 0x02, 0x03})
-	request.SmsRegisterRequest = ptrOctetString([]byte{0x01, 0x02, 0x03})
-	request.SgsMmeIdentity = ptrOctetString([]byte{0x01, 0x02, 0x03})
-	request.CoupledNodeDiameterId = ptrOctetString([]byte{0x01, 0x02, 0x03})
-	request.AdjacentPlmns = ptrOctetString([]byte{0x00, 0xF1, 0x10})
-	request.SupportedServices = ptrOctetString([]byte{0x01, 0x02, 0x03})
+	request.SmsRegisterRequest = ptrEnumerated(1)
+	request.SgsMmeIdentity = ptrUTF8String("452040000000010")
+	request.CoupledNodeDiameterId = ptrDiameterIdentity("client.example.com")
+	request.AdjacentPlmns = &AdjacentPLMNs{
+		VisitedPlmnId: []models_base.OctetString{models_base.OctetString([]byte{0x00, 0xF1, 0x10})},
+	}
+	request.SupportedServices = &SupportedServices{
+		SupportedMonitoringEvents: ptrUnsigned64(1),
+	}
 	request.Avp = []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})}
 	request.ProxyInfo = []*ProxyInfo{
 		&ProxyInfo{
@@ -1277,78 +1619,168 @@ func TestUL_Pair_PCAP(t *testing.T) {
 		ExperimentalResultCode: models_base.Unsigned32(1),
 	}
 	answer.ErrorDiagnostic = ptrEnumerated(1)
-	answer.OcSupportedFeatures = ptrOctetString([]byte{0x01, 0x02, 0x03})
-	answer.OcOlr = ptrOctetString([]byte{0x01, 0x02, 0x03})
-	answer.Load = []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})}
-	answer.SupportedFeatures = []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})}
+	answer.OcSupportedFeatures = &OCSupportedFeatures{
+		OcFeatureVector: ptrUnsigned64(1),
+	}
+	answer.OcOlr = &OCOLR{
+		OcSequenceNumber:      models_base.Unsigned64(1),
+		OcReportType:          models_base.Enumerated(1),
+		OcReductionPercentage: ptrUnsigned32(1),
+		OcValidityDuration:    ptrUnsigned32(1),
+	}
+	answer.Load = []*Load{
+		&Load{
+			LoadType:  ptrEnumerated(1),
+			LoadValue: ptrUnsigned64(1),
+			SourceId:  ptrDiameterIdentity("client.example.com"),
+		},
+	}
+	answer.SupportedFeatures = []*SupportedFeatures{
+		&SupportedFeatures{
+			VendorId:      models_base.Unsigned32(10415),
+			FeatureListId: models_base.Unsigned32(1),
+			FeatureList:   models_base.Unsigned32(1),
+		},
+	}
 	answer.UlaFlags = ptrUnsigned32(1)
 	answer.SubscriptionData = &SubscriptionData{
 		SubscriberStatus:             ptrEnumerated(1),
 		Msisdn:                       ptrOctetString([]byte{0x01, 0x02, 0x03}),
 		AMsisdn:                      ptrOctetString([]byte{0x01, 0x02, 0x03}),
 		StnSr:                        ptrOctetString([]byte{0x01, 0x02, 0x03}),
-		IcsIndicator:                 ptrOctetString([]byte{0x01, 0x02, 0x03}),
-		NetworkAccessMode:            ptrOctetString([]byte{0x01, 0x02, 0x03}),
+		IcsIndicator:                 ptrEnumerated(1),
+		NetworkAccessMode:            ptrEnumerated(1),
 		OperatorDeterminedBarring:    ptrUnsigned32(1),
-		HplmnOdb:                     ptrOctetString([]byte{0x00, 0xF1, 0x10}),
+		HplmnOdb:                     ptrUnsigned32(1),
 		RegionalSubscriptionZoneCode: []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})},
 		AccessRestrictionData:        ptrUnsigned32(1),
 		ApnOiReplacement:             ptrUTF8String("452040000000010"),
-		LcsInfo:                      ptrOctetString([]byte{0x01, 0x02, 0x03}),
-		TeleserviceList:              ptrOctetString([]byte{0x01, 0x02, 0x03}),
-		CallBarringInfo:              []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})},
-		ChargingCharacteristics:      ptrOctetString([]byte{0x01, 0x02, 0x03}),
+		LcsInfo:                      &LCSInfo{
+			// GmlcAddress: nil, // (type: Address) needs to be set
+			// LcsPrivacyException: nil, // (type: Grouped) needs to be set
+			// MoLr: nil, // (type: Grouped) needs to be set
+		},
+		TeleserviceList: &TeleserviceList{
+			TsCode: []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})},
+		},
+		CallBarringInfo: []*CallBarringInfo{
+			&CallBarringInfo{
+				SsCode:                       models_base.OctetString([]byte{0x01, 0x02, 0x03}),
+				SsStatus:                     models_base.OctetString([]byte{0x01, 0x02, 0x03}),
+				Password:                     ptrOctetString([]byte{0x01, 0x02, 0x03}),
+				WrongPasswordAttemptsCounter: ptrUnsigned32(1),
+			},
+		},
+		ChargingCharacteristics: ptrUTF8String("452040000000010"),
 		Ambr: &AMBR{
-			MaxRequestedBandwidthUl:  models_base.OctetString([]byte{0x01, 0x02, 0x03}),
-			MaxRequestedBandwidthDl:  models_base.OctetString([]byte{0x01, 0x02, 0x03}),
-			ExtendedMaxRequestedBwUl: ptrOctetString([]byte{0x01, 0x02, 0x03}),
-			ExtendedMaxRequestedBwDl: ptrOctetString([]byte{0x01, 0x02, 0x03}),
+			MaxRequestedBandwidthUl:  models_base.Unsigned32(1),
+			MaxRequestedBandwidthDl:  models_base.Unsigned32(1),
+			ExtendedMaxRequestedBwUl: ptrUnsigned32(1),
+			ExtendedMaxRequestedBwDl: ptrUnsigned32(1),
 		},
 		ApnConfigurationProfile: &APNConfigurationProfile{
 			ContextIdentifier: models_base.Unsigned32(1),
 			// AllApnConfigIncluded: nil, // (type: Enumerated) needs to be set
 			// ApnConfiguration: nil, // (type: Grouped) needs to be set
 		},
-		RatFrequencySelectionPriorityId: ptrOctetString([]byte{0x01, 0x02, 0x03}),
-		TraceData:                       ptrOctetString([]byte{0x01, 0x02, 0x03}),
-		GprsSubscriptionData:            ptrOctetString([]byte{0x01, 0x02, 0x03}),
+		RatFrequencySelectionPriorityId: ptrUnsigned32(1),
+		TraceData: &TraceData{
+			TraceReference: models_base.OctetString([]byte{0x01, 0x02, 0x03}),
+			// TraceDepth: nil, // (type: Enumerated) needs to be set
+			TraceNeTypeList:    models_base.OctetString([]byte{0x01, 0x02, 0x03}),
+			TraceInterfaceList: ptrOctetString([]byte{0x01, 0x02, 0x03}),
+			TraceEventList:     models_base.OctetString([]byte{0x01, 0x02, 0x03}),
+			OmcId:              ptrOctetString([]byte{0x01, 0x02, 0x03}),
+			// TraceCollectionEntity: nil, // (type: Address) needs to be set
+			// MdtConfiguration: nil, // (type: Grouped) needs to be set
+		},
+		GprsSubscriptionData: &GPRSSubscriptionData{
+			// CompleteDataListIncludedIndicator: nil, // (type: Enumerated) needs to be set
+			// PdpContext: nil, // (type: Grouped) needs to be set
+		},
 		CsgSubscriptionData: []*CSGSubscriptionData{
 			&CSGSubscriptionData{
-				CsgId:            models_base.OctetString([]byte{0x01, 0x02, 0x03}),
-				ExpirationDate:   ptrOctetString([]byte{0x01, 0x02, 0x03}),
+				CsgId: models_base.Unsigned32(1),
+				// ExpirationDate: nil, // (type: Time) needs to be set
 				ServiceSelection: []models_base.UTF8String{models_base.UTF8String("test")},
 				VisitedPlmnId:    ptrOctetString([]byte{0x01, 0x02, 0x03}),
 			},
 		},
-		RoamingRestricted:                    ptrOctetString([]byte{0x01, 0x02, 0x03}),
-		SubscribedPeriodicRauTauTimer:        ptrOctetString([]byte{0x01, 0x02, 0x03}),
-		MpsPriority:                          ptrOctetString([]byte{0x01, 0x02, 0x03}),
-		VplmnLipaAllowed:                     ptrOctetString([]byte{0x00, 0xF1, 0x10}),
-		RelayNodeIndicator:                   ptrOctetString([]byte{0x01, 0x02, 0x03}),
-		MdtUserConsent:                       ptrOctetString([]byte{0x01, 0x02, 0x03}),
-		SubscribedVsrvcc:                     ptrOctetString([]byte{0x01, 0x02, 0x03}),
-		ProseSubscriptionData:                ptrOctetString([]byte{0x01, 0x02, 0x03}),
-		SubscriptionDataFlags:                ptrOctetString([]byte{0x01, 0x02, 0x03}),
-		AdjacentAccessRestrictionData:        []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})},
-		DlBufferingSuggestedPacketCount:      ptrOctetString([]byte{0x01, 0x02, 0x03}),
-		ImsiGroupId:                          []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})},
-		UeUsageType:                          ptrOctetString([]byte{0x01, 0x02, 0x03}),
-		AeseCommunicationPattern:             []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})},
-		MonitoringEventConfiguration:         []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})},
-		EmergencyInfo:                        ptrOctetString([]byte{0x01, 0x02, 0x03}),
-		V2xSubscriptionData:                  ptrOctetString([]byte{0x01, 0x02, 0x03}),
-		EdrxCycleLength:                      ptrOctetString([]byte{0x01, 0x02, 0x03}),
-		ExternalIdentifier:                   ptrOctetString([]byte{0x01, 0x02, 0x03}),
-		ActiveTime:                           ptrOctetString([]byte{0x01, 0x02, 0x03}),
-		ServiceGapTime:                       ptrOctetString([]byte{0x01, 0x02, 0x03}),
-		BroadcastLocationAssistanceDataTypes: ptrOctetString([]byte{0x01, 0x02, 0x03}),
-		AerialUeSubscriptionInformation:      ptrOctetString([]byte{0x01, 0x02, 0x03}),
-		CoreNetworkRestrictions:              ptrOctetString([]byte{0x01, 0x02, 0x03}),
+		RoamingRestricted:             ptrEnumerated(1),
+		SubscribedPeriodicRauTauTimer: ptrUnsigned32(1),
+		MpsPriority:                   ptrUnsigned32(1),
+		VplmnLipaAllowed:              ptrEnumerated(1),
+		RelayNodeIndicator:            ptrEnumerated(1),
+		MdtUserConsent:                ptrEnumerated(1),
+		SubscribedVsrvcc:              ptrEnumerated(1),
+		ProseSubscriptionData: &ProSeSubscriptionData{
+			ProsePermission: models_base.Unsigned32(1),
+		},
+		SubscriptionDataFlags: ptrUnsigned32(1),
+		AdjacentAccessRestrictionData: []*AdjacentAccessRestrictionData{
+			&AdjacentAccessRestrictionData{
+				PlmnId:                models_base.OctetString([]byte{0x01, 0x02, 0x03}),
+				AccessRestrictionData: models_base.Unsigned32(1),
+			},
+		},
+		// DlBufferingSuggestedPacketCount: nil, // (type: Integer32) needs to be set
+		ImsiGroupId: []*IMSIGroupId{
+			&IMSIGroupId{
+				GroupServiceId: models_base.Unsigned32(1),
+				GroupPlmnId:    models_base.OctetString([]byte{0x01, 0x02, 0x03}),
+				LocalGroupId:   models_base.OctetString([]byte{0x01, 0x02, 0x03}),
+			},
+		},
+		UeUsageType: ptrUnsigned32(1),
+		AeseCommunicationPattern: []*AESECommunicationPattern{
+			&AESECommunicationPattern{
+				// ScefId: nil, // (type: DiameterIdentity) needs to be set
+				// CommunicationPatternSet: nil, // (type: Grouped) needs to be set
+			},
+		},
+		MonitoringEventConfiguration: []*MonitoringEventConfiguration{
+			&MonitoringEventConfiguration{
+				// ScefId: nil, // (type: DiameterIdentity) needs to be set
+				ScefReferenceId: models_base.Unsigned32(1),
+				// MonitoringType: nil, // (type: Enumerated) needs to be set
+				MaximumNumberOfReports: ptrUnsigned32(1),
+				// MonitoringDuration: nil, // (type: Time) needs to be set
+				ChargedParty:         ptrUTF8String("test"),
+				MaximumDetectionTime: ptrUnsigned32(1),
+				// UeReachabilityConfiguration: nil, // (type: Grouped) needs to be set
+				// ImsiGroupId: nil, // (type: Grouped) needs to be set
+				// PeriodicCommunicationIndicator: nil, // (type: Enumerated) needs to be set
+				ActiveTime: ptrUnsigned32(1),
+				// OneTimeNotification: nil, // (type: Enumerated) needs to be set
+			},
+		},
+		EmergencyInfo: &EmergencyInfo{
+			// Mip6AgentInfo: nil, // (type: Grouped) needs to be set
+		},
+		V2xSubscriptionData: &V2XSubscriptionData{
+			V2xPermission: ptrUnsigned32(1),
+			UePc5Ambr:     ptrUnsigned32(1),
+			// V2xPc5QosParameters: nil, // (type: Grouped) needs to be set
+		},
+		EdrxCycleLength: &EDRXCycleLength{
+			// RatType: nil, // (type: Enumerated) needs to be set
+			EdrxCycleLengthValue: models_base.OctetString([]byte{0x01, 0x02, 0x03}),
+		},
+		ExternalIdentifier:                   ptrUTF8String("452040000000010"),
+		ActiveTime:                           ptrUnsigned32(1),
+		ServiceGapTime:                       ptrUnsigned32(1),
+		BroadcastLocationAssistanceDataTypes: ptrUnsigned64(1),
+		AerialUeSubscriptionInformation: &AerialUESubscriptionInformation{
+			AerialUeSecurityInformation: ptrUnsigned32(1),
+		},
+		CoreNetworkRestrictions: &CoreNetworkRestrictions{
+			CoreNetworkRestrictionType: ptrUnsigned32(1),
+		},
 	}
 	answer.ResetId = []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})}
 	answer.Avp = []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})}
 	answer.FailedAvp = &FailedAVP{
-		AVP: []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})},
+		Avp: []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})},
 	}
 	answer.ProxyInfo = []*ProxyInfo{
 		&ProxyInfo{

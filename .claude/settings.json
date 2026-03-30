@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:github.com)",
+      "WebSearch",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "WebFetch(domain:www.tech-invite.com)",
+      "Bash(make generate-with-tests:*)",
+      "Bash(go test:*)"
+    ]
+  }
+}

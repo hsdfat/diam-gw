@@ -295,7 +295,7 @@ func TestMIC_Pair_PCAP(t *testing.T) {
 	}
 	answer.Avp = []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})}
 	answer.FailedAvp = &FailedAVP{
-		AVP: []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})},
+		Avp: []models_base.OctetString{models_base.OctetString([]byte{0x01, 0x02, 0x03})},
 	}
 	answer.ProxyInfo = []*ProxyInfo{
 		&ProxyInfo{
