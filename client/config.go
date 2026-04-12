@@ -1,6 +1,9 @@
 package client
 
-import "time"
+import (
+	"net"
+	"time"
+)
 
 // DRAConfig holds the configuration for connecting to a DRA
 type DRAConfig struct {
@@ -36,6 +39,25 @@ type DRAConfig struct {
 	// Application IDs to advertise in CER
 	AuthAppIDs []uint32 // Auth-Application-IDs
 	AcctAppIDs []uint32 // Acct-Application-IDs
+
+	// AcquireLocalAddr, when non-nil, is called before each TCP dial to
+	// obtain the local address (source IP + port) the dialer must bind.
+	// The owner string is the connection id, useful for diagnostics. The
+	// returned error becomes the dial failure: per the telco profile, the
+	// connection MUST NOT silently fall back to an OS-chosen ephemeral
+	// port — exhaustion is a hard failure that the reconnect loop will
+	// surface and retry.
+	//
+	// Production wires this to portpool.Pool.Acquire via a thin closure
+	// in pkg/connmanager. Leaving it nil preserves the legacy OS-ephemeral
+	// behaviour for code paths that have not migrated yet.
+	AcquireLocalAddr func(owner string) (*net.TCPAddr, error)
+
+	// ReleaseLocalAddr, when non-nil, is called to return a previously
+	// acquired local address back to its source. It runs on dial failure
+	// and on connection close, including the deferred-cleanup paths used
+	// after handshake failures, so the pool never leaks.
+	ReleaseLocalAddr func(*net.TCPAddr)
 }
 
 // DefaultConfig returns a DRAConfig with sensible defaults

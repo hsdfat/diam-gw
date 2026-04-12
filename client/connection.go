@@ -29,6 +29,13 @@ type Connection struct {
 	conn   connection.Conn
 	connMu sync.RWMutex
 
+	// boundLocalAddr is the source (IP, port) currently held for this
+	// connection's TCP socket, when DRAConfig.AcquireLocalAddr is set.
+	// It is non-nil between a successful Acquire (in connect) and the
+	// matching Release (in close), and protected by connMu alongside
+	// c.conn so the (conn, addr) pair stays consistent.
+	boundLocalAddr *net.TCPAddr
+
 	// State management
 	state   atomic.Value // stores ConnectionState
 	stateMu sync.Mutex
@@ -206,8 +213,31 @@ func (c *Connection) connect() error {
 		Timeout: c.config.ConnectTimeout,
 	}
 
+	// Telco profile: bind the dial to a pre-allocated (source IP, source
+	// port) when the config provides a port source. Acquire MUST happen
+	// before each dial (not once at construction) so that quarantine in
+	// the underlying pool can give the kernel time to clear TIME_WAIT on
+	// the previous 4-tuple after a fast reconnect.
+	var localAddr *net.TCPAddr
+	if c.config.AcquireLocalAddr != nil {
+		la, err := c.config.AcquireLocalAddr(c.id)
+		if err != nil {
+			c.setState(StateFailed)
+			c.stats.SetLastError(err)
+			return fmt.Errorf("acquire local addr: %w", err)
+		}
+		localAddr = la
+		dialer.LocalAddr = la
+	}
+
 	conn, err := dialer.DialContext(c.ctx, "tcp", addr)
 	if err != nil {
+		// Return the port immediately so the next reconnect attempt can
+		// pick a fresh one (and so a permanent dial failure on this slot
+		// does not pin a port forever).
+		if localAddr != nil && c.config.ReleaseLocalAddr != nil {
+			c.config.ReleaseLocalAddr(localAddr)
+		}
 		c.setState(StateFailed)
 		c.stats.SetLastError(err)
 		return fmt.Errorf("failed to connect: %w", err)
@@ -215,6 +245,7 @@ func (c *Connection) connect() error {
 
 	c.connMu.Lock()
 	c.conn = connection.NewConn(conn, connection.DefaultConnectionConfig())
+	c.boundLocalAddr = localAddr
 	c.connMu.Unlock()
 
 	c.logger.Infow("TCP connection established", "conn_id", c.id)
@@ -838,7 +869,14 @@ func (c *Connection) reconnect() {
 	}
 }
 
-// close closes the connection
+// close closes the connection.
+//
+// If a local address was acquired from the configured port source for this
+// session, it is released here. close() can run twice along the failure
+// path (once from connect() on handshake error, once from handleFailure());
+// snapshotting boundLocalAddr under the mutex and clearing it in the same
+// critical section makes the second call a safe no-op so the pool never
+// double-frees.
 func (c *Connection) close() {
 	c.stopWatchdog()
 
@@ -847,7 +885,13 @@ func (c *Connection) close() {
 		c.conn.Close()
 		c.conn = nil
 	}
+	bound := c.boundLocalAddr
+	c.boundLocalAddr = nil
 	c.connMu.Unlock()
+
+	if bound != nil && c.config.ReleaseLocalAddr != nil {
+		c.config.ReleaseLocalAddr(bound)
+	}
 }
 
 // Close gracefully closes the connection
