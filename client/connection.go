@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"math/rand"
 	"net"
 	"sync"
 	"sync/atomic"
@@ -78,9 +79,20 @@ type ConnectionStats struct {
 	MessagesReceived atomic.Uint64
 	BytesSent        atomic.Uint64
 	BytesReceived    atomic.Uint64
-	Reconnects       atomic.Uint32
-	lastErrorMu      sync.RWMutex
-	lastError        error
+
+	// Reconnect telemetry — Reconnects counts the number of reconnect
+	// loops entered (one per failure handled). Attempts/Successes/Failures
+	// count the per-iteration dial attempts inside those loops.
+	Reconnects         atomic.Uint32
+	ReconnectAttempts  atomic.Uint64
+	ReconnectSuccesses atomic.Uint64
+	ReconnectFailures  atomic.Uint64
+	DialErrors         atomic.Uint64
+	Drops              atomic.Uint64
+	CurrentRetryDelay  atomic.Int64 // nanoseconds; 0 when not retrying
+
+	lastErrorMu sync.RWMutex
+	lastError   error
 }
 
 func (c *Connection) DisableReconnect() {
@@ -335,9 +347,16 @@ func (c *Connection) startWatchdog() {
 	}
 
 	ticker := time.NewTicker(c.config.DWRInterval)
+	stop := make(chan struct{})
 	c.dwrTicker = ticker
-	c.dwrStop = make(chan struct{})
+	c.dwrStop = stop
 
+	// The goroutine references its own stop channel via the local `stop`
+	// variable rather than reading c.dwrStop through the receiver. After
+	// a reconnect cycle, stopWatchdog closes the OLD stop and startWatchdog
+	// installs a NEW one — without this capture, the old goroutine would
+	// race against the field overwrite under -race. Same reasoning as the
+	// captured `ticker` local right above.
 	c.wg.Add(1)
 	go func() {
 		defer c.wg.Done()
@@ -346,7 +365,7 @@ func (c *Connection) startWatchdog() {
 			select {
 			case <-c.ctx.Done():
 				return
-			case <-c.dwrStop:
+			case <-stop:
 				return
 			case <-ticker.C:
 				if err := c.sendDWR(); err != nil {
@@ -529,7 +548,13 @@ func (c *Connection) Receive() <-chan DiamConnectionInfo {
 	return c.recvCh
 }
 
-// startReadLoop starts the message read loop
+// startReadLoop starts the message read loop.
+//
+// The loop snapshots c.conn under the mutex once per iteration, nil-checks
+// it, and then uses only the local for both the CloseNotify select and
+// the blocking read. Reading c.conn through the receiver after close()
+// sets it to nil would panic; the snapshot keeps a closing connection
+// from racing the read here.
 func (c *Connection) startReadLoop() {
 	c.wg.Add(1)
 	go func() {
@@ -537,20 +562,21 @@ func (c *Connection) startReadLoop() {
 		defer c.logger.Infow("Read loop exited", "conn_id", c.id)
 
 		for {
-			select {
-			case <-c.ctx.Done():
-				return
-			case <-c.conn.(connection.CloseNotifier).CloseNotify():
-				c.handleFailure(fmt.Errorf("connect closed"))
-			default:
-			}
-
 			c.connMu.RLock()
 			conn := c.conn
 			c.connMu.RUnlock()
 
 			if conn == nil {
 				return
+			}
+
+			select {
+			case <-c.ctx.Done():
+				return
+			case <-conn.(connection.CloseNotifier).CloseNotify():
+				c.handleFailure(fmt.Errorf("connection closed"))
+				return
+			default:
 			}
 
 			message, err := connection.ReadMessage(conn.Connection())
@@ -635,41 +661,46 @@ func (c *Connection) deliverResponse(hopByHopID uint32, data *Message) error {
 	return nil
 }
 
-// startWriteLoop starts the message write loop
+// startWriteLoop starts the message write loop.
+//
+// Exactly ONE writer goroutine per connection. Multiple writers on the same
+// *net.TCPConn would interleave Diameter frames at the byte level and
+// corrupt the wire stream — the peer would hard-disconnect on the first
+// malformed length field. Serialization is enforced here at the channel
+// boundary; callers can call Send() concurrently and messages are flushed
+// in FIFO order.
 func (c *Connection) startWriteLoop() {
-	c.wg.Add(8)
-	for range 8 {
-		go func() {
-			defer c.wg.Done()
-			defer c.logger.Infow("Write loop exited", "conn_id", c.id)
+	c.wg.Add(1)
+	go func() {
+		defer c.wg.Done()
+		defer c.logger.Infow("Write loop exited", "conn_id", c.id)
 
-			for {
-				select {
-				case <-c.ctx.Done():
-					return
-				case data := <-c.sendCh:
-					c.connMu.RLock()
-					conn := c.conn
-					c.connMu.RUnlock()
+		for {
+			select {
+			case <-c.ctx.Done():
+				return
+			case data := <-c.sendCh:
+				c.connMu.RLock()
+				conn := c.conn
+				c.connMu.RUnlock()
 
-					if conn == nil {
-						continue
-					}
-
-					if _, err := conn.Write(data); err != nil {
-						if c.ctx.Err() == nil {
-							c.logger.Errorw("Failed to write", "conn_id", c.id, "error", err)
-							c.handleFailure(err)
-						}
-						return
-					}
-
-					c.stats.MessagesSent.Add(1)
-					c.stats.BytesSent.Add(uint64(len(data)))
+				if conn == nil {
+					continue
 				}
+
+				if _, err := conn.Write(data); err != nil {
+					if c.ctx.Err() == nil {
+						c.logger.Errorw("Failed to write", "conn_id", c.id, "error", err)
+						c.handleFailure(err)
+					}
+					return
+				}
+
+				c.stats.MessagesSent.Add(1)
+				c.stats.BytesSent.Add(uint64(len(data)))
 			}
-		}()
-	}
+		}
+	}()
 }
 
 // write writes data to the connection
@@ -731,37 +762,79 @@ func (c *Connection) handleFailure(err error) {
 	}
 }
 
-// reconnect attempts to reconnect with exponential backoff
+// reconnect attempts to reconnect with exponential backoff + full jitter.
+//
+// The loop NEVER gives up on its own; it only exits when the connection
+// context is cancelled (i.e. the gateway is shutting down) or when a dial
+// finally succeeds. This is the per-connection guarantee required by
+// telco resiliency requirement R1.
+//
+// Backoff schedule (full jitter, AWS-recommended):
+//
+//	ceiling_n = min(initial * backoff^n, max)
+//	delay_n   = rand(0, ceiling_n)
+//
+// Full jitter prevents thundering herd: when N sockets to the same DRA
+// all fail at the same instant they each pick an independent random delay
+// in [0, ceiling], so retries are spread across the window instead of
+// hammering the DRA in lock-step.
 func (c *Connection) reconnect() {
-	backoff := c.config.ReconnectInterval
+	c.stats.Reconnects.Add(1)
+	defer c.stats.CurrentRetryDelay.Store(0)
+
+	initial := c.config.ReconnectInterval
+	maxDelay := c.config.MaxReconnectDelay
+	backoff := c.config.ReconnectBackoff
+	if backoff < 1.0 {
+		backoff = 1.0
+	}
+
+	ceiling := initial
 	attempts := 0
 
-	c.stats.Reconnects.Add(1)
-
 	for {
+		// Compute next delay with full jitter.
+		delay := time.Duration(rand.Int63n(int64(ceiling) + 1))
+		c.stats.CurrentRetryDelay.Store(int64(delay))
+
+		c.logger.Infow("Reconnection scheduled",
+			"conn_id", c.id,
+			"attempt", attempts+1,
+			"delay", delay,
+			"ceiling", ceiling)
+
 		select {
 		case <-c.ctx.Done():
 			return
-		case <-time.After(backoff):
-			attempts++
-			c.logger.Infow("Reconnection attempt", "conn_id", c.id, "attempt", attempts)
-
-			c.setState(StateReconnecting)
-
-			if err := c.connect(); err != nil {
-				c.logger.Warn("Reconnection failed", "conn_id", c.id, "error", err)
-
-				// Exponential backoff
-				backoff = time.Duration(float64(backoff) * c.config.ReconnectBackoff)
-				if backoff > c.config.MaxReconnectDelay {
-					backoff = c.config.MaxReconnectDelay
-				}
-				continue
-			}
-
-			c.logger.Infow("Reconnection successful", "conn_id", c.id, "attempts", attempts)
-			return
+		case <-time.After(delay):
 		}
+
+		attempts++
+		c.stats.ReconnectAttempts.Add(1)
+		c.setState(StateReconnecting)
+
+		if err := c.connect(); err != nil {
+			c.stats.ReconnectFailures.Add(1)
+			c.stats.DialErrors.Add(1)
+			c.logger.Warnw("Reconnection failed",
+				"conn_id", c.id,
+				"attempt", attempts,
+				"error", err)
+
+			// Grow the ceiling, clamped to max. We deliberately keep
+			// climbing on every failure so that a permanent outage
+			// settles into MaxReconnectDelay rather than burning CPU.
+			next := time.Duration(float64(ceiling) * backoff)
+			if next > maxDelay || next <= 0 {
+				next = maxDelay
+			}
+			ceiling = next
+			continue
+		}
+
+		c.stats.ReconnectSuccesses.Add(1)
+		c.logger.Infow("Reconnection successful", "conn_id", c.id, "attempts", attempts)
+		return
 	}
 }
 
@@ -850,6 +923,12 @@ func (c *Connection) GetStats() ConnectionStats {
 	stats.BytesSent.Store(c.stats.BytesSent.Load())
 	stats.BytesReceived.Store(c.stats.BytesReceived.Load())
 	stats.Reconnects.Store(c.stats.Reconnects.Load())
+	stats.ReconnectAttempts.Store(c.stats.ReconnectAttempts.Load())
+	stats.ReconnectSuccesses.Store(c.stats.ReconnectSuccesses.Load())
+	stats.ReconnectFailures.Store(c.stats.ReconnectFailures.Load())
+	stats.DialErrors.Store(c.stats.DialErrors.Load())
+	stats.Drops.Store(c.stats.Drops.Load())
+	stats.CurrentRetryDelay.Store(c.stats.CurrentRetryDelay.Load())
 
 	c.stats.lastErrorMu.RLock()
 	stats.lastError = c.stats.lastError
