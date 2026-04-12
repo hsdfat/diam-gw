@@ -1,6 +1,7 @@
 package server
 
 import (
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -85,13 +86,13 @@ func TestMiddlewareIntegration_RateLimitingDetailed(t *testing.T) {
 
 	// Custom rate limiting middleware with tracking
 	rateLimiter := func(maxPerSecond int) Middleware {
-		var (
-			lastReset     = time.Now()
-			requestCount  = 0
-		)
+		var mu sync.Mutex
+		lastReset := time.Now()
+		requestCount := 0
 
 		return func(next Handler) Handler {
 			return func(msg *Message, conn Conn) {
+				mu.Lock()
 				now := time.Now()
 
 				// Reset counter every second
@@ -101,9 +102,12 @@ func TestMiddlewareIntegration_RateLimitingDetailed(t *testing.T) {
 				}
 
 				requestCount++
-				if requestCount > maxPerSecond {
+				current := requestCount
+				mu.Unlock()
+
+				if current > maxPerSecond {
 					rejected.Add(1)
-					t.Logf("Request %d rejected (rate limit: %d/sec)", requestCount, maxPerSecond)
+					t.Logf("Request %d rejected (rate limit: %d/sec)", current, maxPerSecond)
 					return
 				}
 

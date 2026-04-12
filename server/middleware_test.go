@@ -347,6 +347,9 @@ func TestConditionalMiddleware(t *testing.T) {
 	client.sendCER(t)
 	client.receiveCEA(t)
 
+	// Reset after CER/CEA handshake (CER is > 100 bytes and triggers the condition)
+	mwCalled.Store(false)
+
 	// DWR is small, should not trigger middleware
 	sendDWR(t, client.conn)
 	time.Sleep(100 * time.Millisecond)
@@ -455,6 +458,10 @@ func TestCommandSpecificMiddleware(t *testing.T) {
 
 	client.sendCER(t)
 	client.receiveCEA(t)
+
+	// Reset after CER/CEA handshake (CER triggers the cerMW)
+	dwrMWCalled.Store(false)
+	cerMWCalled.Store(false)
 
 	// Send DWR
 	sendDWR(t, client.conn)

@@ -1,6 +1,7 @@
 package server
 
 import (
+	"sync"
 	"time"
 
 	"github.com/hsdfat/diam-gw/pkg/connection"
@@ -82,14 +83,13 @@ func RecoveryMiddleware(s *Server) Middleware {
 // RateLimitMiddleware creates a middleware that implements basic rate limiting
 // This is a simple example - for production use a more sophisticated rate limiter
 func RateLimitMiddleware(s *Server, maxRequestsPerSecond int) Middleware {
-	var (
-		lastReset     time.Time
-		requestCount  int
-		maxRequests   = maxRequestsPerSecond
-	)
+	var mu sync.Mutex
+	lastReset := time.Now()
+	requestCount := 0
 
 	return func(next Handler) Handler {
 		return func(msg *Message, conn Conn) {
+			mu.Lock()
 			now := time.Now()
 
 			// Reset counter every second
@@ -99,11 +99,13 @@ func RateLimitMiddleware(s *Server, maxRequestsPerSecond int) Middleware {
 			}
 
 			requestCount++
-			if requestCount > maxRequests {
+			current := requestCount
+			mu.Unlock()
+
+			if current > maxRequestsPerSecond {
 				s.logger.Warnw("Rate limit exceeded",
 					"remote_addr", conn.RemoteAddr().String(),
-					"requests", requestCount)
-				// Optionally send error response here
+					"requests", current)
 				return
 			}
 
