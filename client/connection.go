@@ -2,12 +2,15 @@ package client
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"math/rand"
 	"net"
+	"os"
 	"sync"
 	"sync/atomic"
+	"syscall"
 	"time"
 
 	"github.com/hsdfat/diam-gw/commands/base"
@@ -230,7 +233,13 @@ func (c *Connection) connect() error {
 		dialer.LocalAddr = la
 	}
 
-	conn, err := dialer.DialContext(c.ctx, "tcp", addr)
+	var conn net.Conn
+	var err error
+	if localAddr == nil && (c.config.LocalAddr != "" || c.config.LocalPortMin > 0) {
+		conn, err = c.dialWithLocalBind(addr)
+	} else {
+		conn, err = dialer.DialContext(c.ctx, "tcp", addr)
+	}
 	if err != nil {
 		// Return the port immediately so the next reconnect attempt can
 		// pick a fresh one (and so a permanent dial failure on this slot
@@ -944,6 +953,73 @@ func (c *Connection) getLocalAddr() net.IP {
 		}
 	}
 	return nil
+}
+
+// LocalTCPAddr returns the full local TCP endpoint (IP + port) of the
+// underlying socket, or nil if no connection is currently established.
+func (c *Connection) LocalTCPAddr() *net.TCPAddr {
+	c.connMu.RLock()
+	defer c.connMu.RUnlock()
+	if c.conn == nil {
+		return nil
+	}
+	if addr, ok := c.conn.LocalAddr().(*net.TCPAddr); ok {
+		return addr
+	}
+	return nil
+}
+
+// dialWithLocalBind dials the remote address while binding the source side to
+// c.config.LocalAddr and a port from [LocalPortMin, LocalPortMax]. Ports are
+// scanned sequentially; EADDRINUSE moves to the next candidate, any other
+// error aborts the attempt immediately.
+func (c *Connection) dialWithLocalBind(remoteAddr string) (net.Conn, error) {
+	var localIP net.IP
+	if c.config.LocalAddr != "" {
+		localIP = net.ParseIP(c.config.LocalAddr)
+		if localIP == nil {
+			return nil, fmt.Errorf("invalid LocalAddr: %s", c.config.LocalAddr)
+		}
+	}
+
+	min, max := c.config.LocalPortMin, c.config.LocalPortMax
+	if min <= 0 || max <= 0 {
+		dialer := net.Dialer{
+			Timeout:   c.config.ConnectTimeout,
+			LocalAddr: &net.TCPAddr{IP: localIP},
+		}
+		return dialer.DialContext(c.ctx, "tcp", remoteAddr)
+	}
+
+	for port := min; port <= max; port++ {
+		dialer := net.Dialer{
+			Timeout:   c.config.ConnectTimeout,
+			LocalAddr: &net.TCPAddr{IP: localIP, Port: port},
+		}
+		conn, err := dialer.DialContext(c.ctx, "tcp", remoteAddr)
+		if err == nil {
+			return conn, nil
+		}
+		if isAddrInUse(err) {
+			c.logger.Debugw("local port in use, trying next", "port", port, "conn_id", c.id)
+			continue
+		}
+		return nil, err
+	}
+	return nil, fmt.Errorf("no available local port in range [%d-%d] on %s", min, max, c.config.LocalAddr)
+}
+
+// isAddrInUse reports whether err represents EADDRINUSE (port already bound).
+func isAddrInUse(err error) bool {
+	var opErr *net.OpError
+	if !errors.As(err, &opErr) {
+		return false
+	}
+	var sysErr *os.SyscallError
+	if !errors.As(opErr.Err, &sysErr) {
+		return false
+	}
+	return errors.Is(sysErr.Err, syscall.EADDRINUSE)
 }
 
 func (c *Connection) registerPending(hopByHopID uint32, ch chan []byte) {

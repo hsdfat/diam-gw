@@ -11,6 +11,11 @@ type DRAConfig struct {
 	Host string // DRA hostname or IP address
 	Port int    // DRA port (typically 3868)
 
+	// Local source binding (optional)
+	LocalAddr    string // Local IP to bind (empty = OS default)
+	LocalPortMin int    // Min local source port (0 = OS default)
+	LocalPortMax int    // Max local source port (0 = OS default)
+
 	// Diameter identity
 	OriginHost  string // Local origin host (e.g., "gateway.example.com")
 	OriginRealm string // Local origin realm (e.g., "example.com")
@@ -111,6 +116,20 @@ func (c *DRAConfig) Validate() error {
 	}
 	if c.MaxDWRFailures <= 0 {
 		return ErrInvalidConfig{Field: "MaxDWRFailures", Reason: "must be greater than 0"}
+	}
+	if c.LocalAddr != "" && net.ParseIP(c.LocalAddr) == nil {
+		return ErrInvalidConfig{Field: "LocalAddr", Reason: "must be a valid IP address"}
+	}
+	if c.LocalPortMin != 0 || c.LocalPortMax != 0 {
+		if c.LocalPortMin <= 0 || c.LocalPortMax <= 0 {
+			return ErrInvalidConfig{Field: "LocalPortMin/Max", Reason: "both must be set together"}
+		}
+		if c.LocalPortMin > c.LocalPortMax {
+			return ErrInvalidConfig{Field: "LocalPortMin", Reason: "must be <= LocalPortMax"}
+		}
+		if c.LocalPortMax > 65535 {
+			return ErrInvalidConfig{Field: "LocalPortMax", Reason: "must be <= 65535"}
+		}
 	}
 	return nil
 }

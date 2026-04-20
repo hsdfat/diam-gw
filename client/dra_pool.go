@@ -23,16 +23,29 @@ type DRAServerConfig struct {
 
 type Command = connection.Command
 
-// DRAPoolConfig holds configuration for multiple DRAs with priorities
+// DRAPoolConfig holds configuration for multiple DRAs with priorities.
+// All DRAs inside this pool share local source binding and Diameter identity.
 type DRAPoolConfig struct {
+	// Logical name of this pool (e.g. "s13", "s6a"); used for logging
+	Name string
+
 	// DRA servers grouped by priority
 	DRAs []*DRAServerConfig
+
+	// Local source binding applied to all outbound connections in this pool
+	LocalAddr    string // Local IP to bind (empty = OS default)
+	LocalPortMin int    // Min local source port (0 = OS default)
+	LocalPortMax int    // Max local source port (0 = OS default)
 
 	// Common Diameter identity
 	OriginHost  string
 	OriginRealm string
 	ProductName string
 	VendorID    uint32
+
+	// Application IDs advertised in CER for every DRA in this pool
+	AuthAppIDs []uint32
+	AcctAppIDs []uint32
 
 	// Connection settings (per DRA)
 	ConnectionsPerDRA int // Number of connections to each DRA
@@ -65,6 +78,9 @@ type DRAPool struct {
 
 	// Priority groups
 	priorityGroups map[int][]*DRAServerConfig // priority -> DRAs
+
+	// Round-robin cursor per priority level
+	priorityRR map[int]*atomic.Uint32
 
 	// Active priority tracking
 	activePriority atomic.Int32
@@ -140,11 +156,18 @@ func NewDRAPool(ctx context.Context, config *DRAPoolConfig, log logger.Logger) (
 		priorityGroups[dra.Priority] = append(priorityGroups[dra.Priority], dra)
 	}
 
+	// Initialize round-robin cursors for each priority
+	priorityRR := make(map[int]*atomic.Uint32, len(priorityGroups))
+	for priority := range priorityGroups {
+		priorityRR[priority] = &atomic.Uint32{}
+	}
+
 	pool := &DRAPool{
 		config:         config,
 		draPools:       make(map[string]*ConnectionPool),
 		draConfigs:     sortedDRAs,
 		priorityGroups: priorityGroups,
+		priorityRR:     priorityRR,
 		recvCh:         make(chan DiamConnectionInfo, config.RecvBufferSize*len(config.DRAs)*config.ConnectionsPerDRA),
 		ctx:            ctx,
 		cancel:         cancel,
@@ -162,10 +185,15 @@ func NewDRAPool(ctx context.Context, config *DRAPoolConfig, log logger.Logger) (
 		poolConfig := &DRAConfig{
 			Host:              draConfig.Host,
 			Port:              draConfig.Port,
+			LocalAddr:         config.LocalAddr,
+			LocalPortMin:      config.LocalPortMin,
+			LocalPortMax:      config.LocalPortMax,
 			OriginHost:        config.OriginHost,
 			OriginRealm:       config.OriginRealm,
 			ProductName:       config.ProductName,
 			VendorID:          config.VendorID,
+			AuthAppIDs:        config.AuthAppIDs,
+			AcctAppIDs:        config.AcctAppIDs,
 			ConnectionCount:   config.ConnectionsPerDRA,
 			ConnectTimeout:    config.ConnectTimeout,
 			CERTimeout:        config.CERTimeout,
@@ -266,21 +294,27 @@ func (p *DRAPool) Start() error {
 	return nil
 }
 
-// Send sends a message to active priority DRAs using load balancing
+// Send sends a message using round-robin across healthy DRAs at the currently
+// active priority. If all DRAs at that priority fail, the error is returned;
+// priority failover is handled asynchronously by the priority manager.
 func (p *DRAPool) Send(data []byte) error {
 	currentPriority := int(p.activePriority.Load())
 
 	// Get DRAs at current priority level
 	p.priorityMu.RLock()
 	draList := p.priorityGroups[currentPriority]
+	rr := p.priorityRR[currentPriority]
 	p.priorityMu.RUnlock()
 
-	if len(draList) == 0 {
+	n := uint32(len(draList))
+	if n == 0 {
 		return fmt.Errorf("no DRAs available at priority %d", currentPriority)
 	}
 
-	// Try to send to each DRA at current priority
-	for _, dra := range draList {
+	// Advance RR cursor once; rotate through all peers at this priority
+	start := rr.Add(1)
+	for i := uint32(0); i < n; i++ {
+		dra := draList[(start+i)%n]
 		pool := p.draPools[dra.Name]
 		if pool.IsHealthy() {
 			if err := pool.Send(data); err == nil {
@@ -292,13 +326,17 @@ func (p *DRAPool) Send(data []byte) error {
 	return fmt.Errorf("failed to send message to any DRA at priority %d", currentPriority)
 }
 
-// SendToDRA sends a message to a specific DRA
+// SendToDRA sends a message to a specific DRA, bypassing priority routing and
+// round-robin. Returns an error if the DRA is unknown or currently unhealthy.
+// Intended for sticky sessions, retries, or operator-directed traffic.
 func (p *DRAPool) SendToDRA(draName string, data []byte) error {
 	pool, exists := p.draPools[draName]
 	if !exists {
 		return fmt.Errorf("DRA %s not found", draName)
 	}
-
+	if !pool.IsHealthy() {
+		return fmt.Errorf("DRA %s is not healthy", draName)
+	}
 	return pool.Send(data)
 }
 

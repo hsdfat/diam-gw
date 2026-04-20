@@ -122,13 +122,13 @@ func (e *S13EIRSimulator) Stop() error {
 // registerHandlers registers base protocol and S13 application handlers
 func (e *S13EIRSimulator) registerHandlers() {
 	// Register base protocol handlers
-	e.server.HandleFunc(server.Command{Interface: 0, Code: 257}, e.handleCER)
-	e.server.HandleFunc(server.Command{Interface: 0, Code: 280}, e.handleDWR)
-	e.server.HandleFunc(server.Command{Interface: 0, Code: 282}, e.handleDPR)
+	e.server.HandleFunc(server.Command{Interface: 0, Code: 257, Request: true}, e.handleCER)
+	e.server.HandleFunc(server.Command{Interface: 0, Code: 280, Request: true}, e.handleDWR)
+	e.server.HandleFunc(server.Command{Interface: 0, Code: 282, Request: true}, e.handleDPR)
 
 	// Register S13 application handler
 	// ME-Identity-Check-Request (Command Code 324, Application ID 16777252)
-	e.server.HandleFunc(server.Command{Interface: 16777252, Code: 324}, e.handleMICR)
+	e.server.HandleFunc(server.Command{Interface: 16777252, Code: 324, Request: true}, e.handleMICR)
 }
 
 // processMessages processes incoming messages from the server's receive channel
