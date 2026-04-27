@@ -93,7 +93,12 @@ func NewAddressClient(ctx context.Context, config *PoolConfig, log logger.Logger
 			log.Errorw("not found any session")
 			return
 		}
-		session.ResponseChan <- dci.Message
+		select {
+		case session.ResponseChan <- dci.Message:
+		case <-client.ctx.Done():
+		default:
+			log.Warnw("session response channel full", "hop_by_hop_id", messageInfo.HopByHopID)
+		}
 	}
 
 	client.logger.Infow("Address-based Diameter client created")
@@ -105,6 +110,16 @@ func (c *AddressClient) StoreSession(hopbyhop uint32, s *Session) {
 	c.sessionsMu.Lock()
 	c.sessions[hopbyhop] = s
 	c.sessionsMu.Unlock()
+}
+
+func (c *AddressClient) DeleteSession(hopbyhop uint32) {
+	c.sessionsMu.Lock()
+	delete(c.sessions, hopbyhop)
+	c.sessionsMu.Unlock()
+}
+
+func (c *AddressClient) RemoveSession(hopbyhop uint32) {
+	c.DeleteSession(hopbyhop)
 }
 
 func (c *AddressClient) FindSession(hopbyhop uint32) (*Session, error) {
@@ -138,6 +153,14 @@ func (c *AddressClient) SendWithContext(ctx context.Context, remoteAddr string, 
 	}
 	c.stats.TotalRequests.Add(1)
 
+	hopByHopID := binary.BigEndian.Uint32(message[12:16])
+	rspChan := make(chan *Message, 1)
+	c.StoreSession(hopByHopID, &Session{
+		CreatedAt:    time.Now(),
+		ResponseChan: rspChan,
+	})
+	defer c.DeleteSession(hopByHopID)
+
 	// Send via pool (pool handles connection lookup/creation)
 	if err := c.pool.Send(ctx, remoteAddr, message); err != nil {
 		c.stats.TotalErrors.Add(1)
@@ -156,17 +179,13 @@ func (c *AddressClient) SendWithContext(ctx context.Context, remoteAddr string, 
 	c.logger.Debugw("Message sent successfully",
 		"remote_addr", remoteAddr,
 		"message_len", len(message))
-	rspChan := make(chan *Message, 1)
-	c.StoreSession(binary.BigEndian.Uint32(message[12:16]), &Session{
-		CreatedAt:    time.Now(),
-		ResponseChan: rspChan,
-	})
 	select {
 	case rsp := <-rspChan:
 		c.stats.TotalResponses.Add(1)
 		c.logger.Debugw("receive response", "msg", rsp)
 		return append(rsp.Header, rsp.Body...), nil
 	case <-ctx.Done():
+		c.stats.TotalTimeouts.Add(1)
 		return nil, fmt.Errorf("not receive response")
 	}
 }

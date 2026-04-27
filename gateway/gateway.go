@@ -341,8 +341,13 @@ func (gw *Gateway) SendInternal(remote string, req []byte) ([]byte, error) {
 
 func (gw *Gateway) StoreSession(hopbyhop uint32, s *Session) {
 	gw.sessionsMu.Lock()
+	_, exists := gw.sessions[hopbyhop]
 	gw.sessions[hopbyhop] = s
 	gw.sessionsMu.Unlock()
+	if !exists {
+		gw.stats.ActiveSessions.Add(1)
+		gw.stats.SessionsCreated.Add(1)
+	}
 }
 
 func (gw *Gateway) FindSession(hopbyhop uint32) (*Session, error) {
@@ -353,6 +358,25 @@ func (gw *Gateway) FindSession(hopbyhop uint32) (*Session, error) {
 		return nil, fmt.Errorf("not found session")
 	}
 	return s, nil
+}
+
+func (gw *Gateway) DeleteSession(hopbyhop uint32) bool {
+	gw.sessionsMu.Lock()
+	_, ok := gw.sessions[hopbyhop]
+	if ok {
+		delete(gw.sessions, hopbyhop)
+	}
+	gw.sessionsMu.Unlock()
+
+	if ok {
+		gw.stats.ActiveSessions.Add(^uint64(0))
+		gw.stats.SessionsCompleted.Add(1)
+	}
+	return ok
+}
+
+func (gw *Gateway) RemoveSession(hopbyhop uint32) bool {
+	return gw.DeleteSession(hopbyhop)
 }
 
 // cleanupExpiredSessions removes sessions that have timed out

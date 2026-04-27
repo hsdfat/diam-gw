@@ -86,27 +86,34 @@ func readMessage(conn net.Conn) ([]byte, error) {
 
 // --- DRANode peer registry helpers ---
 
+func peerRegistryKey(p *Peer) string {
+	return p.OriginHost + "|" + p.conn.RemoteAddr().String()
+}
+
 func (d *DRANode) registerPeer(p *Peer) {
 	d.peersMu.Lock()
 	defer d.peersMu.Unlock()
-	if old, ok := d.peers[p.OriginHost]; ok && old != p {
-		old.Close()
-	}
-	d.peers[p.OriginHost] = p
+	d.peers[peerRegistryKey(p)] = p
 }
 
 func (d *DRANode) removePeer(p *Peer) {
 	d.peersMu.Lock()
 	defer d.peersMu.Unlock()
-	if cur, ok := d.peers[p.OriginHost]; ok && cur == p {
-		delete(d.peers, p.OriginHost)
+	key := peerRegistryKey(p)
+	if cur, ok := d.peers[key]; ok && cur == p {
+		delete(d.peers, key)
 	}
 }
 
 func (d *DRANode) peerByHost(host string) *Peer {
 	d.peersMu.RLock()
 	defer d.peersMu.RUnlock()
-	return d.peers[host]
+	for _, p := range d.peers {
+		if p.OriginHost == host {
+			return p
+		}
+	}
+	return nil
 }
 
 // peersByRealm returns all peers whose Origin-Realm matches. Used for

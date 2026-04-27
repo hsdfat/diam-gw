@@ -45,7 +45,7 @@ type DRANode struct {
 	listener net.Listener
 
 	peersMu sync.RWMutex
-	peers   map[string]*Peer // key: Origin-Host learned from CER
+	peers   map[string]*Peer // key: Origin-Host plus remote endpoint
 
 	// pending indexes in-flight requests so answers can be routed back
 	// to the peer that sent the original request (by rewritten HbH id).

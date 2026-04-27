@@ -3,7 +3,9 @@ package gateway_test
 import (
 	"context"
 	"fmt"
+	"os"
 	"sort"
+	"strconv"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -399,5 +401,238 @@ func TestE2E_Perf_MixedS6aS13(t *testing.T) {
 	totalOK := s6aOK.Load() + s13OK.Load()
 	if totalOK < totalReqs*95/100 {
 		t.Errorf("overall success rate too low: %d / %d", totalOK, totalReqs)
+	}
+}
+
+// TestE2E_Perf_Pipeline exercises the gateway with multiple concurrent in-flight
+// requests per MME. Unlike the sequential tests above (one request at a time per
+// MME), this test has `pipeline` goroutines per MME all calling SendAIR at once,
+// stressing the DRA's pending-table and the gateway dispatcher simultaneously.
+func TestE2E_Perf_Pipeline(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping perf in -short")
+	}
+	const (
+		numMMEs        = 5
+		pipeline       = 8   // concurrent in-flight per MME
+		requestsPerMME = 400 // total AIRs per MME
+		perReqBudget   = 5 * time.Second
+	)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
+	defer cancel()
+
+	stack := buildPerfStack(t, ctx, perfStackOpts{
+		withS6a:      true,
+		s6aPortRange: [2]int{49000, 49200},
+	})
+	defer stack.close()
+
+	mmes := make([]*MMESimulator, numMMEs)
+	for i := 0; i < numMMEs; i++ {
+		mmes[i] = stack.addMME(t, ctx, fmt.Sprintf("mme-pipe-%02d.epc.test", i))
+	}
+
+	var (
+		successCount atomic.Uint64
+		errorCount   atomic.Uint64
+		latMu        sync.Mutex
+	)
+	latencies := make([]time.Duration, 0, numMMEs*requestsPerMME)
+
+	var outerWg sync.WaitGroup
+	start := time.Now()
+
+	for i := 0; i < numMMEs; i++ {
+		outerWg.Add(1)
+		go func(mme *MMESimulator, mmeIdx int) {
+			defer outerWg.Done()
+
+			sem := make(chan struct{}, pipeline) // cap inflight to `pipeline`
+			var innerWg sync.WaitGroup
+			var localMu sync.Mutex
+			local := make([]time.Duration, 0, requestsPerMME)
+
+			for j := 0; j < requestsPerMME; j++ {
+				sem <- struct{}{}
+				innerWg.Add(1)
+				go func(j int) {
+					defer func() { <-sem; innerWg.Done() }()
+					t0 := time.Now()
+					_, err := mme.SendAIR(
+						fmt.Sprintf("1234567890%02d%04d", mmeIdx, j),
+						"hss.realm", "gw-s6a.test", perReqBudget)
+					if err != nil {
+						errorCount.Add(1)
+						return
+					}
+					d := time.Since(t0)
+					successCount.Add(1)
+					localMu.Lock()
+					local = append(local, d)
+					localMu.Unlock()
+				}(j)
+			}
+			innerWg.Wait()
+
+			latMu.Lock()
+			latencies = append(latencies, local...)
+			latMu.Unlock()
+		}(mmes[i], i)
+	}
+
+	outerWg.Wait()
+	total := time.Since(start)
+	totalReqs := uint64(numMMEs * requestsPerMME)
+	qps := float64(successCount.Load()) / total.Seconds()
+
+	stats := computeLatencyStats(latencies)
+	t.Logf("pipeline S6a (%d MMEs × %d reqs, depth=%d): %s",
+		numMMEs, requestsPerMME, pipeline, stats)
+	t.Logf("  total=%s ok=%d err=%d qps=%.1f",
+		total, successCount.Load(), errorCount.Load(), qps)
+	t.Logf("  HSS=%+v", stack.hss.GetStats())
+
+	if successCount.Load() < totalReqs*95/100 {
+		t.Errorf("success rate too low: %d / %d", successCount.Load(), totalReqs)
+	}
+}
+
+// TestE2E_Stress_Sustained runs a sustained load against the full S6a path for
+// a configurable duration (default 2 min; set DIAM_STRESS_DURATION=30m for a
+// full 30-minute endurance run). It periodically reports a latency snapshot so
+// regressions are visible in the log rather than just at end-of-test.
+//
+// Run with:
+//
+//	go test ./gateway_test -run TestE2E_Stress_Sustained -v -timeout 35m \
+//	    -count=1 DIAM_STRESS_DURATION=30m
+func TestE2E_Stress_Sustained(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping stress test in -short")
+	}
+
+	duration := 2 * time.Minute
+	if v := os.Getenv("DIAM_STRESS_DURATION"); v != "" {
+		secs, err := strconv.Atoi(v)
+		if err != nil {
+			// Try time.ParseDuration as well
+			if d, err2 := time.ParseDuration(v); err2 == nil {
+				duration = d
+			} else {
+				t.Fatalf("DIAM_STRESS_DURATION %q: %v", v, err)
+			}
+		} else {
+			duration = time.Duration(secs) * time.Second
+		}
+	}
+	t.Logf("stress duration: %s (set DIAM_STRESS_DURATION=30m for full run)", duration)
+
+	const (
+		numMMEs    = 8
+		pipeline   = 4   // concurrent in-flight per MME
+		perReqBudg = 5 * time.Second
+		reportEvery = 30 * time.Second
+	)
+
+	ctx, cancel := context.WithTimeout(context.Background(), duration+30*time.Second)
+	defer cancel()
+
+	stack := buildPerfStack(t, ctx, perfStackOpts{
+		withS6a:      true,
+		s6aPortRange: [2]int{49300, 49600},
+	})
+	defer stack.close()
+
+	mmes := make([]*MMESimulator, numMMEs)
+	for i := 0; i < numMMEs; i++ {
+		mmes[i] = stack.addMME(t, ctx, fmt.Sprintf("mme-stress-%02d.epc.test", i))
+	}
+
+	var (
+		totalOK  atomic.Uint64
+		totalErr atomic.Uint64
+		imsiSeq  atomic.Uint64
+		latMu    sync.Mutex
+		window   []time.Duration // current reporting window samples
+	)
+
+	startAll := time.Now()
+	deadline := startAll.Add(duration)
+
+	// Periodic reporter
+	reportTicker := time.NewTicker(reportEvery)
+	defer reportTicker.Stop()
+	go func() {
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-reportTicker.C:
+				latMu.Lock()
+				snap := make([]time.Duration, len(window))
+				copy(snap, window)
+				window = window[:0]
+				latMu.Unlock()
+				elapsed := time.Since(startAll).Round(time.Second)
+				stats := computeLatencyStats(snap)
+				t.Logf("[%s] ok=%d err=%d | window: %s",
+					elapsed, totalOK.Load(), totalErr.Load(), stats)
+			}
+		}
+	}()
+
+	var wg sync.WaitGroup
+	for i := 0; i < numMMEs; i++ {
+		wg.Add(1)
+		go func(mme *MMESimulator, mmeIdx int) {
+			defer wg.Done()
+			sem := make(chan struct{}, pipeline)
+			var innerWg sync.WaitGroup
+
+			for time.Now().Before(deadline) {
+				sem <- struct{}{}
+				seq := imsiSeq.Add(1)
+				innerWg.Add(1)
+				go func(seq uint64) {
+					defer func() { <-sem; innerWg.Done() }()
+					imsi := fmt.Sprintf("%015d", seq%999999999999999)
+					t0 := time.Now()
+					_, err := mme.SendAIR(imsi, "hss.realm", "gw-s6a.test", perReqBudg)
+					d := time.Since(t0)
+					if err != nil {
+						totalErr.Add(1)
+						return
+					}
+					totalOK.Add(1)
+					latMu.Lock()
+					window = append(window, d)
+					latMu.Unlock()
+				}(seq)
+			}
+			innerWg.Wait()
+		}(mmes[i], i)
+	}
+
+	wg.Wait()
+	elapsed := time.Since(startAll)
+	ok := totalOK.Load()
+	errs := totalErr.Load()
+	qps := float64(ok) / elapsed.Seconds()
+
+	// Final window flush
+	latMu.Lock()
+	finalStats := computeLatencyStats(window)
+	latMu.Unlock()
+
+	t.Logf("=== sustained stress result ===")
+	t.Logf("  duration=%s ok=%d err=%d qps=%.1f", elapsed.Round(time.Second), ok, errs, qps)
+	t.Logf("  final window latency: %s", finalStats)
+	t.Logf("  HSS=%+v", stack.hss.GetStats())
+
+	total := ok + errs
+	if total > 0 && errs*100/total > 5 {
+		t.Errorf("error rate %.1f%% exceeds 5%% threshold (%d err / %d total)",
+			float64(errs)*100/float64(total), errs, total)
 	}
 }

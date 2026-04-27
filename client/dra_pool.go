@@ -347,65 +347,73 @@ const (
 func (p *DRAPool) startHandleReceive() {
 
 	for i := 0; i < nworker; i++ {
+		p.wg.Add(1)
 		go p.handleReceive()
 	}
 }
 
 // Receive returns the aggregated receive channel
 func (p *DRAPool) handleReceive() {
-	for rev := range p.recvCh {
-		go func() {
-			msg := rev.Message
-			if msg == nil {
-				p.logger.Errorw("recv msg is nil")
-				return
-			}
-			header, err := ParseMessageHeader(msg.Header)
-			if err != nil {
-				p.logger.Errorw("parse header error", "err", err)
-				return
-			}
-			command := connection.Command{
-				Interface: int(header.ApplicationID),
-				Request:   header.IsRequest,
-				Code:      int(header.CommandCode),
-			}
-			p.handlerMu.RLock()
-			fn, ok := p.handlers[command]
-			p.handlerMu.RUnlock()
+	defer p.wg.Done()
+
+	for {
+		select {
+		case <-p.ctx.Done():
+			return
+		case rev, ok := <-p.recvCh:
 			if !ok {
-				p.logger.Errorw("cannot found any handler", "app-id",
-					header.ApplicationID, "code", header.CommandCode, "request", header.IsRequest)
 				return
 			}
-			for _, middleFunc := range p.middleware {
-				middleFunc()
-			}
-			fn(rev.Message, rev.DiamConn)
-		}()
+			p.dispatchReceived(rev)
+		}
 	}
+}
+
+func (p *DRAPool) dispatchReceived(rev DiamConnectionInfo) {
+	msg := rev.Message
+	if msg == nil {
+		p.logger.Errorw("recv msg is nil")
+		return
+	}
+	header, err := ParseMessageHeader(msg.Header)
+	if err != nil {
+		p.logger.Errorw("parse header error", "err", err)
+		return
+	}
+	command := connection.Command{
+		Interface: int(header.ApplicationID),
+		Request:   header.IsRequest,
+		Code:      int(header.CommandCode),
+	}
+	p.handlerMu.RLock()
+	fn, ok := p.handlers[command]
+	p.handlerMu.RUnlock()
+	if !ok {
+		p.logger.Errorw("cannot found any handler", "app-id",
+			header.ApplicationID, "code", header.CommandCode, "request", header.IsRequest)
+		return
+	}
+	for _, middleFunc := range p.middleware {
+		middleFunc()
+	}
+	fn(rev.Message, rev.DiamConn)
 }
 
 // startMessageAggregator aggregates messages from all DRA pools
 func (p *DRAPool) startMessageAggregator() {
-	p.wg.Add(1)
-	go func() {
-		defer p.wg.Done()
+	for _, pool := range p.draPools {
+		ch := pool.Receive()
+		p.wg.Add(1)
+		go func(ch <-chan DiamConnectionInfo) {
+			defer p.wg.Done()
 
-		// Collect receive channels from all pools
-		channels := make([]<-chan DiamConnectionInfo, 0, len(p.draPools))
-		for _, pool := range p.draPools {
-			channels = append(channels, pool.Receive())
-		}
-
-		for {
-			for _, ch := range channels {
+			for {
 				select {
 				case <-p.ctx.Done():
 					return
 				case msg, ok := <-ch:
 					if !ok {
-						continue
+						return
 					}
 					select {
 					case p.recvCh <- msg:
@@ -415,12 +423,10 @@ func (p *DRAPool) startMessageAggregator() {
 						p.logger.Warn("DRA pool receive buffer full, dropping message")
 						atomic.AddUint64(&p.stats.TotalMessagesDrop, 1)
 					}
-				default:
 				}
 			}
-			time.Sleep(1 * time.Millisecond)
-		}
-	}()
+		}(ch)
+	}
 }
 
 // startHealthMonitor monitors health of all DRAs

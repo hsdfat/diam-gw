@@ -430,23 +430,35 @@ func (p *AddressConnectionPool) establishConnection(ctx context.Context, remoteA
 	// Set failure callback for immediate cleanup
 	conn.SetOnFailure(mc.onConnectionFailure)
 
+	if !p.config.ReconnectEnabled {
+		conn.DisableReconnect()
+	}
+
 	// Start the connection (this performs CER/CEA)
 	if err := conn.Start(); err != nil {
 		connCancel()
 		return nil, fmt.Errorf("failed to start connection: %w", err)
-	}
-	if !p.config.ReconnectEnabled {
-		conn.DisableReconnect()
 	}
 
 	// Start lifecycle management
 	mc.startLifecycleManager()
 
 	if mc.handleFn != nil {
+		recvCh := mc.ReceiveChan()
 		for range 8 {
+			mc.wg.Add(1)
 			go func() {
-				for v := range mc.ReceiveChan() {
-					go mc.handleFn(v)
+				defer mc.wg.Done()
+				for {
+					select {
+					case <-mc.ctx.Done():
+						return
+					case v, ok := <-recvCh:
+						if !ok {
+							return
+						}
+						mc.handleFn(v)
+					}
 				}
 			}()
 		}

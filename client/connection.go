@@ -72,7 +72,20 @@ type Connection struct {
 	cancel context.CancelFunc
 	wg     sync.WaitGroup
 
-	reconnectDisabled bool
+	writeLoopStarted   atomic.Bool
+	healthLoopStarted  atomic.Bool
+	reconnectDisabled  atomic.Bool
+	connGeneration     atomic.Uint64
+	reconnectMu        sync.Mutex
+	reconnecting       bool
+	reconnectRequested bool
+
+	// portScanStart rotates the starting offset for dialWithLocalBind so
+	// each reconnect attempt tries a different port first rather than
+	// always starting from LocalPortMin. Without this, the lowest port in
+	// the range is reused on every reconnect once TIME_WAIT clears,
+	// making monitoring tools report only one active source port.
+	portScanStart atomic.Uint32
 
 	// Failure callback
 	onFailure   func(error)
@@ -90,9 +103,9 @@ type ConnectionStats struct {
 	BytesSent        atomic.Uint64
 	BytesReceived    atomic.Uint64
 
-	// Reconnect telemetry — Reconnects counts the number of reconnect
-	// loops entered (one per failure handled). Attempts/Successes/Failures
-	// count the per-iteration dial attempts inside those loops.
+	// Reconnect telemetry — Reconnects counts serialized reconnect loops.
+	// Attempts/Successes/Failures count the per-iteration dial attempts
+	// inside those loops.
 	Reconnects         atomic.Uint32
 	ReconnectAttempts  atomic.Uint64
 	ReconnectSuccesses atomic.Uint64
@@ -106,7 +119,7 @@ type ConnectionStats struct {
 }
 
 func (c *Connection) DisableReconnect() {
-	c.reconnectDisabled = true
+	c.reconnectDisabled.Store(true)
 }
 
 // SetOnFailure sets the failure callback
@@ -196,6 +209,9 @@ func (c *Connection) IsActive() bool {
 func (c *Connection) Start() error {
 	c.logger.Infow("Starting connection", "conn_id", c.id, "host", c.config.Host, "port", c.config.Port)
 
+	c.startWriteLoop()
+	c.startHealthMonitor()
+
 	if err := c.connect(); err != nil {
 		// Trigger reconnection mechanism for initial connection failures
 		// This ensures connections retry even when they fail during startup
@@ -255,14 +271,15 @@ func (c *Connection) connect() error {
 	c.connMu.Lock()
 	c.conn = connection.NewConn(conn, connection.DefaultConnectionConfig())
 	c.boundLocalAddr = localAddr
+	connWrapper := c.conn
+	generation := c.connGeneration.Add(1)
 	c.connMu.Unlock()
 
 	c.logger.Infow("TCP connection established", "conn_id", c.id)
 
-	// Start read and write loops
-	c.startReadLoop()
-	c.startWriteLoop()
-	c.startHealthMonitor()
+	// Start a read loop for this specific TCP socket. The write and health
+	// loops are connection-object scoped and are started once in Start().
+	c.startReadLoop(connWrapper, generation)
 
 	// Perform CER/CEA handshake
 	if err := c.performHandshake(); err != nil {
@@ -435,6 +452,7 @@ func (c *Connection) sendDWR() error {
 	if !c.IsActive() {
 		return ErrConnectionClosed{ConnectionID: c.id}
 	}
+	generation := c.currentGeneration()
 
 	c.logger.Debugw("Sending DWR", "conn_id", c.id)
 
@@ -465,21 +483,27 @@ func (c *Connection) sendDWR() error {
 	}
 
 	// Wait for DWA in background
-	go func() {
+	go func(generation uint64) {
 		defer c.unregisterPending(hopByHopID)
 
 		select {
 		case dwaData := <-respCh:
+			if !c.isCurrentGeneration(generation) {
+				return
+			}
 			if err := c.handleDWA(dwaData); err != nil {
 				c.logger.Errorw("Failed to handle DWA", "conn_id", c.id, "error", err)
 				c.handleDWRFailure(err)
 			}
 		case <-time.After(c.config.DWRTimeout):
+			if !c.isCurrentGeneration(generation) {
+				return
+			}
 			err := ErrConnectionTimeout{Operation: "DWR/DWA", Timeout: c.config.DWRTimeout.String()}
 			c.handleDWRFailure(err)
 		case <-c.ctx.Done():
 		}
-	}()
+	}(generation)
 
 	return nil
 }
@@ -588,47 +612,41 @@ func (c *Connection) Receive() <-chan DiamConnectionInfo {
 	return c.recvCh
 }
 
-// startReadLoop starts the message read loop.
-//
-// The loop snapshots c.conn under the mutex once per iteration, nil-checks
-// it, and then uses only the local for both the CloseNotify select and
-// the blocking read. Reading c.conn through the receiver after close()
-// sets it to nil would panic; the snapshot keeps a closing connection
-// from racing the read here.
-func (c *Connection) startReadLoop() {
+// startReadLoop starts the message read loop for one TCP socket generation.
+// Reconnects install a new generation, causing old read loops and stale
+// watchdog responses to exit without touching the new socket.
+func (c *Connection) startReadLoop(conn connection.Conn, generation uint64) {
 	c.wg.Add(1)
 	go func() {
 		defer c.wg.Done()
 		defer c.logger.Infow("Read loop exited", "conn_id", c.id)
 
 		for {
-			c.connMu.RLock()
-			conn := c.conn
-			c.connMu.RUnlock()
-
-			if conn == nil {
+			if !c.isCurrentGeneration(generation) {
 				return
 			}
 
 			select {
 			case <-c.ctx.Done():
 				return
-			case <-conn.(connection.CloseNotifier).CloseNotify():
-				c.handleFailure(fmt.Errorf("connection closed"))
-				return
 			default:
 			}
 
 			message, err := connection.ReadMessage(conn.Connection())
 			if err != nil {
-				c.handleFailure(err)
+				if c.ctx.Err() == nil && c.isCurrentGeneration(generation) {
+					c.handleFailure(err)
+				}
+				return
+			}
+			if !c.isCurrentGeneration(generation) {
 				return
 			}
 			c.stats.MessagesReceived.Add(1)
 			c.stats.BytesReceived.Add(uint64(message.Length))
 
 			// Dispatch message
-			if err := c.dispatchMessage(message); err != nil {
+			if err := c.dispatchMessage(message, conn); err != nil {
 				c.logger.Errorw("Failed to dispatch message", "conn_id", c.id, "error", err)
 			}
 		}
@@ -642,7 +660,7 @@ func (c *Connection) readFull(conn net.Conn, buf []byte) error {
 }
 
 // dispatchMessage dispatches a message based on its type
-func (c *Connection) dispatchMessage(data *Message) error {
+func (c *Connection) dispatchMessage(data *Message, diamConn connection.Conn) error {
 	info, err := ParseMessageHeader(data.Header)
 	if err != nil {
 		return err
@@ -670,7 +688,7 @@ func (c *Connection) dispatchMessage(data *Message) error {
 	select {
 	case c.recvCh <- DiamConnectionInfo{
 		Message:  data,
-		DiamConn: c.conn,
+		DiamConn: diamConn,
 	}:
 	case <-c.ctx.Done():
 		return c.ctx.Err()
@@ -710,6 +728,10 @@ func (c *Connection) deliverResponse(hopByHopID uint32, data *Message) error {
 // boundary; callers can call Send() concurrently and messages are flushed
 // in FIFO order.
 func (c *Connection) startWriteLoop() {
+	if !c.writeLoopStarted.CompareAndSwap(false, true) {
+		return
+	}
+
 	c.wg.Add(1)
 	go func() {
 		defer c.wg.Done()
@@ -719,12 +741,16 @@ func (c *Connection) startWriteLoop() {
 			select {
 			case <-c.ctx.Done():
 				return
-			case data := <-c.sendCh:
+			case data, ok := <-c.sendCh:
+				if !ok {
+					return
+				}
 				c.connMu.RLock()
 				conn := c.conn
 				c.connMu.RUnlock()
 
 				if conn == nil {
+					c.stats.Drops.Add(1)
 					continue
 				}
 
@@ -733,7 +759,7 @@ func (c *Connection) startWriteLoop() {
 						c.logger.Errorw("Failed to write", "conn_id", c.id, "error", err)
 						c.handleFailure(err)
 					}
-					return
+					continue
 				}
 
 				c.stats.MessagesSent.Add(1)
@@ -751,6 +777,10 @@ func (c *Connection) write(conn net.Conn, data []byte) error {
 
 // startHealthMonitor starts the health monitoring goroutine
 func (c *Connection) startHealthMonitor() {
+	if !c.healthLoopStarted.CompareAndSwap(false, true) {
+		return
+	}
+
 	c.wg.Add(1)
 	go func() {
 		defer c.wg.Done()
@@ -787,9 +817,23 @@ func (c *Connection) startHealthMonitor() {
 
 // handleFailure handles connection failure
 func (c *Connection) handleFailure(err error) {
-	c.logger.Errorw("Handling failure", "conn_id", c.id, "error", err, "reconnect", !c.reconnectDisabled)
+	state := c.GetState()
+	if c.ctx.Err() != nil || state == StateClosed {
+		return
+	}
 
 	c.stats.SetLastError(err)
+
+	c.connMu.RLock()
+	hasConn := c.conn != nil
+	c.connMu.RUnlock()
+	if !hasConn && (state == StateFailed || state == StateReconnecting) {
+		return
+	}
+
+	reconnectEnabled := !c.reconnectDisabled.Load()
+	c.logger.Errorw("Handling failure", "conn_id", c.id, "error", err, "reconnect", reconnectEnabled)
+
 	c.setState(StateFailed)
 	c.close()
 
@@ -797,9 +841,22 @@ func (c *Connection) handleFailure(err error) {
 	c.callOnFailure(err)
 
 	// Attempt reconnection in a separate goroutine to avoid blocking
-	if !c.reconnectDisabled {
-		go c.reconnect()
+	if reconnectEnabled {
+		c.scheduleReconnect()
 	}
+}
+
+func (c *Connection) scheduleReconnect() {
+	c.reconnectMu.Lock()
+	defer c.reconnectMu.Unlock()
+
+	if c.reconnecting {
+		c.reconnectRequested = true
+		return
+	}
+
+	c.reconnecting = true
+	go c.reconnect()
 }
 
 // reconnect attempts to reconnect with exponential backoff + full jitter.
@@ -820,10 +877,15 @@ func (c *Connection) handleFailure(err error) {
 // hammering the DRA in lock-step.
 func (c *Connection) reconnect() {
 	c.stats.Reconnects.Add(1)
-	defer c.stats.CurrentRetryDelay.Store(0)
 
 	initial := c.config.ReconnectInterval
+	if initial <= 0 {
+		initial = time.Second
+	}
 	maxDelay := c.config.MaxReconnectDelay
+	if maxDelay <= 0 {
+		maxDelay = initial
+	}
 	backoff := c.config.ReconnectBackoff
 	if backoff < 1.0 {
 		backoff = 1.0
@@ -845,6 +907,7 @@ func (c *Connection) reconnect() {
 
 		select {
 		case <-c.ctx.Done():
+			c.finishReconnect(false)
 			return
 		case <-time.After(delay):
 		}
@@ -874,8 +937,31 @@ func (c *Connection) reconnect() {
 
 		c.stats.ReconnectSuccesses.Add(1)
 		c.logger.Infow("Reconnection successful", "conn_id", c.id, "attempts", attempts)
-		return
+		if c.finishReconnect(true) {
+			return
+		}
+		// A failure was queued while we were reconnecting. Begin a fresh
+		// backoff cycle from the initial ceiling so the next attempt isn't
+		// penalised by the delay that accumulated during the previous failure.
+		c.stats.Reconnects.Add(1)
+		ceiling = initial
+		attempts = 0
 	}
+}
+
+func (c *Connection) finishReconnect(success bool) bool {
+	c.reconnectMu.Lock()
+	defer c.reconnectMu.Unlock()
+
+	if !success || (c.GetState().IsActive() && !c.reconnectRequested) {
+		c.reconnecting = false
+		c.reconnectRequested = false
+		c.stats.CurrentRetryDelay.Store(0)
+		return true
+	}
+
+	c.reconnectRequested = false
+	return false
 }
 
 // close closes the connection.
@@ -893,6 +979,7 @@ func (c *Connection) close() {
 	if c.conn != nil {
 		c.conn.Close()
 		c.conn = nil
+		c.connGeneration.Add(1)
 	}
 	bound := c.boundLocalAddr
 	c.boundLocalAddr = nil
@@ -910,6 +997,7 @@ func (c *Connection) Close() error {
 	c.setState(StateClosed)
 	c.cancel()
 	c.close()
+	c.finishReconnect(false)
 
 	// Wait for goroutines to finish
 	c.wg.Wait()
@@ -941,6 +1029,14 @@ func (c *Connection) getDWRLastFailTime() time.Time {
 	c.dwrLastFailTimeMu.RLock()
 	defer c.dwrLastFailTimeMu.RUnlock()
 	return c.dwrLastFailTime
+}
+
+func (c *Connection) currentGeneration() uint64 {
+	return c.connGeneration.Load()
+}
+
+func (c *Connection) isCurrentGeneration(generation uint64) bool {
+	return c.connGeneration.Load() == generation
 }
 
 func (c *Connection) getLocalAddr() net.IP {
@@ -991,7 +1087,14 @@ func (c *Connection) dialWithLocalBind(remoteAddr string) (net.Conn, error) {
 		return dialer.DialContext(c.ctx, "tcp", remoteAddr)
 	}
 
-	for port := min; port <= max; port++ {
+	count := max - min + 1
+	// Advance the scan offset on each call so successive reconnects rotate
+	// across the full port range instead of always reusing LocalPortMin.
+	// The modulo wraps the offset into [0, count-1].
+	startOff := int(c.portScanStart.Add(1)) % count
+
+	for i := 0; i < count; i++ {
+		port := min + (startOff+i)%count
 		dialer := net.Dialer{
 			Timeout:   c.config.ConnectTimeout,
 			LocalAddr: &net.TCPAddr{IP: localIP, Port: port},

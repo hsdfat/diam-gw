@@ -19,9 +19,8 @@ type ConnectionPool struct {
 	nextConnIdx atomic.Uint32
 
 	// State tracking
-	mu          sync.RWMutex
-	activeCount int
-	closed      bool
+	mu     sync.RWMutex
+	closed bool
 
 	// Message aggregation
 	recvCh chan DiamConnectionInfo
@@ -108,8 +107,6 @@ func (p *ConnectionPool) Start() error {
 					"conn_id", c.ID(), "error", err)
 				// Still report error for initial pool health check
 				errCh <- err
-			} else {
-				p.incrementActive()
 			}
 		}(i, conn)
 	}
@@ -149,26 +146,19 @@ func (p *ConnectionPool) Start() error {
 
 // startMessageAggregator aggregates messages from all connections
 func (p *ConnectionPool) startMessageAggregator() {
-	p.wg.Add(1)
-	go func() {
-		defer p.wg.Done()
+	for _, conn := range p.connections {
+		ch := conn.Receive()
+		p.wg.Add(1)
+		go func(ch <-chan DiamConnectionInfo) {
+			defer p.wg.Done()
 
-		// Create a slice of receive channels
-		channels := make([]<-chan DiamConnectionInfo, len(p.connections))
-		for i, conn := range p.connections {
-			channels[i] = conn.Receive()
-		}
-
-		// Aggregate messages from all connections
-		for {
-			// Use select with all channels
-			for _, ch := range channels {
+			for {
 				select {
 				case <-p.ctx.Done():
 					return
 				case msg, ok := <-ch:
 					if !ok {
-						continue
+						return
 					}
 					select {
 					case p.recvCh <- msg:
@@ -177,15 +167,10 @@ func (p *ConnectionPool) startMessageAggregator() {
 					default:
 						logger.Log.Warn("Pool receive buffer full, dropping message")
 					}
-				default:
-					// Non-blocking check
 				}
 			}
-
-			// Small sleep to avoid busy loop
-			time.Sleep(1 * time.Millisecond)
-		}
-	}()
+		}(ch)
+	}
 }
 
 // startHealthReporter periodically logs pool health
@@ -328,7 +313,7 @@ func (p *ConnectionPool) GetStats() PoolStats {
 
 	stats := PoolStats{
 		TotalConnections:  len(p.connections),
-		ActiveConnections: p.activeCount,
+		ActiveConnections: p.countActiveLocked(),
 	}
 
 	for _, conn := range p.connections {
@@ -358,8 +343,6 @@ func (p *ConnectionPool) GetConnectionStates() map[string]ConnectionState {
 
 // IsHealthy returns true if at least one connection is active
 func (p *ConnectionPool) IsHealthy() bool {
-	// Check actual connection states instead of relying on activeCount
-	// which is not updated when connections fail during runtime
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 
@@ -409,7 +392,6 @@ func (p *ConnectionPool) Close() error {
 			if err := c.Close(); err != nil {
 				logger.Log.Errorw("Error closing connection", "conn_id", c.ID(), "error", err)
 			}
-			p.decrementActive()
 		}(conn)
 	}
 
@@ -433,24 +415,21 @@ func (p *ConnectionPool) handleConnectionFailure(connID string, err error) {
 	logger.Log.Warnw("Connection failure detected, automatic reconnection in progress",
 		"conn_id", connID,
 		"error", err)
-	// Note: Connection will automatically attempt reconnection via its reconnect() method
-	// We don't need to decrement activeCount here as IsHealthy() checks actual connection states
-}
-
-func (p *ConnectionPool) incrementActive() {
-	p.mu.Lock()
-	p.activeCount++
-	p.mu.Unlock()
-}
-
-func (p *ConnectionPool) decrementActive() {
-	p.mu.Lock()
-	p.activeCount--
-	p.mu.Unlock()
+	// Connection automatically attempts reconnection via its reconnect loop.
 }
 
 func (p *ConnectionPool) getActiveCount() int {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
-	return p.activeCount
+	return p.countActiveLocked()
+}
+
+func (p *ConnectionPool) countActiveLocked() int {
+	active := 0
+	for _, conn := range p.connections {
+		if conn.IsActive() {
+			active++
+		}
+	}
+	return active
 }
